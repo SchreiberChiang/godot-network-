@@ -1,0 +1,75 @@
+# 02 控制协议与生命周期
+
+状态：以下为整体设计。M1 已实现的 control_protocol=1 子集、payload 与错误码见 [09_m1_control.md](09_m1_control.md) 和 `schemas/control.schema.json`；其余操作仍为后续阶段设计。JSON Schema 不能替代认证与生命周期语义检查。
+
+## 1. 通用消息
+
+消息外壳见 `schemas/envelope.schema.json`。ID 使用字符串。必需字段：`version`、`kind`、`type`、`payload`；请求/响应必须有 `request_id`；事件必须有 `event_id`。响应带 `ok`，失败带 `error.code/message/retryable`。
+
+创建房间等有副作用的请求额外使用 `idempotency_key`。同一用户同一操作同一 key 重试必须返回同一结果；相同 key 不同请求体返回 `IDEMPOTENCY_CONFLICT`。request_id 仅用于关联某次请求，不自动提供持久化幂等。
+
+公共外壳允许向后兼容的字段演进须先修改 schema 与契约版本策略；不能让发送方默默增加接收方拒绝的字段。v0.1 默认严格字段校验，只接受列明的 type。
+
+## 2. 通道分帧
+
+WebSocket：一条文本消息承载一个 JSON 外壳。
+
+本机 TCP：`4字节无符号大端正文长度 + UTF-8 JSON正文`。长度只计算正文的字节数，不计算字符数或前缀。建议初值正文上限 64 KiB；拒绝 0 长度、超限、非法 UTF-8、非对象 JSON及过深嵌套。未收齐时保存缓冲；一次读取可能含半条或多条消息。发送队列也必须处理部分写入和背压。
+
+TCP 提供字节流，不负责保留应用写入的消息边界。[S4] 超时不能以“本次没有数据”立即判定断线。
+
+## 3. 操作表
+
+| 方向 | type | 主要作用 |
+|---|---|---|
+| 客户端→宿主 | session.create | 第一阶段仅受限开发游客身份；公网身份提供方另行接入 |
+| 客户端→宿主 | room.list | 按 game_id/兼容版本过滤公开房间，分页 |
+| 客户端→宿主 | room.create | 校验模式、配额、人数后创建，先返回 room_id/STARTING |
+| 客户端→宿主 | room.reserve | 为身份分配目标房间席位并发放短期票据 |
+| 客户端→宿主 | room.get | 查询创建结果，不以启动进程成功替代房间就绪 |
+| 房间→宿主 | room.register | 用本次启动凭据绑定 room_id/launch_id/构建身份 |
+| 房间→宿主 | room.ready | 确认实际监听、配置校验、地图加载、认证门禁均已就绪 |
+| 房间→宿主 | room.heartbeat | 上报序号、阶段、进程/逻辑健康、人数快照 |
+| 房间→宿主 | admission.consume | 原子核销票据，绑定当前身份与连接尝试 |
+| 房间→宿主 | member.joined/left | 带稳定事件ID同步名单；定期快照用于校正 |
+| 房间→宿主 | result.submit | 提交可幂等持久化的结算事件 |
+| 宿主→房间 | room.drain/stop | 停止接收新成员，再有序关闭 |
+| 房间→宿主 | room.stopped | 正常退出通知；不替代宿主核实进程终止 |
+
+实际实现每种消息前，补充 payload schema、权限、超时、错误码和至少一条失败测试。
+
+## 4. 创建与入房
+
+客户端提交 game_id、兼容标识、模式、地图ID、人数；不能提交可执行文件路径、shell指令或任意资源路径。
+
+宿主校验并记录幂等请求 → 预留容量与端口 → 生成 room_id/launch_id 和私有启动配置 → 启动 allowlist 中的构建 → 认证注册 → 等待 ready → 对外可加入。
+
+玩家入房使用两阶段名额管理：预留名额 → 连接与认证 → 正式成员。名额从 reserved 转为 admitting/connected 必须是原子迁移，不能重复计数，也不能遗漏认证中的席位。维持 `reserved + admitting + connected <= capacity`；重连保位未来作为独立状态设计。
+
+v0.1 建议采用高熵随机一次性票据：宿主保存票据摘要、user_id/game_id/build_id/room_id/launch_id、到期时间与核销状态。票据只用于这一间房，不携带账号密码。房间通过已认证的控制连接请求核销；相同连接尝试的重试可返回原结果，新的连接重放不得通过。连接中断后重新申请票据，不能重复使用已消费票据。
+
+必须在生成玩家节点和允许游戏 RPC 之前完成认证。Godot SceneMultiplayer 提供 auth_callback、send_auth、complete_auth；待认证阶段只收发认证数据，双方完成后才进入正式 peer_connected。[S3]
+
+票据防重放不等于加密。公网原生房间须完成经验证的安全传输适配；优先验证所锁定 Godot 版本的 ENet DTLS 集成，未完成时仅限受控测试。官方 ENetConnection 有显式 DTLS 配置接口，不是普通创建 ENet 后就自动启用。[S5]
+
+## 5. 分开记录两类状态
+
+进程生命周期：`ALLOCATING → STARTING → READY → DRAINING → STOPPING → STOPPED`。
+
+玩法阶段：项目报告如 `waiting/loading/playing/finished`。框架只使用明确的 joinable 与生命周期决定接入，不能硬编码“playing 一律禁止加入”。
+
+异常可记录 FAILED，但**状态变为 FAILED 不代表端口与进程已回收**。资源必须保持隔离，直到确认对应 launch_id 的进程终止和端口可重新绑定。
+
+## 6. 失败政策与初始参数
+
+下面只是首轮可调初值：启动超时30秒；心跳间隔2秒；失联判定10秒；空房回收60秒；票据有效期30秒。它们不是 Godot 默认值或性能结论。长地图加载等应按测量调整。
+
+心跳正常不必然代表模拟正常，应包含模拟步计数或逻辑健康指标。控制失联先禁止新接入；v0.1 默认在有界宽限后中止并退出，不承诺断线续局。宿主重启时先处理遗留实例，不能清空端口表后盲目启动新房。仅凭 PID 不足以认领或终止进程，需结合启动记录、进程身份及 launch_id。
+
+正常结束先 drain、提交结果、等待持久化确认，再退出；超时未确认的结果写入持久化 outbox，由恢复流程重发。进程崩溃重启产生新 launch_id，不能宣称原对局已经恢复。
+
+## 7. 错误码
+
+至少包括：AUTH_REQUIRED、AUTH_FAILED、GAME_NOT_FOUND、BUILD_MISMATCH、INVALID_OPTIONS、ROOM_STARTING、ROOM_FULL、ROOM_DRAINING、HOST_CAPACITY_EXCEEDED、PORT_BIND_FAILED、START_TIMEOUT、TICKET_EXPIRED、TICKET_ALREADY_USED、IDEMPOTENCY_CONFLICT、RATE_LIMITED、CONTROL_UNAVAILABLE。
+
+错误附可否重试。客户端对失败应返回可操作状态，不能无限快速重试或只弹“网络错误”。

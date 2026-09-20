@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "kind": "request",
+  "type": "room.create",
+  "request_id": "request-example-001",
+  "idempotency_key": "create-example-001",
+  "game_id": "minimal_room",
+  "payload": {
+    "compatibility_id": "minimal-dev-001",
+    "mode": "sandbox",
+    "map_id": "empty",
+    "max_players": 16
+  }
+}

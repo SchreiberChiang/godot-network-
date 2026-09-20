@@ -1,0 +1,9 @@
+{
+  "godot_executable": "D:/SteamLibrary/steamapps/common/Godot Engine/godot.windows.opt.tools.64.exe",
+  "udp_first": 28100,
+  "udp_last": 28131,
+  "control_port": 0,
+  "start_timeout_ms": 15000,
+  "heartbeat_timeout_ms": 5000,
+  "stop_timeout_ms": 3000
+}

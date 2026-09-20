@@ -1,0 +1,21 @@
+{
+  "manifest_version": 1,
+  "game_id": "minimal_room",
+  "build_id": "dev-001",
+  "control_protocol": 1,
+  "game_protocol": 1,
+  "sdk_version": "0.1.0",
+  "godot_version": "4.7.2.stable.steam.ed1daf0bf",
+  "compatibility_id": "roomkit-minimal-dev-001",
+  "server_artifact": "minimal-dev-windows",
+  "transport": "enet",
+  "max_players": 16,
+  "modes": {
+    "sandbox": {
+      "min_players": 1,
+      "max_players": 16,
+      "maps": ["empty"],
+      "allow_join_in_progress": false
+    }
+  }
+}

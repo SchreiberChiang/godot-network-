@@ -1,0 +1,20 @@
+# Godot generated caches (do not ignore source .uid sidecars)
+**/.godot/
+
+# Local runtime state and secrets at repository root
+/run/
+/data/
+/logs/
+/artifacts/
+.env
+.env.*
+!.env.example
+config/local.*
+config/secrets/
+*.key
+*.pem
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.tmp

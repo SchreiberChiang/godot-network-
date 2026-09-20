@@ -1,0 +1,241 @@
+extends SceneTree
+## Game entry assigns build_identity and adapter, then calls super._initialize().
+const Transport = preload("res://sdk/roomkit/shared/control_transport.gd")
+const Protocol = preload("res://sdk/roomkit/shared/protocol.gd")
+const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
+const NetRoom = preload("res://sdk/roomkit/shared/net_room.gd")
+var adapter
+var build_identity: Dictionary
+var context: Dictionary
+var transport = Transport.new()
+var control := StreamPeerTCP.new()
+var enet := ENetMultiplayerPeer.new()
+var network := SceneMultiplayer.new()
+var net_node
+var members: Dictionary = {}
+var attempts: Dictionary = {}
+var revision := 1
+var registered := false
+var ready := false
+var stopping := false
+var stop_at := 0
+var last_host := 0
+var last_beat := 0
+var sequence := 0
+var step := 0
+var started := 0
+
+func _initialize() -> void:
+	var args: Dictionary = {}
+	for argument in OS.get_cmdline_user_args():
+		var pair := argument.split("=", true, 1)
+		if pair.size() == 2:
+			args[pair[0]] = pair[1]
+	var file: String = args.get("--launch-config", "")
+	if not FileAccess.file_exists(file):
+		quit(2)
+		return
+	context = Wire.decode(FileAccess.get_file_as_bytes(file), "", 16384)
+	if context.is_empty() or context.get("launch_id", "") != args.get("--launch-id", ""):
+		quit(2)
+		return
+	for key in ["game_id", "build_id", "compatibility_id", "game_protocol"]:
+		if context.get(key) != build_identity.get(key):
+			quit(2)
+			return
+	var public_context := context.duplicate(true)
+	public_context.erase("token")
+	if adapter == null or not adapter.configure_room(public_context):
+		quit(2)
+		return
+	multiplayer_poll = false
+	set_multiplayer(network)
+	network.server_relay = false
+	network.auth_timeout = 5.0
+	network.auth_callback = _authenticate
+	network.peer_connected.connect(_peer_connected)
+	network.peer_disconnected.connect(_peer_left)
+	network.peer_authentication_failed.connect(_peer_left)
+	net_node = NetRoom.new()
+	net_node.name = "NetRoom"
+	root.add_child(net_node)
+	net_node.loaded_received.connect(_loaded)
+	net_node.leave_received.connect(_disconnect)
+	started = Time.get_ticks_msec()
+	last_host = started
+	control.connect_to_host("127.0.0.1", int(context.control_port))
+
+func _process(_delta: float) -> bool:
+	if context.is_empty():
+		return false
+	var now := Time.get_ticks_msec()
+	control.poll()
+	if control.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+		if not registered:
+			control.set_no_delay(true)
+			_send("room.register", {"token": context.token, "pid": OS.get_process_id()})
+			context.token = ""
+			registered = true
+			enet.set_bind_ip("127.0.0.1")
+			if enet.create_server(int(context.udp_port), int(context.options.capacity)) != OK:
+				_send("room.failed", {"code": "PORT_BIND_FAILED"})
+				stopping = true
+				stop_at = now + 150
+			else:
+				network.multiplayer_peer = enet
+				ready = true
+				_send("room.ready", {"udp_port": int(context.udp_port)})
+		for message in transport.pump(control):
+			if not Protocol.validate(message).is_empty() or message.room_id != context.room_id or message.launch_id != context.launch_id or message.game_id != context.game_id or message.build_id != context.build_id:
+				_shutdown("CONTROL_UNAVAILABLE")
+				break
+			last_host = now
+			_handle_control(message)
+		if ready and not stopping:
+			network.poll()
+			step += 1
+			if now - last_beat >= int(context.heartbeat_ms):
+				last_beat = now
+				sequence += 1
+				_send("room.heartbeat", {"sequence": sequence, "step": step})
+			for peer_id in members.keys():
+				if members[peer_id].state != "IN_ROOM" and now > int(members[peer_id].deadline):
+					_disconnect(peer_id)
+		if not transport.flush(control) or transport.error != "":
+			_shutdown("CONTROL_UNAVAILABLE")
+	elif registered:
+		_shutdown("CONTROL_UNAVAILABLE")
+	if not registered and now - started > int(context.startup_timeout_ms):
+		_shutdown("START_TIMEOUT")
+	if now - last_host > int(context.host_timeout_ms):
+		_shutdown("CONTROL_UNAVAILABLE")
+	if stopping and now >= stop_at:
+		enet.close()
+		quit(0)
+	return false
+
+func _authenticate(peer_id: int, bytes: PackedByteArray) -> void:
+	if stopping or members.has(peer_id):
+		_disconnect(peer_id)
+		return
+	var hello := Wire.decode(bytes, "res://schemas/admission_hello.schema.json", 4096)
+	if hello.is_empty():
+		_disconnect(peer_id)
+		return
+	for key in ["room_id", "launch_id", "game_id", "build_id", "compatibility_id", "game_protocol"]:
+		if hello.get(key) != context.get(key):
+			_disconnect(peer_id)
+			return
+	if attempts.has(hello.attempt_id):
+		_disconnect(peer_id)
+		return
+	members[peer_id] = {"state": "AUTHENTICATING", "attempt_id": hello.attempt_id, "user_id": hello.user_id, "display_name": "", "deadline": Time.get_ticks_msec() + 12000, "revision": 0}
+	attempts[hello.attempt_id] = peer_id
+	_send("admission.consume", {"ticket": hello.ticket, "attempt_id": hello.attempt_id, "user_id": hello.user_id, "compatibility_id": hello.compatibility_id, "game_protocol": hello.game_protocol})
+
+func _handle_control(message: Dictionary) -> void:
+	var payload: Dictionary = message.payload
+	match message.type:
+		"room.heartbeat": pass
+		"room.drain": network.refuse_new_connections = true
+		"room.stop": _shutdown(payload.reason)
+		"admission.revoke":
+			if attempts.has(payload.attempt_id):
+				_disconnect(attempts[payload.attempt_id])
+		"admission.result":
+			if not attempts.has(payload.attempt_id):
+				return
+			var peer_id: int = attempts[payload.attempt_id]
+			var member: Dictionary = members[peer_id]
+			if not payload.ok or payload.user_id != member.user_id:
+				_disconnect(peer_id)
+				return
+			if member.state != "AUTHENTICATING":
+				return
+			member.display_name = payload.display_name
+			member.state = "AUTHENTICATED"
+			network.send_auth(peer_id, JSON.stringify({"ok": true, "attempt_id": payload.attempt_id}).to_utf8_buffer())
+			network.complete_auth(peer_id)
+		"member.accepted":
+			if not attempts.has(payload.attempt_id):
+				return
+			var peer_id: int = attempts[payload.attempt_id]
+			if not payload.ok:
+				_disconnect(peer_id)
+				return
+			var member: Dictionary = members[peer_id]
+			if member.state != "WAIT_HOST":
+				return
+			member.state = "IN_ROOM"
+			revision += 1
+			adapter.on_player_admitted(_identity(member))
+			net_node.confirm.rpc_id(peer_id, _snapshot())
+			_broadcast()
+		_: _shutdown("CONTROL_UNAVAILABLE")
+
+func _peer_connected(peer_id: int) -> void:
+	if not members.has(peer_id) or members[peer_id].state != "AUTHENTICATED":
+		_disconnect(peer_id)
+		return
+	members[peer_id].state = "LOADING"
+	_prepare(peer_id)
+
+func _prepare(peer_id: int) -> void:
+	members[peer_id].revision = revision
+	net_node.prepare.rpc_id(peer_id, _snapshot())
+
+func _loaded(peer_id: int, received_revision: int) -> void:
+	if not members.has(peer_id) or members[peer_id].state != "LOADING":
+		return
+	if received_revision != revision or int(members[peer_id].revision) != revision:
+		_prepare(peer_id)
+		return
+	members[peer_id].state = "WAIT_HOST"
+	_send("member.joined", {"attempt_id": members[peer_id].attempt_id, "user_id": members[peer_id].user_id})
+
+func _peer_left(peer_id: int) -> void:
+	if not members.has(peer_id):
+		return
+	var member: Dictionary = members[peer_id]
+	_send("member.left", {"attempt_id": member.attempt_id, "user_id": member.user_id})
+	if member.state == "IN_ROOM":
+		adapter.on_player_left(_identity(member), "disconnected")
+		revision += 1
+	attempts.erase(member.attempt_id)
+	members.erase(peer_id)
+	_broadcast()
+
+func _disconnect(peer_id: int) -> void:
+	_peer_left(peer_id)
+	network.disconnect_peer(peer_id)
+
+func _identity(member: Dictionary) -> Dictionary:
+	return {"user_id": member.user_id, "display_name": member.display_name}
+
+func _snapshot() -> Dictionary:
+	var list: Array = []
+	for member in members.values():
+		if member.state == "IN_ROOM":
+			list.append(_identity(member))
+	return {"room_id": context.room_id, "revision": revision, "members": list}
+
+func _broadcast() -> void:
+	if stopping:
+		return
+	for peer_id in members:
+		if members[peer_id].state == "IN_ROOM":
+			net_node.roster.rpc_id(peer_id, _snapshot())
+
+func _shutdown(reason: String) -> void:
+	if stopping:
+		return
+	stopping = true
+	stop_at = Time.get_ticks_msec() + 150
+	adapter.on_shutdown_requested(reason)
+	for peer_id in members.keys():
+		_disconnect(peer_id)
+	enet.close()
+	_send("room.stopped", {})
+
+func _send(type: String, payload: Dictionary) -> void:
+	transport.queue(Protocol.event(type, context.room_id, context.launch_id, payload, context.game_id, context.build_id))

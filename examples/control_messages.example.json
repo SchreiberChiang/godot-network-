@@ -1,0 +1,9 @@
+[
+  {"version":1,"kind":"event","type":"room.register","event_id":"example_register_001","room_id":"r_example","launch_id":"example_launch","game_id":"minimal_room","build_id":"dev-001","payload":{"token":"0000000000000000000000000000000000000000000000000000000000000000","pid":1234}},
+  {"version":1,"kind":"event","type":"room.ready","event_id":"example_ready_002","room_id":"r_example","launch_id":"example_launch","game_id":"minimal_room","build_id":"dev-001","payload":{"udp_port":28100}},
+  {"version":1,"kind":"event","type":"room.heartbeat","event_id":"example_heartbeat_003","room_id":"r_example","launch_id":"example_launch","game_id":"minimal_room","build_id":"dev-001","payload":{"sequence":1,"step":1}},
+  {"version":1,"kind":"event","type":"room.drain","event_id":"example_drain_004","room_id":"r_example","launch_id":"example_launch","game_id":"minimal_room","build_id":"dev-001","payload":{"reason":"requested"}},
+  {"version":1,"kind":"event","type":"room.stop","event_id":"example_stop_005","room_id":"r_example","launch_id":"example_launch","game_id":"minimal_room","build_id":"dev-001","payload":{"reason":"requested"}},
+  {"version":1,"kind":"event","type":"room.stopped","event_id":"example_stopped_006","room_id":"r_example","launch_id":"example_launch","game_id":"minimal_room","build_id":"dev-001","payload":{}},
+  {"version":1,"kind":"event","type":"room.failed","event_id":"example_failed_007","room_id":"r_example","launch_id":"example_launch","game_id":"minimal_room","build_id":"dev-001","payload":{"code":"PORT_BIND_FAILED"}}
+]

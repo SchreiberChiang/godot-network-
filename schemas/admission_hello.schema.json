@@ -1,0 +1,65 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "game_id",
+    "build_id",
+    "compatibility_id",
+    "game_protocol",
+    "room_id",
+    "launch_id",
+    "user_id",
+    "attempt_id",
+    "ticket"
+  ],
+  "properties": {
+    "type": {
+      "const": "hello"
+    },
+    "game_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "build_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "compatibility_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "game_protocol": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "room_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "launch_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "ticket": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+{"type":"object","additionalProperties":false,"required":["turn","take"],"properties":{"turn":{"type":"integer","minimum":1,"maximum":9007199254740991},"take":{"type":"integer","minimum":1,"maximum":2}}}

@@ -1,0 +1,6 @@
+[
+  {"schema":"blocks_input","message":{"sequence":1,"x":1,"y":0}},
+  {"schema":"blocks_state","message":{"tick":20,"players":[{"user_id":"u_example","display_name":"Player One","x":120,"y":180}]}},
+  {"schema":"turns_input","message":{"turn":1,"take":2}},
+  {"schema":"turns_state","message":{"round":1,"stones":12,"turn":1,"active_user":"u_example","players":[{"user_id":"u_example","display_name":"Player One","score":0}]}}
+]
