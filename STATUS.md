@@ -4,7 +4,7 @@
 
 ## 本轮 M3：可以打开窗口试玩的两个游戏
 
-Git 交付准备（2026-09-21）：用户已明确授权上传 GitHub，覆盖初始任务中“不推送远端”的限制。首次本地提交为65bd328，源码与文档纳入版本管理；run/、logs/、artifacts/、私有配置与密钥文件继续排除。上传前扫描102个待提交文件，未命中常见GitHub令牌/私钥格式。用户指定远端 https://github.com/SchreiberChiang/godot-network-.git，已配置为origin，并合并保留远端main的初始MIT许可证提交88137fb。首次推送因GitHub未认证失败，正在通过Git Credential Manager设备登录完成认证；在确认远端提交一致前不声称上传成功。本次只处理Git交付，没有重跑或改变上方运行时验收结果。
+Git 交付完成（2026-09-21）：用户已明确授权上传 GitHub，覆盖初始任务中“不推送远端”的限制。首次本地提交为65bd328，源码与文档纳入版本管理；run/、logs/、artifacts/、私有配置与密钥文件继续排除。上传前扫描102个待提交文件，未命中常见GitHub令牌/私钥格式。用户指定远端 https://github.com/SchreiberChiang/godot-network-.git，已配置为origin，并合并保留远端main的初始MIT许可证提交88137fb。首次推送因GitHub未认证失败；用户完成Git Credential Manager设备登录后，git push -u origin HEAD:main 退出0，远端main已从88137fb推进至02a9a37，包含完整源码和文档。本地分支同步命名为main；本状态更新作为后续提交推送。全程未强制推送，未改动全局Git配置。本次只处理Git交付，没有重跑或改变上方运行时验收结果。
 
 用户继续授权后，按 docs/06 从零实现方块移动与无 CharacterBody/武器的回合取石子游戏，范围决定和协议见 docs/12_m3_games.md。宿主与 SDK 核心未改：本轮开始记录的13个 GDScript 文件 SHA-256 全部一致，两个独立产物携带的 SDK 也与源码一致。新增游戏通过自己的 GameAdapter、房间子类和本机注册配置接入。
 
