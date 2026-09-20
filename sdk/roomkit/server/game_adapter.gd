@@ -1,5 +1,6 @@
 extends RefCounted
 ## Games override these callbacks. No actor or scene base class is required.
+signal result_requested(match_key: String, status: String, payload: Dictionary)
 func configure_room(_context: Dictionary) -> bool:
 	return true
 

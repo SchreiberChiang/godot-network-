@@ -3,7 +3,10 @@ const Manager = preload("res://host/core/room_manager.gd")
 const Lobby = preload("res://host/lobby_server.gd")
 const Development = preload("res://host/development.gd")
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
+const Results = preload("res://host/core/result_service.gd")
 var manager = Manager.new()
+var results = Results.new()
+var result_root := ""
 var lobby = Lobby.new()
 var automated := false
 var visual := false
@@ -43,6 +46,14 @@ func _run() -> void:
 	var config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/development.json"))
 	config.godot_executable = OS.get_executable_path()
 	config.heartbeat_timeout_ms = 10000
+	result_root = ProjectSettings.globalize_path("res://data/showcase-results" if not automated else "res://data/game-results-" + Wire.uid())
+	if not check(results.initialize(result_root, {"blocks": "res://schemas/summary_result.schema.json", "turns": "res://schemas/summary_result.schema.json"}).ok, "private SQLite result store initialized"):
+		quit(1)
+		return
+	var recovery: Dictionary = results.recover()
+	print("RESULT_RECOVERY accepted=", recovery.accepted, " rejected=", recovery.rejected, " pending=", recovery.pending)
+	manager.result_service = results
+	results.manager = manager
 	if not check(manager.initialize(config).ok, "host initialized"):
 		quit(1)
 		return
@@ -84,6 +95,9 @@ func _run() -> void:
 			if visual:
 				check(report.get("screenshot_saved", false), "rendered screenshot saved " + process.label)
 		check(lobby.admissions.count(rooms.blocks, "CONNECTED") == 2 and lobby.admissions.count(rooms.turns, "CONNECTED") == 2, "four formal seats remain isolated by game")
+		check(await until(func(): return results.accepted_count > 0, 10000), "real turn-based round committed to SQLite")
+		var saved: Dictionary = results.repository.execute({"op": "inspect"})
+		check(saved.ok and saved.count >= 1 and JSON.parse_string(saved.rows[0].body).game_id == "turns", "stored result belongs to turn-based game")
 		var rejoin_marker := FileAccess.open(work.path_join("rejoin.signal"), FileAccess.WRITE)
 		rejoin_marker.store_string("rejoin")
 		rejoin_marker.close()
@@ -164,11 +178,13 @@ func finish() -> void:
 	lobby.close()
 	check(manager.close(), "host listeners closed")
 	initialized = false
+	var recovered: Dictionary = results.recover()
+	print("RESULT_STORE path=", result_root, " recovered=", recovered.accepted, " pending=", recovered.pending)
 	var reports: Array = []
 	for process in processes:
 		reports.append(read_report(process))
 	var file := FileAccess.open("res://logs/games-result.json", FileAccess.WRITE)
-	file.store_string(JSON.stringify({"passed": passed, "failed": failed, "visual": visual, "automated": automated, "evidence_dir": work, "reports": reports, "artifacts": artifacts}, "  "))
+	file.store_string(JSON.stringify({"passed": passed, "failed": failed, "visual": visual, "automated": automated, "evidence_dir": work, "result_store": result_root, "reports": reports, "artifacts": artifacts}, "  "))
 	file.close()
 	print("GAMES_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)

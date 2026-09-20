@@ -1,5 +1,6 @@
 extends Node
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
+signal round_finished(round_index: int, scores: Array)
 var server := false
 var players: Dictionary = {}
 var peers: Dictionary = {}
@@ -46,6 +47,7 @@ func handle_input(peer: int, command: Dictionary) -> bool:
 	stones -= int(command.take)
 	if stones == 0:
 		players[user].score += 1
+		round_finished.emit(round_number, players.values().duplicate(true))
 		round_number += 1
 		stones = 12
 	active_user = str(order[(order.find(user) + 1) % order.size()])

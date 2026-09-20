@@ -73,3 +73,11 @@ v0.1 建议采用高熵随机一次性票据：宿主保存票据摘要、user_i
 至少包括：AUTH_REQUIRED、AUTH_FAILED、GAME_NOT_FOUND、BUILD_MISMATCH、INVALID_OPTIONS、ROOM_STARTING、ROOM_FULL、ROOM_DRAINING、HOST_CAPACITY_EXCEEDED、PORT_BIND_FAILED、START_TIMEOUT、TICKET_EXPIRED、TICKET_ALREADY_USED、IDEMPOTENCY_CONFLICT、RATE_LIMITED、CONTROL_UNAVAILABLE。
 
 错误附可否重试。客户端对失败应返回可操作状态，不能无限快速重试或只弹“网络错误”。
+
+## M4已实现的结果增量（2026-09-21）
+
+唯一契约为schemas/result_record.schema.json、result_submission.schema.json和result_ack.schema.json，由control.schema.json引用；回合示例使用summary_result.schema.json。结构例子见examples/result_messages.example.json，全零signature/record_hash仅演示格式，不能认证或清除真实记录。运行时验证JSON有限数、深度与Schema，正文最大16KiB；按递归字典排序、整数规范化后的完整精度UTF-8 JSON计算SHA-256和每launch独立HMAC-SHA256。match_id以m_<launch_id>_开头，SDK局内key限1—64个字母/数字/下划线/连字符。
+
+result.submit身份必须与已认证控制连接及持久启动授权一致；result.ack同时绑定result_id和record_hash。DUPLICATE是成功确认；RESULT_CONFLICT、MATCH_RESULT_CONFLICT、AUTH_FAILED、INVALID_RESULT是不可自动覆盖的失败，outbox保留为.rejected.json。STORAGE_UNAVAILABLE与STORAGE_CAPACITY_EXCEEDED保留文件重试。SDK本地未启用服务返回RESULTS_DISABLED；初始化可返回UNSUPPORTED_STORAGE或PRIVATE_DATA_FAILED，这些本地错误不作为线上ACK。
+
+正常停止最多额外等待1.5秒发送/确认；超时留存outbox，后续恢复。尚未生成、未成功写入outbox的内存结果不保证恢复。未实现奖励或外部业务副作用。

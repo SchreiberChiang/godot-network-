@@ -1,0 +1,43 @@
+[
+  {
+    "version": 1,
+    "kind": "event",
+    "event_id": "example_result_submit",
+    "type": "result.submit",
+    "room_id": "r_example",
+    "launch_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "game_id": "turns",
+    "build_id": "turns-dev-002",
+    "payload": {
+      "record": {
+        "game_id": "turns",
+        "build_id": "turns-dev-002",
+        "room_id": "r_example",
+        "launch_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "match_id": "m_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_round_1",
+        "result_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "result_kind": "final",
+        "result_version": 1,
+        "status": "completed",
+        "payload": {"round": 1, "players": [{"user_id": "u_example", "score": 1}]}
+      },
+      "signature": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  {
+    "version": 1,
+    "kind": "event",
+    "event_id": "example_result_ack",
+    "type": "result.ack",
+    "room_id": "r_example",
+    "launch_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "game_id": "turns",
+    "build_id": "turns-dev-002",
+    "payload": {
+      "result_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "record_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "ok": true,
+      "code": "DUPLICATE"
+    }
+  }
+]

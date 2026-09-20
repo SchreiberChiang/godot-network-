@@ -18,6 +18,7 @@ var config: Dictionary
 var runtime_root := ""
 var closed := false
 var control_handler: Callable
+var result_service
 
 func initialize(settings: Dictionary, process_adapter = null) -> Dictionary:
 	config = settings.duplicate(true)
@@ -42,6 +43,8 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 	var resolved: Dictionary = registry.resolve(game_id)
 	if not resolved.ok:
 		return resolved
+	if result_service != null and resolved.manifest.get("sdk_version", "") != "0.3.0":
+		return {"ok": false, "code": "BUILD_MISMATCH"}
 	var valid: Dictionary = registry.validate_options(game_id, options)
 	if not valid.ok:
 		return valid
@@ -62,6 +65,13 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 	var private_config: Dictionary = {"room_id": room_id, "launch_id": launch_id, "token": row.token, "game_id": game_id, "build_id": row.build_id, "udp_port": row.port, "control_port": control_port, "heartbeat_ms": int(config.get("heartbeat_ms", 250)), "host_timeout_ms": int(config.get("heartbeat_timeout_ms", 8000)), "startup_timeout_ms": int(config.get("start_timeout_ms", 15000)), "options": options}
 	private_config.compatibility_id = row.compatibility_id
 	private_config.game_protocol = row.game_protocol
+	if result_service != null:
+		var prepared: Dictionary = result_service.prepare_launch(row)
+		if not prepared.ok:
+			_fail(row, prepared.code)
+			_cleanup(row)
+			return {"ok": false, "code": row.code, "room_id": room_id}
+		private_config.results = prepared.config
 	var file := FileAccess.open(row.config_path, FileAccess.WRITE)
 	if file == null:
 		_fail(row, "PRIVATE_CONFIG_FAILED")
@@ -229,6 +239,9 @@ func _receive(connection: Dictionary, message: Dictionary) -> void:
 			row.stop_notice = true
 		"room.failed":
 			_fail(row, message.payload.code)
+		"result.submit":
+			if result_service == null or not result_service.handle(row, message):
+				_reject(connection)
 		_:
 			if not control_handler.is_valid() or not control_handler.call(row, message):
 				_reject(connection)

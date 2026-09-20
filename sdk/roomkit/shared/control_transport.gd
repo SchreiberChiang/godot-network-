@@ -15,7 +15,7 @@ func queue(message: Dictionary) -> bool:
 		return false
 	if not _json_value(message, 0):
 		return _fail("INVALID_JSON")
-	var body := JSON.stringify(message).to_utf8_buffer()
+	var body := JSON.stringify(message, "", true, true).to_utf8_buffer()
 	if body.size() == 0 or body.size() > MAX_BODY:
 		return _fail("MESSAGE_TOO_LARGE")
 	if not StrictJSON.valid(body.get_string_from_utf8(), MAX_DEPTH):

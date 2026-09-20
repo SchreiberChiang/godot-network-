@@ -34,6 +34,8 @@ unit 成功信号为 `UNIT_RESULT passed=... failed=0`；integration 为 `INTEGR
 
 ## 环境事件与边界
 
+2026-09-21 M4：实际加载C:\Windows\System32\winsqlite3.dll，查询版本3.51.1。无需下载DLL、额外数据库服务或更改全局配置。tools/protect_data.ps1仅在本项目data/设置当前用户ACL并拒绝越界/重解析目录。数据库、备份和签名outbox全部排除Git。同步PowerShell助手的busy_timeout=1500ms不包含进程启动/编译及全部系统调用；测试总超时不能代替常驻宿主的异步存储和总时限。Linux存储适配未实现。
+
 2026-09-18 开发环境曾出现 Windows 沙箱 `setup refresh had errors`，部分升级权限检查被拒绝；另有普通沙箱下的 WMI/CIM 进程身份检查失败。这些失败保留为历史结果，没有算作通过，也没有修改全局沙箱设置。
 
 2026-09-19 当前会话由环境提供无沙箱执行权限，运行本项目不再需要向工具申请权限升级。这一会话设置不代表其它电脑或终端拥有同样权限。正常本机使用应能读取自己启动的子进程信息，包括 `Get-CimInstance Win32_Process` 返回的可执行路径、父进程与命令行，并能给本项目 `run/` 设置当前用户 ACL；不要求预先以管理员身份启动。如果身份核验不可用，宿主返回 `PROCESS_IDENTITY_UNVERIFIED` 并保留隔离，不能绕过校验或按裸 PID 任意终止进程。

@@ -44,6 +44,10 @@ ADR-007：v0.1不保证崩溃续局。明确中止和清理政策比未实现的
 
 ## 4. 变更规则
 
+2026-09-21 M4第一部分：源码SDK标识0.3.0，control_protocol=1增加可选result.submit/result.ack，正文result_version=1。结果服务要求宿主与房间同步升级，当前仅接受SDK 0.3.0；旧宿主不支持新事件。M1夹具使用原消息子集，未启用结果服务的M2流程不发送结果事件。当前示例构建更新为minimal_room/dev-003、blocks/blocks-dev-002、turns/turns-dev-002；兼容标识分别roomkit-minimal-dev-003、blocks-v2、turns-v2，避免将旧产物误当新构建。game_protocol仍为1；未承诺与旧客户端交叉互通。以上是开发源码版本，不是发行包。
+
+ADR-008：Windows SQLite适配通过系统winsqlite3.dll及宿主PowerShell助手实现。数据库Schema user_version=1，从空库初始化或打开已有v1库，未知版本拒绝。result_id及(game_id,match_id,result_kind)双重唯一约束，提交完成才ACK。密钥、数据库与持久outbox在项目data/下，排除Git；结果恢复不等于恢复房间进程或对局。同步助手延迟、资源限额和断电限制见docs/13。
+
 2026-09-19 M0/M1 实施记录：实际锁定 `4.7.2.stable.steam.ed1daf0bf`。开发组合入口位于 `host/development.gd`，核心不引用示例路径。Windows 终止过程固定进程句柄并校验创建时间、父 PID、可执行路径与 launch_id；仅对精确已验证引擎实现缓存句柄回收，其它版本不执行该专用路径。SDK 分发、GameAdapter 玩家回调和导出产物仍属后续阶段；本轮完整结果见 STATUS。
 
 修改公开消息或SDK先改契约/示例/测试，再改实现。破坏性变更升级协议或兼容标识。发布SDK时记录支持矩阵与迁移步骤。不得把固定分支永远设为latest，让旧项目自动获得未验证的新行为。

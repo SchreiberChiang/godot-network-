@@ -1,8 +1,52 @@
-﻿# 实际开发状态
+# 实际开发状态
 
-更新：2026-09-20。**M0/M1、M2 接入闭环与 M3 本地双玩法开发工程验证已完成。** 现在可打开窗口操作方块移动或回合取石子；两个游戏可以同时开房，四名客户端实际操作、退房重入并回收。所有证据限本机 Windows / Godot 4.7.2；未读取、复制或修改旧游戏／服务器。
+更新：2026-09-21。M0—M3已有本机验证；本轮继续实现M4第一部分：SQLite结果保存、幂等确认、持久outbox、宿主退出后的结果补存和在线备份。M4整体未完成。仅在当前独立仓库开发，未读取、复制或修改旧项目。
 
-## 本轮 M3：可以打开窗口试玩的两个游戏
+## 本轮M4第一部分：结果可保存、重发、恢复与备份
+
+本轮从干净main建立codex/m4-results开发分支，沿用用户对指定GitHub仓库的上传授权。无公网部署、账号/商城开发或云资源消耗。当前工作目录仍为F:\文档\GodotGame\Net\RoomKit；引擎4.7.2.stable.steam.ed1daf0bf、Git 2.55.0.windows.3，系统SQLite实测3.51.1。
+
+完成：宿主集中写SQLite，结果ID及同局最终结果双重唯一约束；每房独立签名授权；房间先写持久outbox再发送，只有提交成功且确认摘要匹配才删除；丢ACK重试不重复写库；真实终止宿主后房间自行退出、UDP可重新绑定，新宿主补存遗留结果；在线备份及从备份打开验证。回合玩法已经实际接入，方块玩法不生成成绩。SDK更新为0.3.0，示例构建及兼容标识同步更新，协议/例子/错误码见docs/02、07、13。
+
+本机验证：双击StartTurns.cmd，两个窗口轮流取完一局石子，关闭窗口后双击ShowResults.cmd，可用中文查看已保存的局数和玩家分数。数据位于data/showcase-results/results.sqlite，不进入Git。成绩记录不等于账号累计积分；新房不会自动恢复旧局。
+
+### 本轮实际测试
+
+以下均在本项目运行，退出码0；计数是断言数，不是玩家数。
+
+| 实际命令 | 结果 |
+|---|---|
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode all | unit 248/248；launcher 63/63（句柄321→321）；integration 133/133（22子进程）；demo 4心跳、leases=0；players 33/33；games 47/47；persistence 42/42 |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit | 补充控制封装深度边界后最终249/249；包含非有限数拒绝、签名小数精度及协议例子 |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode persistence | 最终代码复验42/42；真实SQLite、真实Godot子进程及宿主终止恢复，中文/引号往返一致，备份integrity_check=ok |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode games | 最终代码重新打包复验47/47；SDK与两个独立工程一致，实际回合结果落库 |
+| cmd /c "StartTurns.cmd -Smoke < NUL" | 18/18；实际启动两个图形窗口并自动调用关闭处理，房间/客户端回收；非人工试玩 |
+| cmd /c "ShowResults.cmd -Store <games报告中的result_store> < NUL" | 显示真实双玩法测试保存的1局回合结果，两玩家分别0/1分，退出0 |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\results.ps1 -Store <persistence报告中的data_root> -Operation inspect / backup / recover | 三种操作分别运行、分别退出0；已保存结果可查看，备份产生新文件，无待恢复记录时不重复写入 |
+
+主要日志：logs/m4-all-run.txt、m4-unit-final.txt、m4-persistence-final.txt、m4-games-final.txt、m4-play-turns.txt、m4-show-results.txt及m4-results-*.txt。机器报告为logs/m4-games-result.json、m4-persistence-result.json、m4-final-audit.json。最终核查退出0：当前项目Godot残留0、私有启动配置0、最终运行时错误0、独立工程SDK差异0。41个改动文件中常见凭据模式命中0；最终测试使用的6个真实签名密钥在日志/产物文本中命中0。初始全套回归后补充了封装深度拒绝，不再重复无关的进程启动器测试。
+
+### 失败修复与未运行
+
+- 初次unit为242通过/1失败：嵌套NaN绕过通用结果校验；增加递归JSON有限数及深度校验。初次persistence因GDScript动态变量类型推断编译失败，总watchdog终止原宿主句柄，未算作运行通过。证据保留m4-unit-attempt-failed.txt、m4-persistence-parse-failed.log。
+- 首次能运行的持久化测试出现RefCounted循环引用退出泄漏；结果服务改用WeakRef引用管理器，后续最终stderr无泄漏/资源未释放错误。
+- 增加中文与引号断言后一次全套回归persistence为41通过/1失败：数据库内容正确，Windows管道返回Godot时乱码；助手改用ASCII JSON Unicode转义，最终往返断言通过。失败保留m4-all-attempt-failed.txt、m4-unicode-attempt-failed.log。另补文件和控制帧完整小数精度，避免签名摘要漂移。
+- 单元恶意1e999仍产生预期Exponent too high警告，拒绝断言通过；没有隐藏警告。
+- ACK丢失是在真实控制链路的测试宿主中故意跳过首个ACK；宿主终止前的未提交状态由测试故障钩子保持。不是网络设备丢包或真实磁盘故障。SQLite损坏文件拒绝是真实执行；存储不可用ACK保留文件由单元验证。
+- 未验证断电、磁盘满、写临时文件中途崩溃、正式奖励业务、16人/100轮、Linux、专用导出或公网。同步PowerShell存储存在阻塞延迟；每库256授权/10000结果、每房128待发送的当前上限没有自动清理策略。M4的正式身份、安全传输、完整资源治理和立即重开房的遗留实例隔离仍未完成，详见docs/13。
+
+### 本轮实际修改文件（41个）
+
+- 根入口/说明：ShowResults.cmd、README.md、STATUS.md。
+- 宿主：host/core/result_service.gd、host/core/room_manager.gd、host/storage/sqlite_repository.gd。
+- SDK：sdk/roomkit/server/game_adapter.gd、room_runtime.gd、result_outbox.gd；sdk/roomkit/shared/result_format.gd、control_transport.gd。
+- 工具：tools/protect_data.ps1、sqlite_store.ps1、results.gd、results.ps1、run.ps1。
+- Schema：schemas/result_record.schema.json、result_submission.schema.json、result_ack.schema.json、summary_result.schema.json、control.schema.json。
+- 示例：examples/showcase/host.gd；examples/turn_based/adapter.gd、game.gd、game_manifest.json；examples/blocks/game_manifest.json；examples/minimal/multiplayer_manifest.json；examples/result_messages.example.json、m2_messages.example.json。
+- 测试：tests/test_results.gd、run_persistence.gd、run_unit.gd；tests/fakes/lost_result_ack.gd；tests/fixtures/result_host.gd、result_room.gd。
+- 文档：docs/02_contracts.md、03_sdk_integration.md、06_roadmap_acceptance.md、07_versions_decisions.md、10_environment.md、13_m4_results.md。
+
+## 以下为M3历史：可以打开窗口试玩的两个游戏
 
 Git 交付完成（2026-09-21）：用户已明确授权上传 GitHub，覆盖初始任务中“不推送远端”的限制。首次本地提交为65bd328，源码与文档纳入版本管理；run/、logs/、artifacts/、私有配置与密钥文件继续排除。上传前扫描102个待提交文件，未命中常见GitHub令牌/私钥格式。用户指定远端 https://github.com/SchreiberChiang/godot-network-.git，已配置为origin，并合并保留远端main的初始MIT许可证提交88137fb。首次推送因GitHub未认证失败；用户完成Git Credential Manager设备登录后，git push -u origin HEAD:main 退出0，远端main已从88137fb推进至02a9a37，包含完整源码和文档。本地分支同步命名为main；本状态更新作为后续提交推送。全程未强制推送，未改动全局Git配置。本次只处理Git交付，没有重跑或改变上方运行时验收结果。
 

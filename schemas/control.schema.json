@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "RoomKit M1/M2 process control protocol 1",
+  "title": "RoomKit M1/M2/M4 process control protocol 1",
   "description": "Strict loopback process-control subset; runtime checks authentication, identity and lifecycle. Not the public lobby protocol.",
   "allOf": [
     {
@@ -35,6 +35,8 @@
     },
     {
       "oneOf": [
+        {"properties":{"type":{"const":"result.submit"},"payload":{"$ref":"result_submission.schema.json"}}},
+        {"properties":{"type":{"const":"result.ack"},"payload":{"$ref":"result_ack.schema.json"}}},
         {
           "properties": {
             "type": {

@@ -75,6 +75,8 @@ Godot 高层RPC要求两端对应节点路径一致；RPC配置也有兼容性�
 
 ## 7. 开箱即用的验收含义
 
+2026-09-21当前结果API：GameAdapter在完成一局时发出result_requested(match_key, status, payload)信号，RoomRuntime调用submit_result并在发送前写持久outbox。宿主组合入口创建ResultService，传入game_id到payload Schema的映射，再赋给RoomManager.result_service。核心不引用玩法。configure_room收到的results_enabled不包含数据库路径、密钥或控制token。回合示例见examples/turn_based/adapter.gd。上文mark_ready/set_joinable/set_phase仍是设计接口，不能当作本轮新增的可调用API。
+
 把新项目接入说明交给未参与框架开发的人，仅按文档新增配置与适配器，就能本地启动宿主、房间和两个客户端并完成一次完整流程。无需修改 host/core、SDK核心或继承射击角色。
 
 网页实时游戏另做传输配置与认证/导出测试；仅大厅改WSS不代表整个ENet游戏已支持浏览器。Godot网页平台不提供原始TCP/UDP，支持范围与原生端不同。[S7]

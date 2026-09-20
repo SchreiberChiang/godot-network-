@@ -4,6 +4,8 @@ const Transport = preload("res://sdk/roomkit/shared/control_transport.gd")
 const Protocol = preload("res://sdk/roomkit/shared/protocol.gd")
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const NetRoom = preload("res://sdk/roomkit/shared/net_room.gd")
+const Outbox = preload("res://sdk/roomkit/server/result_outbox.gd")
+const ResultFormat = preload("res://sdk/roomkit/shared/result_format.gd")
 var adapter
 var build_identity: Dictionary
 var context: Dictionary
@@ -24,6 +26,10 @@ var last_beat := 0
 var sequence := 0
 var step := 0
 var started := 0
+var result_outbox
+var submitted_results: Dictionary = {}
+var last_result_send := -1000
+var last_result_error := ""
 
 func _initialize() -> void:
 	var args: Dictionary = {}
@@ -45,6 +51,16 @@ func _initialize() -> void:
 			return
 	var public_context := context.duplicate(true)
 	public_context.erase("token")
+	public_context.erase("results")
+	public_context.results_enabled = context.has("results")
+	if context.has("results"):
+		result_outbox = Outbox.new()
+		if not result_outbox.initialize(context.results.directory, context.results.secret):
+			quit(2)
+			return
+		context.erase("results")
+	if adapter != null:
+		adapter.result_requested.connect(submit_result)
 	if adapter == null or not adapter.configure_room(public_context):
 		quit(2)
 		return
@@ -103,6 +119,13 @@ func _process(_delta: float) -> bool:
 					_disconnect(peer_id)
 		if not transport.flush(control) or transport.error != "":
 			_shutdown("CONTROL_UNAVAILABLE")
+		if registered and result_outbox != null and now - last_result_send >= 1000:
+			last_result_send = now
+			var pending: Array = result_outbox.pending()
+			if not pending.is_empty():
+				var item := Wire.decode(FileAccess.get_file_as_bytes(pending[0]), "res://schemas/result_submission.schema.json", 32768)
+				if not item.is_empty():
+					_send("result.submit", item)
 	elif registered:
 		_shutdown("CONTROL_UNAVAILABLE")
 	if not registered and now - started > int(context.startup_timeout_ms):
@@ -136,6 +159,12 @@ func _authenticate(peer_id: int, bytes: PackedByteArray) -> void:
 func _handle_control(message: Dictionary) -> void:
 	var payload: Dictionary = message.payload
 	match message.type:
+		"result.ack":
+			if result_outbox != null:
+				result_outbox.acknowledge(payload)
+				if not payload.ok:
+					last_result_error = payload.code
+					printerr("RESULT_REJECTED code=", payload.code)
 		"room.heartbeat": pass
 		"room.drain": network.refuse_new_connections = true
 		"room.stop": _shutdown(payload.reason)
@@ -232,6 +261,8 @@ func _shutdown(reason: String) -> void:
 	stopping = true
 	stop_at = Time.get_ticks_msec() + 150
 	adapter.on_shutdown_requested(reason)
+	if result_outbox != null and not result_outbox.pending().is_empty():
+		stop_at = Time.get_ticks_msec() + 1500
 	for peer_id in members.keys():
 		_disconnect(peer_id)
 	enet.close()
@@ -239,3 +270,21 @@ func _shutdown(reason: String) -> void:
 
 func _send(type: String, payload: Dictionary) -> void:
 	transport.queue(Protocol.event(type, context.room_id, context.launch_id, payload, context.game_id, context.build_id))
+
+func submit_result(match_key: String, status: String, payload: Dictionary) -> Dictionary:
+	if result_outbox == null:
+		return Wire.failure("RESULTS_DISABLED")
+	var pattern := RegEx.new()
+	pattern.compile("^[A-Za-z0-9_-]{1,64}$")
+	if pattern.search(match_key) == null:
+		return Wire.failure("INVALID_RESULT")
+	var record := {"game_id": context.game_id, "build_id": context.build_id, "room_id": context.room_id, "launch_id": context.launch_id, "match_id": "m_" + context.launch_id + "_" + match_key, "result_id": submitted_results.get(match_key, {}).get("result_id", Wire.uid()), "result_kind": "final", "result_version": 1, "status": status, "payload": payload.duplicate(true)}
+	if submitted_results.has(match_key):
+		return {"ok": true, "result_id": record.result_id} if ResultFormat.hash_record(record) == ResultFormat.hash_record(submitted_results[match_key]) else Wire.failure("RESULT_CONFLICT")
+	var result: Dictionary = result_outbox.enqueue(record)
+	if result.ok:
+		submitted_results[match_key] = record
+	else:
+		last_result_error = result.code
+		printerr("RESULT_QUEUE_FAILED code=", result.code)
+	return result

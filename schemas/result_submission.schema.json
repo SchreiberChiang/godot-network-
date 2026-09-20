@@ -1,0 +1,1 @@
+{"type":"object","additionalProperties":false,"required":["record","signature"],"properties":{"record":{"$ref":"result_record.schema.json"},"signature":{"type":"string","pattern":"^[a-f0-9]{64}$"}}}

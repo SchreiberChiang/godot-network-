@@ -1,12 +1,14 @@
 # RoomKit：独立的本地房间框架
 
-更新：2026-09-20。现在有两个可以打开窗口操作的最小游戏：方块移动和回合取石子。它们共用同一套房间框架，每间房运行在独立 Godot 进程中；工程从零编写，不依赖以前的游戏或服务器。
+更新：2026-09-21。现在有两个可以打开窗口操作的最小游戏：方块移动和回合取石子。回合结果可保存到本地SQLite，关闭重开后仍能查看；未确认结果可在宿主重启后补存。每间房运行在独立Godot进程中，工程从零编写，不依赖以前的游戏或服务器。
 
 **直接试玩：双击 `StartPlay.cmd`，打开两个方块游戏窗口。** 点击其中一个窗口，用 WASD 或方向键移动；切到另一窗口操作另一个玩家。橙色方块是当前玩家。点“退出房间”可以回大厅，再点“重新入房”加入。关闭两个窗口后自动回收本次房间。
 
 **第二个游戏：双击 `StartTurns.cmd`。** 每回合取1或2颗石子，拿走最后一颗得1分并开始下一局。轮流在两个窗口点击按钮。两个启动器建议依次运行，便于分清窗口。每次会话最长30分钟。
 
 `StartDemo.cmd` 仍保留原来的纯文字自动入房/退房测试。所有入口都需要本机已安装下述 Godot；目前仅支持本机回环，不能直接给另一台电脑或公网玩家连接。
+
+**查看战绩：先运行 `StartTurns.cmd`，轮流取完一局石子，再关闭两个窗口，双击 `ShowResults.cmd`。** 会显示保存的局数与每局玩家分数；这些是本地开发身份的结果记录，重新进入后的实时分数仍按示例原规则计算，不是账号累计积分。数据库位于 `data/showcase-results/results.sqlite`，不会上传GitHub。完整路线见[docs/06_roadmap_acceptance.md](docs/06_roadmap_acceptance.md)，当前M4仅完成结果存储部分。
 
 **实际通过、失败和未运行项见 [STATUS.md](STATUS.md)。** 本文描述当前代码和启动入口，不代替验收记录。原文档包的 v0.2 是设计包编号；当前工程尚不代表正式框架发布版。
 
@@ -35,9 +37,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode player
 | `integration` | 真实 Godot 子进程、TCP 控制、ENet 端口、故障与连续开关房测试 | `INTEGRATION_RESULT passed=... failed=0` |
 | `demo` | 自动创建一房，收到至少四次心跳后停止并退出 | `DEMO_PASS` |
 | `players` | 真实 WebSocket 大厅、两名独立 ENet 测试玩家进入/退房、非法票据/满员拒绝与资源回收 | `PLAYERS_RESULT passed=33 failed=0` |
-| `games` | 两个独立游戏工程、四名真实客户端、移动/回合操作、跨游戏拒绝、退房重入和回收 | `GAMES_RESULT passed=44 failed=0` |
+| `games` | 两个独立游戏、四名真实客户端、玩法/退房重入与实际回合结果落库 | `GAMES_RESULT passed=47 failed=0` |
+| `persistence` | 真实SQLite、丢ACK重试、宿主终止/房间自退、离线补存、备份与中文读写 | `PERSISTENCE_RESULT passed=... failed=0` |
 
-每种模式还必须出现 `ROOMKIT_EXIT mode=<模式> code=0`。脚本检查真实退出码、脚本错误和成功标记，并设置整体超时。`-Mode all` 按 unit → launcher → integration → demo → players → games 运行。`-Mode games -Visual` 会打开真实图形窗口并额外保存4张截图，成功计数48。`-Godot '完整路径'` 可指定可执行文件，但更换引擎版本需要重新验收。所有入口让子进程使用当前启动宿主的 Godot。
+每种模式还必须出现 `ROOMKIT_EXIT mode=<模式> code=0`。脚本检查真实退出码、脚本错误和成功标记，并设置整体超时。`-Mode all` 按 unit → launcher → integration → demo → players → games → persistence 运行。`-Mode games -Visual` 会打开真实图形窗口并额外保存4张截图。`-Godot '完整路径'` 可指定可执行文件，但更换引擎版本需要重新验收。所有入口让子进程使用当前启动宿主的Godot。
+
+结果专项和本地管理命令：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode persistence
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\results.ps1 -Operation inspect
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\results.ps1 -Operation recover
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\results.ps1 -Operation backup
+```
+
+先关闭演示窗口再手动恢复或备份；重新启动试玩也会自动补存已落盘的待确认结果。`-Store 'res://data/某测试目录'`可指定本项目的其它结果库。备份会打印新文件路径，不覆盖现有数据库。详细语义、限制与测试边界见[docs/13_m4_results.md](docs/13_m4_results.md)。
 
 日志位于 `logs/`：每种模式的 `*-console.log`、`*-stderr.log`、`*-godot.log`，集成测试另写 `integration-result.json`。分帧部分写入由可控写入器模拟；它不等于证明操作系统此次真实发生部分写入。进程集成测试运行开发工程，不等于专用服务器导出验证。
 
