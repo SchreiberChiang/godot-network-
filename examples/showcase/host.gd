@@ -23,6 +23,7 @@ var artifacts: Dictionary = {}
 var work := ""
 var stop_file := ""
 var args: Dictionary = {}
+var dashboard
 
 func _initialize() -> void:
 	for arg in OS.get_cmdline_user_args():
@@ -36,6 +37,8 @@ func _process(_delta: float) -> bool:
 	if initialized:
 		manager.poll()
 		lobby.poll()
+		if dashboard != null:
+			dashboard.poll()
 	return false
 
 func _run() -> void:
@@ -80,6 +83,11 @@ func _run() -> void:
 	if not check(lobby.start(manager, 0, security) == OK, "authenticated loopback WSS lobby bound"):
 		await finish()
 		return
+	if args.get("--panel", "false") == "true":
+		dashboard = preload("res://host/dashboard_server.gd").new()
+		if not check(dashboard.start(manager, lobby, results, int(args.get("--panel-port", "28291"))) == OK, "local read-only dashboard started"):
+			await finish()
+			return
 	for game in ["blocks", "turns"]:
 		if not check(Development.register_artifact(manager, artifacts[game]).ok, "independent artifact registered " + game):
 			await finish()
@@ -100,7 +108,7 @@ func _run() -> void:
 	var chosen: Array = ["blocks", "turns"] if automated else [args.get("--game", "blocks")]
 	for game in chosen:
 		for role in ["one", "two"]:
-			start_client(game, role)
+			await start_client(game, role)
 	if automated:
 		check(await until(func(): return all_reports("PLAYING"), 35000), "four clients play in two simultaneous games")
 		for process in processes:
@@ -176,9 +184,25 @@ func start_client(game: String, role: String) -> void:
 		arguments.append("--close-after-ms=3500")
 	if visual:
 		arguments.append("--screenshot=" + work.path_join(label + ".png"))
-	var result: Dictionary = manager.launcher.launch({"executable": artifacts[game].get("client_executable", OS.get_executable_path()), "args": arguments}, launch, PackedStringArray())
+	# Keep lobby/TLS and room polling alive while capturing a new client's identity.
+	var task := Thread.new()
+	var descriptor := {"executable": artifacts[game].get("client_executable", OS.get_executable_path()), "args": arguments}
+	if task.start(_launch_client_worker.bind(descriptor, launch)) != OK:
+		check(false, "client launch worker started " + label)
+		return
+	while task.is_alive():
+		await process_frame
+	var completed: Dictionary = task.wait_to_finish()
+	if not completed.owned.is_empty():
+		manager.launcher.import_owned(completed.owned)
+	var result: Dictionary = completed.result
 	check(result.ok, "verified client launch " + label)
 	processes.append({"launch_id": launch, "output": output, "label": label, "game": game})
+
+static func _launch_client_worker(descriptor: Dictionary, launch: String) -> Dictionary:
+	var launcher = preload("res://host/platform/process_launcher.gd").new()
+	var result: Dictionary = launcher.launch(descriptor, launch, PackedStringArray())
+	return {"result": result, "owned": launcher.record(launch)}
 
 func read_report(process: Dictionary) -> Dictionary:
 	if not FileAccess.file_exists(process.output):
@@ -200,6 +224,9 @@ func until(predicate: Callable, timeout_ms: int) -> bool:
 	return bool(predicate.call())
 
 func finish() -> void:
+	if dashboard != null:
+		dashboard.close()
+		dashboard = null
 	manager.stop_all()
 	check(await until(func(): return manager.active_count() == 0, 18000), "all game room processes exited and reclaimed")
 	for process in processes:

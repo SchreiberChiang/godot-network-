@@ -1,0 +1,31 @@
+{
+    "host":  {
+                 "active_rooms":  0,
+                 "control_port":  28290,
+                 "engine":  "4.7.2-stable (steam)",
+                 "engine_memory_bytes":  27174774,
+                 "lobby_port":  3935,
+                 "lobby_sessions":  0,
+                 "online_players":  0,
+                 "pid":  1000,
+                 "quarantined_ports":  0,
+                 "room_history_total":  0,
+                 "sampled_at":  1790000966.142,
+                 "uptime_ms":  201377
+             },
+    "players":  [
+
+                ],
+    "rooms":  [
+
+              ],
+    "storage":  {
+                    "records":  [
+
+                                ],
+                    "state":  "ready",
+                    "total":  0,
+                    "updated_at":  1790000961
+                },
+    "version":  1
+}

@@ -1,6 +1,8 @@
 param(
     [ValidateSet('blocks','turns')][string]$Game = 'blocks',
     [switch]$Smoke,
+    [switch]$Panel,
+    [switch]$NoBrowser,
     [string]$Godot = 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe'
 )
 $ErrorActionPreference = 'Stop'
@@ -11,9 +13,11 @@ $logs = Join-Path $projectRoot 'logs'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
 $arguments = @('--headless','--path',$projectRoot,'--log-file',(Join-Path $logs 'play-host.log'),'--script','res://examples/showcase/host.gd','--',('--game=' + $Game))
 if ($Smoke) { $arguments += '--smoke=true' }
+if ($Panel) { $arguments += @('--panel=true','--managed=true') }
 $quoted = foreach ($argument in $arguments) { '"' + ($argument -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"' }
 $process = Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logs 'play-console.log') -RedirectStandardError (Join-Path $logs 'play-stderr.log')
 $ownedHandle = $process.Handle
+if ($Panel) { & (Join-Path $PSScriptRoot 'open_panel.ps1') -ExpectedPid $process.Id -NoBrowser:$NoBrowser }
 Write-Output 'Opening two game windows. Close both windows to finish. Local session limit: 30 minutes.'
 if (-not $process.WaitForExit(1900000)) {
     $process.Kill()

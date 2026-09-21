@@ -1,0 +1,242 @@
+{
+    "type":  "object",
+    "additionalProperties":  false,
+    "required":  [
+                     "version",
+                     "host",
+                     "rooms",
+                     "players",
+                     "storage"
+                 ],
+    "properties":  {
+                       "version":  {
+                                       "const":  1
+                                   },
+                       "host":  {
+                                    "type":  "object",
+                                    "additionalProperties":  false,
+                                    "required":  [
+                                                     "engine",
+                                                     "pid",
+                                                     "uptime_ms",
+                                                     "sampled_at",
+                                                     "engine_memory_bytes",
+                                                     "active_rooms",
+                                                     "room_history_total",
+                                                     "online_players",
+                                                     "lobby_sessions",
+                                                     "control_port",
+                                                     "lobby_port",
+                                                     "quarantined_ports"
+                                                 ],
+                                    "properties":  {
+                                                       "engine":  {
+                                                                      "type":  "string"
+                                                                  },
+                                                       "pid":  {
+                                                                   "type":  "integer"
+                                                               },
+                                                       "uptime_ms":  {
+                                                                         "type":  "integer"
+                                                                     },
+                                                       "sampled_at":  {
+                                                                          "type":  "number"
+                                                                      },
+                                                       "engine_memory_bytes":  {
+                                                                                   "type":  "integer"
+                                                                               },
+                                                       "active_rooms":  {
+                                                                            "type":  "integer"
+                                                                        },
+                                                       "room_history_total":  {
+                                                                                  "type":  "integer"
+                                                                              },
+                                                       "online_players":  {
+                                                                              "type":  "integer"
+                                                                          },
+                                                       "lobby_sessions":  {
+                                                                              "type":  "integer"
+                                                                          },
+                                                       "control_port":  {
+                                                                            "type":  "integer"
+                                                                        },
+                                                       "lobby_port":  {
+                                                                          "type":  "integer"
+                                                                      },
+                                                       "quarantined_ports":  {
+                                                                                 "type":  "integer"
+                                                                             }
+                                                   }
+                                },
+                       "rooms":  {
+                                     "type":  "array",
+                                     "maxItems":  128,
+                                     "items":  {
+                                                   "type":  "object",
+                                                   "additionalProperties":  false,
+                                                   "required":  [
+                                                                    "room_id",
+                                                                    "game_id",
+                                                                    "state",
+                                                                    "code",
+                                                                    "pid",
+                                                                    "port",
+                                                                    "capacity",
+                                                                    "players",
+                                                                    "reserved",
+                                                                    "heartbeats",
+                                                                    "heartbeat_age_ms",
+                                                                    "memory_bytes",
+                                                                    "cpu_ms",
+                                                                    "cleaned"
+                                                                ],
+                                                   "properties":  {
+                                                                      "room_id":  {
+                                                                                      "type":  "string"
+                                                                                  },
+                                                                      "game_id":  {
+                                                                                      "type":  "string"
+                                                                                  },
+                                                                      "state":  {
+                                                                                    "type":  "string"
+                                                                                },
+                                                                      "code":  {
+                                                                                   "type":  "string"
+                                                                               },
+                                                                      "pid":  {
+                                                                                  "type":  "integer"
+                                                                              },
+                                                                      "port":  {
+                                                                                   "type":  "integer"
+                                                                               },
+                                                                      "capacity":  {
+                                                                                       "type":  "integer"
+                                                                                   },
+                                                                      "players":  {
+                                                                                      "type":  "integer"
+                                                                                  },
+                                                                      "reserved":  {
+                                                                                       "type":  "integer"
+                                                                                   },
+                                                                      "heartbeats":  {
+                                                                                         "type":  "integer"
+                                                                                     },
+                                                                      "heartbeat_age_ms":  {
+                                                                                               "type":  "integer"
+                                                                                           },
+                                                                      "memory_bytes":  {
+                                                                                           "type":  "integer"
+                                                                                       },
+                                                                      "cpu_ms":  {
+                                                                                     "type":  "integer"
+                                                                                 },
+                                                                      "cleaned":  {
+                                                                                      "type":  "boolean"
+                                                                                  }
+                                                                  }
+                                               }
+                                 },
+                       "players":  {
+                                       "type":  "array",
+                                       "maxItems":  1024,
+                                       "items":  {
+                                                     "type":  "object",
+                                                     "additionalProperties":  false,
+                                                     "required":  [
+                                                                      "user_id",
+                                                                      "display_name",
+                                                                      "game_id",
+                                                                      "room_id",
+                                                                      "state"
+                                                                  ],
+                                                     "properties":  {
+                                                                        "user_id":  {
+                                                                                        "type":  "string"
+                                                                                    },
+                                                                        "display_name":  {
+                                                                                             "type":  "string"
+                                                                                         },
+                                                                        "game_id":  {
+                                                                                        "type":  "string"
+                                                                                    },
+                                                                        "room_id":  {
+                                                                                        "type":  "string"
+                                                                                    },
+                                                                        "state":  {
+                                                                                      "type":  "string"
+                                                                                  }
+                                                                    }
+                                                 }
+                                   },
+                       "storage":  {
+                                       "type":  "object",
+                                       "additionalProperties":  false,
+                                       "required":  [
+                                                        "state",
+                                                        "updated_at",
+                                                        "total",
+                                                        "records"
+                                                    ],
+                                       "properties":  {
+                                                          "state":  {
+                                                                        "enum":  [
+                                                                                     "loading",
+                                                                                     "ready",
+                                                                                     "error"
+                                                                                 ]
+                                                                    },
+                                                          "updated_at":  {
+                                                                             "type":  "integer"
+                                                                         },
+                                                          "total":  {
+                                                                        "type":  "integer"
+                                                                    },
+                                                          "records":  {
+                                                                          "type":  "array",
+                                                                          "maxItems":  100,
+                                                                          "items":  {
+                                                                                        "type":  "object",
+                                                                                        "additionalProperties":  false,
+                                                                                        "required":  [
+                                                                                                         "game_id",
+                                                                                                         "match_id",
+                                                                                                         "status",
+                                                                                                         "players"
+                                                                                                     ],
+                                                                                        "properties":  {
+                                                                                                           "game_id":  {
+                                                                                                                           "type":  "string"
+                                                                                                                       },
+                                                                                                           "match_id":  {
+                                                                                                                            "type":  "string"
+                                                                                                                        },
+                                                                                                           "status":  {
+                                                                                                                          "type":  "string"
+                                                                                                                      },
+                                                                                                           "players":  {
+                                                                                                                           "type":  "array",
+                                                                                                                           "maxItems":  16,
+                                                                                                                           "items":  {
+                                                                                                                                         "type":  "object",
+                                                                                                                                         "additionalProperties":  false,
+                                                                                                                                         "required":  [
+                                                                                                                                                          "user_id",
+                                                                                                                                                          "score"
+                                                                                                                                                      ],
+                                                                                                                                         "properties":  {
+                                                                                                                                                            "user_id":  {
+                                                                                                                                                                            "type":  "string"
+                                                                                                                                                                        },
+                                                                                                                                                            "score":  {
+                                                                                                                                                                          "type":  "number"
+                                                                                                                                                                      }
+                                                                                                                                                        }
+                                                                                                                                     }
+                                                                                                                       }
+                                                                                                       }
+                                                                                    }
+                                                                      }
+                                                      }
+                                   }
+                   }
+}

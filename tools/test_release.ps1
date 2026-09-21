@@ -4,7 +4,7 @@ $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $Bundle=[IO.Path]::GetFullPath($Bundle)
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Bundle 'Manage.ps1') -Operation verify
 if($LASTEXITCODE -ne 0) { throw 'Package verification failed' }
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Bundle 'Run.ps1') -Test
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Bundle 'Run.ps1') -Test -Panel -NoBrowser
 if($LASTEXITCODE -ne 0) { throw 'Native two-game test failed' }
 $stdout=Join-Path $root 'logs/release-stop-console.log'
 $stderr=Join-Path $root 'logs/release-stop-stderr.log'

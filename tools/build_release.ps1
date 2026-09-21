@@ -16,7 +16,7 @@ platform="Windows Desktop"
 runnable=true
 dedicated_server=false
 export_filter="all_resources"
-include_filter="*.json,*.gd,*.tscn,*.ps1,*.sh"
+include_filter="*.json,*.gd,*.tscn,*.ps1,*.sh,*.html"
 exclude_filter=""
 export_path=""
 script_export_mode=0
@@ -50,6 +50,7 @@ Copy-Item -LiteralPath (Join-Path $project 'tools') -Destination (Join-Path $bun
 Copy-Item -LiteralPath (Join-Path $project 'project.godot') -Destination $bundle
 Copy-Item -LiteralPath (Join-Path $project 'LICENSE') -Destination $bundle
 Copy-Item -LiteralPath (Join-Path $project 'release\Run.ps1'),(Join-Path $project 'release\StartRoomKit.cmd'),(Join-Path $project 'release\Manage.ps1'),(Join-Path $project 'release\StopRoomKit.cmd'),(Join-Path $project 'release\CheckRoomKit.cmd'),(Join-Path $project 'release\README.md') -Destination $bundle
+Copy-Item -LiteralPath (Join-Path $project 'release\StartPanel.cmd') -Destination $bundle
 & (Join-Path $PSScriptRoot 'build_games.ps1')
 $games=Get-Content -Encoding UTF8 -Raw (Join-Path $project 'artifacts\games.json') | ConvertFrom-Json
 $index=@{}

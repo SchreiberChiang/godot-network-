@@ -1,3 +1,65 @@
+# 本轮：中文本机状态面板
+
+2026-09-21：用户要求类似宝塔的服务器/房间/玩家数据查看，已新增可实际打开的中文只读网页面板。原房间生命周期、加密连接、SQLite和独立包继续保留；未引入额外后端、未访问旧工程、未部署公网。
+
+打开仓库StartPanel.cmd（需本机Godot）或新版独立包StartPanel.cmd（无需编辑器）。面板与两个示例游戏窗口一起启动；查看宿主运行时间、PID/端口、房间状态/人数/心跳/实际工作集、在线玩家身份及最近100条SQLite对局成绩。支持房间搜索、状态筛选、按房间看成员、点击玩家看近期成绩。只读，不包含账号资产/背包/商城、网页开关房或远程系统管理。具体入口与数据来源见docs/16_dashboard.md。
+
+默认面板仅监听127.0.0.1:28291，使用每次宿主随机生成的Bearer凭据；只从私有run描述文件交付给本机页面，不在应用日志打印访问链接。页面2秒刷新、数据库5秒异步读取；明确区分离线旧数据和存储错误。响应使用显式白名单，不返回控制token、票据/摘要、私钥、数据库授权或私有路径。真实响应Schema和例子已同步。测试随机端口使用独立描述文件，不覆盖用户正常面板的授权文件。
+
+## 本轮实际测试（均在Windows本机）
+
+| 命令/验证 | 最终结果 |
+|---|---|
+| tools/run.ps1 -Mode panel | 退出0，62/0；包含原双玩法47项及面板启动、真实HTTP/Schema、四个真实玩家、真实SQLite结果、401/403/404/405/400拒绝、敏感字段投影、关闭描述文件清理 |
+| tools/run.ps1 -Mode unit | 退出0，250/0；未重复运行所有无关的100轮/20人测试，上轮对应结果保留历史范围 |
+| tools/build_release.ps1 | 退出0；HTML随固定入口PCK导出，包内新增StartPanel.cmd |
+| tools/package_release.ps1 | 退出0；37个不可变文件校验一致，程序ZIP共38项，data/run/logs/私钥/SQLite条目0 |
+| tools/test_release.ps1 -Bundle 新解压目录 | 退出0；official EXE -Test -Panel -NoBrowser为48/0，授权HTTP核对真实宿主PID；另开两个窗口经Stop入口退出18/0，结果查看、备份及监听/日志清理通过 |
+| 浏览器实际操作 | 源码面板显示真实2房/2玩家及旧库1条结果；搜索空结果、房间过滤、玩家详情、宿主退出后的离线提示通过。最终official包页面2房/2玩家，导航到玩家后刷新仍在线；中文布局和内存缺项说明已经截图/DOM核实 |
+| 脚本检查 | PowerShell AST解析、CMD UTF8无BOM/CRLF、git diff --check通过；静态检查不代替上方运行测试 |
+
+主要证据：logs/panel-final-test.txt、panel-unit.txt、panel-final-export.txt、panel-package-final.txt、panel-release-final.txt、panel-visual-session.txt、panel-user-session.txt及对应stderr。测试进程已回收；本轮结束时特意保留最终独立包的1个宿主、2个房间和2个玩家窗口供用户查看，浏览器标签页也保留。这些是交付中的运行会话，不宣称此时进程为零；关闭两个游戏窗口或包内StopRoomKit.cmd可停止，30分钟上限仍有效。
+
+## 失败、修复和边界
+
+- 一次重新解压测试32通过/16失败：首个客户端CONTROL_UNAVAILABLE，其它客户端等待双玩法后续阶段超时。连续同步启动/身份捕获会阻止宿主处理早到客户端的WSS连接；已将演示客户端启动改到独立工作线程，在主线程继续轮询连接，完成后移交精确进程身份记录。未延长超时或删测试；最终源码62/0、新解压official48/0通过。失败保留logs/panel-release-startup-failed.txt及对应旧解压目录的客户端日志。
+- official Godot返回静态内存0（未提供该指标）；现明确显示“当前引擎未提供此指标”，不把0画成有效数据。每房工作集仍由真实Windows进程采样得到。未提供整机CPU/磁盘统计。
+- 页面锚点最初可能在刷新时误当授权；改成仅64位十六进制片段作为凭据，其它锚点沿用当前标签页会话，最终浏览器导航/刷新通过。一次浏览器空字符串填充未清空搜索，改键盘选中删除后确认恢复；未把工具动作尝试计作成功。
+- 新库没有对局时显示空状态；只有完成并保存的真实结果才出现。账号总资产、第三方身份服务、远程面板、公网、Linux完整宿主仍未实现或未验收。网页写操作未提供。
+
+## 当前交付位置
+- 程序ZIP：`F:\文档\GodotGame\Net\RoomKit\artifacts\RoomKit-0.1.0-windows-ba558c42d15d46f78efa2dff32b501ce.zip`
+- 已解压启动器：`F:\文档\GodotGame\Net\RoomKit\artifacts\unpacked-ba558c42d15d46f78efa2dff32b501ce\StartPanel.cmd`
+- 程序ZIP SHA256：`A1F1C6AEBE1D4D477B29F4B8214FB16F1EE4874B09A38E365AE6CA026990B1D9`
+
+## 本轮文件清单（21个）
+
+- `docs/02_contracts.md`
+- `docs/06_roadmap_acceptance.md`
+- `docs/16_dashboard.md`
+- `examples/dashboard_status.example.json`
+- `examples/showcase/host.gd`
+- `host/dashboard.html`
+- `host/dashboard_server.gd`
+- `README.md`
+- `release/README.md`
+- `release/Run.ps1`
+- `release/StartPanel.cmd`
+- `schemas/dashboard_status.schema.json`
+- `StartPanel.cmd`
+- `STATUS.md`
+- `tests/run_panel.gd`
+- `tools/build_release.ps1`
+- `tools/open_panel.ps1`
+- `tools/panel.ps1`
+- `tools/play.ps1`
+- `tools/run.ps1`
+- `tools/test_release.ps1`
+
+---
+
+以下保留之前的里程碑历史；最新结论以上方为准。
+
 # 实际开发状态
 
 更新：2026-09-21。本轮继续用户“一口气全做完”的后续授权，完成 Windows 本机 M4 安全/恢复闭环和 M5 发布候选交付；**不把 M4/M5 全部正式门禁标为通过**。Linux完整宿主、跨电脑与公网、最坏玩法容量边界、另一台干净机器仍未验收。只修改当前独立仓库，没有读取、复制或修改旧游戏/旧服务器，没有云部署或账号商城。

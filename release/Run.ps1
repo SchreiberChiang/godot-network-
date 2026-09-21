@@ -1,4 +1,4 @@
-param([ValidateSet('blocks','turns')][string]$Game='turns',[switch]$Test,[switch]$Smoke)
+param([ValidateSet('blocks','turns')][string]$Game='turns',[switch]$Test,[switch]$Smoke,[switch]$Panel,[switch]$NoBrowser)
 $ErrorActionPreference='Stop'
 $bundle=$PSScriptRoot
 $logs=Join-Path $bundle 'logs'
@@ -6,9 +6,11 @@ New-Item -ItemType Directory -Force -Path $logs | Out-Null
 $arguments=@('--headless','--',('--game='+$Game))
 if($Test) { $arguments+='--automated=true' }
 if($Smoke) { $arguments+='--smoke=true' }
+if($Panel) { $arguments+='--panel=true' }
 $quoted=foreach($argument in $arguments) { '"'+($argument -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }
 $process=Start-Process -FilePath (Join-Path $bundle 'RoomHost.exe') -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logs 'host-console.log') -RedirectStandardError (Join-Path $logs 'host-stderr.log')
 $handle=$process.Handle
+if($Panel) { & (Join-Path $bundle 'tools/open_panel.ps1') -ExpectedPid $process.Id -NoBrowser:$NoBrowser }
 $timeout=if($Test -or $Smoke) { 240000 } else { 1900000 }
 if(-not $process.WaitForExit($timeout)) { $process.Kill(); $process.WaitForExit(); throw 'Host timeout; owned host stopped, child watchdogs will exit.' }
 Get-Content -Encoding UTF8 (Join-Path $logs 'host-console.log')

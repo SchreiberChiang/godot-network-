@@ -89,3 +89,5 @@ session.create 的可选 credential 为64个小写十六进制字符，唯一约
 身份摘要文件契约为 identities.schema.json；重启端口/进程记录为 process_journal.schema.json。二者是私有宿主文件，不是客户端协议。身份文件最多128项；日志中的未知owned={}必须持续隔离。RECOVERY_REQUIRED表示日志不可安全恢复，ROOM_MEMORY_LIMIT表示采样超限，HELPER_TIMEOUT/HELPER_FAILED只在本地助手边界使用，存储边界转换为STORAGE_UNAVAILABLE。资源上限使用已有HOST_CAPACITY_EXCEEDED。客户端TLS错误统一表现为AUTH_FAILED或CONTROL_UNAVAILABLE，不回传密钥路径或底层敏感错误。
 
 控制协议仍为1、游戏协议仍为1；SDK和构建兼容标识同步升版。0.3.0旧宿主/旧客户端没有新安全功能，不声称跨版本互通。详细配对见docs/07；配置、过期及证书失败分别由单元和真实secure专项验证。
+
+本机管理面板独立API版本1：GET /api/status，响应唯一契约为schemas/dashboard_status.schema.json，示例为examples/dashboard_status.example.json。需要每次宿主生成的Bearer授权；没有写接口，不改变游戏控制协议。HTTP 401/403/404/405/400分别为缺少授权、错误来源/主机、未知路径、非GET、非法头；完整字段投影和边界见docs/16_dashboard.md，真实HTTP/Schema测试见tests/run_panel.gd。
