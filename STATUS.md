@@ -1,4 +1,52 @@
-# 本轮：中文本机状态面板
+# 本轮：通用框架分支与资产基础
+
+2026-09-21：已从 `codex/m4-results` 的 `1a8bec5` 创建并切换到 `codex/shooter-framework`。用户确认采用“通用框架＋可选玩法模块＋具体游戏模式”，永久账号资产与比赛临时经济分开；当前示例为横版自由混战，战术回合玩法仅保留扩展边界。完整范围已写入 docs/17_framework_shooter_plan.md，原 CODEX_START/docs/00 的 M0/M1 标为历史启动任务。
+
+## 已完成
+
+- S0 分支、架构边界、阶段和契约；完成 S3 的第一批内部资产基础，尚未接公共网络/UI。
+- 可信资产目录与配置槽、独立/共享空间选择；同一个钱包可以共享，默认配置按游戏分别保存。
+- Godot 内部资产服务、SQLite 永久金币/经验/非堆叠所有权/默认配置、购买与选用分开、管理员调整、版本冲突检查、幂等回执与前后状态审计。
+- SQLite 助手 v1→v2 保留式初始化升级、真实事务回滚、在线备份；不迁移旧项目账号。
+- 独立的可选比赛内存钱包，不连接永久数据库，随实例结束清空。
+- 射击策略（大厅/死亡允许）与取石子策略（只允许大厅）分别实现，框架不包含死亡/枪械分支。已验证内部接口复用，不等同于两个完整客户端已接入。
+
+## 本轮真实测试
+
+环境：当前项目 `F:\文档\GodotGame\Net\RoomKit`，Windows、Godot `4.7.2.stable.steam.ed1daf0bf`、SQLite `3.51.1`。所有命令均从本目录运行。
+
+| 实际命令 | 退出码 | 结果与范围 |
+|---|---:|---|
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit | 0 | 最终 284/0；原 250 项＋34 项资产目录、契约、策略和比赛内存钱包检查 |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode assets | 0 | 70/0；其中 30 项纯逻辑＋40 项真实 SQLite/内部服务检查；随后补充的 4 个文档例子在上方 unit 中验收，不虚增此轮 assets 实测数 |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode persistence | 0 | 42/0；原真实 Godot 子进程结果保存、丢 ACK 重试、宿主退出/恢复、签名校验与资源回收回归 |
+
+资产测试真实验证：v1 数据库旧结果保留；购买/选择跨服务重开保留；重复请求只扣一次；不同用户/空间隔离；共用钱包但不同游戏配置不覆盖；两个独立 SQLite 写者同版本竞争仅一方成功；中文审计；备份可读；在写状态后通过测试库触发器让回执写入失败，状态和回执均回滚。
+
+证据：logs/unit-console.log、assets-console.log、persistence-console.log 及各自 stderr。最终资产测试库为 data/test-assets-13d7d40cf0d4c6ceacdc5c7c1888b6ff；失败触发器仅在该独立测试库内，未改用户演示库。运行数据不进入 Git。
+
+## 失败和修复
+
+新增旧库测试夹具首次为 30 通过/1 失败、退出 1。原因是直接调用 PowerShell 脚本后检查没有设置的 LASTEXITCODE，将已成功创建的私有目录误判失败；改为同时依赖脚本异常和 PRIVATE_DATA_READY 成功标记，未降低目录边界检查。保留 logs/assets-legacy-attempt-failed.log 和对应 stderr；修复后的完整资产测试 70/0。单元原有恶意 JSON 指数过大警告仍保留，拒绝断言通过。
+
+## 未完成 / 未运行
+
+尚未实现 S1 常驻可操作后台、S2 用户名密码/邀请码账号、真实房间资产许可及复活串行控制、射击客户端/地图/伤害/背包 UI、整场奖励和自动运维。当前 StartPanel.cmd 仍打开原只读双示例面板。内部 identity/context 只接受宿主可信调用，不是可直接暴露的网络权限接口。
+
+这轮未运行射击联机、跨电脑局域网、Linux、浏览器视觉或新独立包导出。SQLite 竞争测试是真实数据库写入，不是网络并发玩家；死亡策略使用测试上下文，不是真实角色状态；重复请求测试不等于网络丢包注入。没有把新分支的全部开发计划标为完成。
+
+## 文件与启动
+
+- 范围/架构/路线：AGENTS.md、CODEX_START.md、README.md、docs/00_greenfield_start.md、docs/01_scope_architecture.md、docs/02_contracts.md、docs/03_sdk_integration.md、docs/06_roadmap_acceptance.md、docs/17_framework_shooter_plan.md、docs/18_asset_foundation.md、STATUS.md。
+- 内部实现：host/core/asset_catalog.gd、asset_rules.gd、asset_service.gd；sdk/roomkit/server/asset_policy.gd、match_wallet.gd；tools/sqlite_store.ps1。
+- 示例/契约：examples/asset_catalog.example.json、asset_messages.example.json、shooter/asset_policy.gd、turn_based/asset_policy.gd；schemas/asset_catalog.schema.json、asset_command.schema.json、asset_state.schema.json。
+- 验证：tests/test_assets.gd、run_assets.gd、run_unit.gd、fixtures/asset_database.ps1；tools/run.ps1。
+
+复现新增基础功能使用上表 `-Mode assets`；接口、错误码与数据版本边界见 docs/18_asset_foundation.md。当前还没有可以启动的射击游戏入口。后续按 docs/17 继续常驻后台和账号接入，无需重新确定架构方向。
+
+---
+
+# 历史：中文本机状态面板
 
 2026-09-21：用户要求类似宝塔的服务器/房间/玩家数据查看，已新增可实际打开的中文只读网页面板。原房间生命周期、加密连接、SQLite和独立包继续保留；未引入额外后端、未访问旧工程、未部署公网。
 

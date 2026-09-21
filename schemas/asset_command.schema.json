@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Server asset command v1 - internal only",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "request_id"
+  ],
+  "properties": {
+    "kind": {
+      "enum": [
+        "purchase",
+        "select",
+        "adjust"
+      ]
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "item_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+    },
+    "slot": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+    },
+    "credits": {
+      "type": "integer",
+      "minimum": -1000000,
+      "maximum": 1000000
+    },
+    "experience": {
+      "type": "integer",
+      "minimum": -1000000,
+      "maximum": 1000000
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "purchase"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "item_id"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "slot"
+              ]
+            },
+            {
+              "required": [
+                "credits"
+              ]
+            },
+            {
+              "required": [
+                "experience"
+              ]
+            },
+            {
+              "required": [
+                "reason"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "select"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "item_id",
+          "slot"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "credits"
+              ]
+            },
+            {
+              "required": [
+                "experience"
+              ]
+            },
+            {
+              "required": [
+                "reason"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "adjust"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "credits",
+          "experience",
+          "reason"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "item_id"
+              ]
+            },
+            {
+              "required": [
+                "slot"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

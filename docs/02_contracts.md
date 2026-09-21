@@ -1,5 +1,7 @@
 # 02 控制协议与生命周期
 
+2026-09-21 新分支增加内部资产目录、永久状态和交易命令 Schema，见 [18_asset_foundation.md](18_asset_foundation.md)。这些尚未接入大厅/控制网络消息，现有线协议保持严格拒绝未知消息，不能把内部服务当作已上线账号接口。
+
 状态：以下为整体设计。M1 已实现的 control_protocol=1 子集、payload 与错误码见 [09_m1_control.md](09_m1_control.md) 和 `schemas/control.schema.json`；其余操作仍为后续阶段设计。JSON Schema 不能替代认证与生命周期语义检查。
 
 ## 1. 通用消息

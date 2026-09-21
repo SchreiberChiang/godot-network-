@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "spaces": {
+    "shooter": {
+      "items": {
+        "rifle": {
+          "name": "基础步枪",
+          "price": 0
+        },
+        "smg": {
+          "name": "冲锋枪",
+          "price": 100
+        },
+        "shotgun": {
+          "name": "霰弹枪",
+          "price": 200
+        }
+      }
+    },
+    "turns": {
+      "items": {
+        "classic": {
+          "name": "经典主题",
+          "price": 0
+        },
+        "jade": {
+          "name": "玉石主题",
+          "price": 100
+        }
+      }
+    }
+  },
+  "games": {
+    "shooter": {
+      "space": "shooter",
+      "slots": {
+        "primary": {
+          "allowed": [
+            "rifle",
+            "smg",
+            "shotgun"
+          ],
+          "default": "rifle"
+        }
+      }
+    },
+    "turns": {
+      "space": "turns",
+      "slots": {
+        "theme": {
+          "allowed": [
+            "classic",
+            "jade"
+          ],
+          "default": "classic"
+        }
+      }
+    }
+  }
+}

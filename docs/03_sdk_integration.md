@@ -1,5 +1,7 @@
 # 03 SDK与项目接入契约
 
+2026-09-21 分支补充：新增可选服务端 `asset_policy.gd`（默认拒绝，游戏覆写规则）与 `match_wallet.gd`（仅本场内存经济）。永久资产使用宿主内部服务，射击/取石子通过各自策略接入；与实际联网角色状态的绑定仍未实现。见[18](18_asset_foundation.md)，完整分层路线见[17](17_framework_shooter_plan.md)。不要将这些接口标为可直接在客户端调用。
+
 ## 1. 交付形态
 
 建议运行时代码与编辑器辅助工具放在 `addons/roomkit/`，分为 client、server、shared、editor。Godot 编辑器插件遵循 addons/plugin_name 目录，可用 GDScript 和场景制作。[S6] 编辑器插件不是运行时通信的必要条件；打包时不要让服务端依赖编辑器对象。

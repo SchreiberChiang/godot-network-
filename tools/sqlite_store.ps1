@@ -66,16 +66,51 @@ try {
     $db=New-Object RoomKitSqlite($Database)
     $result=@{ok=$true;code=''}
     if ($requestObject.op -eq 'init') {
-        [void](Query 'PRAGMA journal_mode=WAL')
         $version=(Query 'PRAGMA user_version')[0]['user_version']
-        if ($version -notin @('0','1')) { throw 'UNSUPPORTED_DATABASE_VERSION' }
+        if ($version -notin @('0','1','2')) { throw 'UNSUPPORTED_DATABASE_VERSION' }
+        [void](Query 'PRAGMA journal_mode=WAL')
         [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
         [void](Query 'CREATE TABLE IF NOT EXISTS launches (launch_id TEXT PRIMARY KEY, room_id TEXT NOT NULL, game_id TEXT NOT NULL, build_id TEXT NOT NULL, secret TEXT NOT NULL)')
         [void](Query 'CREATE TABLE IF NOT EXISTS results (result_id TEXT PRIMARY KEY, game_id TEXT NOT NULL, match_id TEXT NOT NULL, result_kind TEXT NOT NULL, record_hash TEXT NOT NULL, body TEXT NOT NULL, UNIQUE(game_id, match_id, result_kind))')
-        [void](Query 'PRAGMA user_version=1')
+        [void](Query 'CREATE TABLE IF NOT EXISTS asset_states (user_id TEXT NOT NULL, space_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>=0), body TEXT NOT NULL, PRIMARY KEY(user_id,space_id))')
+        [void](Query 'CREATE TABLE IF NOT EXISTS asset_receipts (user_id TEXT NOT NULL, request_id TEXT NOT NULL, fingerprint TEXT NOT NULL, space_id TEXT NOT NULL, actor_id TEXT NOT NULL, command TEXT NOT NULL, previous_body TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,request_id))')
+        [void](Query 'PRAGMA user_version=2')
         [void](Query 'COMMIT'); $transaction=$false
         $result.sqlite_version=(Query 'SELECT sqlite_version() AS version')[0]['version']
-    } elseif ((Query 'PRAGMA user_version')[0]['user_version'] -ne '1') { throw 'DATABASE_NOT_INITIALIZED' }
+    } elseif ((Query 'PRAGMA user_version')[0]['user_version'] -notin @('1','2')) { throw 'DATABASE_NOT_INITIALIZED' }
+    elseif ($requestObject.op -eq 'asset.read') {
+        $rows=Query 'SELECT body FROM asset_states WHERE user_id=? AND space_id=?' @($requestObject.user_id,$requestObject.space_id)
+        $result.body=if ($rows.Count) { $rows[0]['body'] } else { '' }
+    } elseif ($requestObject.op -eq 'asset.receipt') {
+        $rows=Query 'SELECT fingerprint,body FROM asset_receipts WHERE user_id=? AND request_id=?' @($requestObject.user_id,$requestObject.request_id)
+        $result.found=$rows.Count -gt 0
+        if ($result.found) {
+            if ($rows[0]['fingerprint'] -cne $requestObject.fingerprint) { $result=@{ok=$false;code='REQUEST_CONFLICT'} }
+            else { $result.body=$rows[0]['body']; $result.code='DUPLICATE' }
+        }
+    } elseif ($requestObject.op -eq 'asset.commit') {
+        # This is an internal CAS transaction, never a public SQL/asset write endpoint.
+        $body=$requestObject.body | ConvertFrom-Json
+        if ($requestObject.body.Length -gt 65536 -or [long]$requestObject.expected_revision -lt 0 -or [long]$body.revision -ne ([long]$requestObject.expected_revision+1) -or [long]$body.revision -gt 2147483647) { throw 'INVALID_ASSET_COMMIT' }
+        [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
+        $receipt=Query 'SELECT fingerprint,body FROM asset_receipts WHERE user_id=? AND request_id=?' @($requestObject.user_id,$requestObject.request_id)
+        $current=Query 'SELECT revision,body FROM asset_states WHERE user_id=? AND space_id=?' @($requestObject.user_id,$requestObject.space_id)
+        $revision=if ($current.Count) { [long]$current[0]['revision'] } else { 0L }
+        if ($receipt.Count) {
+            if ($receipt[0]['fingerprint'] -cne $requestObject.fingerprint) { $result=@{ok=$false;code='REQUEST_CONFLICT'} }
+            else { $result.body=$receipt[0]['body']; $result.code='DUPLICATE' }
+        } elseif ($revision -ne [long]$requestObject.expected_revision) { $result=@{ok=$false;code='ASSET_VERSION_CONFLICT'} }
+        elseif ([long](Query 'SELECT count(*) AS count FROM asset_receipts')[0]['count'] -ge 100000) { $result=@{ok=$false;code='STORAGE_CAPACITY_EXCEEDED'} }
+        else {
+            $previous=if ($current.Count) { $current[0]['body'] } else { '' }
+            [void](Query 'INSERT INTO asset_states (user_id,space_id,revision,body) VALUES (?,?,?,?) ON CONFLICT(user_id,space_id) DO UPDATE SET revision=excluded.revision,body=excluded.body' @($requestObject.user_id,$requestObject.space_id,[string]$body.revision,$requestObject.body))
+            [void](Query 'INSERT INTO asset_receipts (user_id,request_id,fingerprint,space_id,actor_id,command,previous_body,body) VALUES (?,?,?,?,?,?,?,?)' @($requestObject.user_id,$requestObject.request_id,$requestObject.fingerprint,$requestObject.space_id,$requestObject.actor_id,$requestObject.command,$previous,$requestObject.body))
+            $result.body=$requestObject.body
+        }
+        [void](Query 'COMMIT'); $transaction=$false
+    } elseif ($requestObject.op -eq 'asset.audit') {
+        $result.rows=@((Query 'SELECT request_id,space_id,actor_id,command,previous_body,body,created_at FROM asset_receipts WHERE user_id=? ORDER BY rowid DESC LIMIT 100' @($requestObject.user_id)).ToArray())
+    }
     elseif ($requestObject.op -eq 'grant') {
         $g=$requestObject.grant
         [void](Query 'BEGIN IMMEDIATE'); $transaction=$true

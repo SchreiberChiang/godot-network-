@@ -1,0 +1,46 @@
+[
+  {
+    "schema": "asset_command.schema.json",
+    "value": {
+      "kind": "purchase",
+      "request_id": "unlock_001",
+      "item_id": "smg"
+    }
+  },
+  {
+    "schema": "asset_command.schema.json",
+    "value": {
+      "kind": "select",
+      "request_id": "select_001",
+      "slot": "primary",
+      "item_id": "smg"
+    }
+  },
+  {
+    "schema": "asset_command.schema.json",
+    "value": {
+      "kind": "adjust",
+      "request_id": "grant_001",
+      "credits": 300,
+      "experience": 0,
+      "reason": "本机测试发放"
+    }
+  },
+  {
+    "schema": "asset_state.schema.json",
+    "value": {
+      "revision": 3,
+      "credits": 200,
+      "experience": 0,
+      "owned": [
+        "rifle",
+        "smg"
+      ],
+      "profiles": {
+        "shooter": {
+          "primary": "smg"
+        }
+      }
+    }
+  }
+]
