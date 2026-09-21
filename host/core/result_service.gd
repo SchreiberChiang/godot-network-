@@ -17,15 +17,17 @@ var ack_count := 0
 var pending: Array = []
 var worker: Thread
 var current: Dictionary = {}
+var reward_calculator: Callable
 
-func initialize(root: String, payload_schemas: Dictionary) -> Dictionary:
+func initialize(root: String, payload_schemas: Dictionary, database_name: String = "results.sqlite") -> Dictionary:
 	schemas = payload_schemas.duplicate()
-	var result: Dictionary = repository.initialize(root)
+	var result: Dictionary = repository.initialize(root, database_name)
 	if not result.ok:
 		return result
 	result = repository.execute({"op": "grants"})
 	if not result.ok:
 		return result
+	grants.clear()
 	for grant in result.grants:
 		grants[grant.launch_id] = grant
 	return {"ok": true, "code": ""}
@@ -63,7 +65,10 @@ func validate_submission(submission: Dictionary) -> Dictionary:
 		return Wire.failure("AUTH_FAILED")
 	if not schemas.has(record.game_id) or Validator.validate_file(record.payload, schemas[record.game_id]) != "":
 		return Wire.failure("INVALID_RESULT")
-	return {"ok": true, "request": {"op": "accept", "record": record.duplicate(true), "record_hash": Format.hash_record(record), "body": Format.canonical(record)}}
+	var request := {"op": "accept", "record": record.duplicate(true), "record_hash": Format.hash_record(record), "body": Format.canonical(record)}
+	if reward_calculator.is_valid():
+		request.rewards = reward_calculator.call(record.duplicate(true))
+	return {"ok": true, "request": request}
 
 func handle(row: Dictionary, message: Dictionary) -> bool:
 	if message.type != "result.submit":

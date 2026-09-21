@@ -1,6 +1,12 @@
 # RoomKit 本地开发 SDK 源码
 
-当前提供客户端 `client/room_client.gd`、房间运行时 `server/room_runtime.gd`、`server/game_adapter.gd` 和共享契约/传输代码。它们不引用具体游戏资源；源码 SDK 0.4.0 已随新工程模板和 Windows 独立示例分发；不是编辑器插件面板。
+当前分支新增源码 SDK **0.5.0** 的可选账号/资产接口。此前 0.4.0 开发身份流程继续保留；新 managed 宿主和双端构建需同步升级，不混用旧游戏产物。实际导出与运行验收见仓库 STATUS，版本号不代表所有发布门禁通过。
+
+`client/account_client.gd` 继承 RoomClient，使用同一个 WebSocket 大厅和 ENet 房间流程。配置除游戏清单外包含 `managed=true`、WSS `url`、`ca_certificate`、`server_hostname`、`secure_enet=true`。调用 `register_account(username,password,display_name,invite_code)` 或 `login(username,password)` 后，在登录成功的连接上创建/进入房间。支持 `logout()`、`rename()`、`change_password()`、`read_assets()`、`purchase(item_id,operation_id)`、`select_item(slot,item_id,operation_id)`。密码变更后旧会话失效；未确认的资产请求保留原 operation_id 重试。
+
+可选资产接入：GameAdapter 的 `on_asset_state(user_id,state)` 接收服务端确认的永久状态；`asset_context(user_id)` 返回游戏自己的可信上下文，具体策略只在游戏注册层解释。`set_asset_busy` 标记正在处理的事务。游戏需要刷新状态后再转阶段时，发出 `asset_refresh_requested(user_id,operation)`；SDK 调用 `complete_asset_refresh(user_id,operation,state)` 或 `cancel_asset_refresh(user_id,operation)`。操作名由游戏定义，SDK 不解释死亡、复活、枪械或赛车。初始状态在 `on_player_admitted` 前送达；超时、离房与重连使旧操作失效。永久钱包由宿主保存，比赛临时经济可选用 `server/match_wallet.gd`，二者不共享余额。
+
+下面是继续保留的开发身份接入方式。共享传输、房间运行时和 GameAdapter 不引用具体游戏资源；SDK 是源码包，不是编辑器插件面板。
 
 客户端将 RoomClient 加入 SceneTree，调用 `configure({url, game_id, build_id, compatibility_id, game_protocol})`，然后依次 `await open_session(display_name)`、`await create_room(options, idempotency_key)` / `await list_rooms()`、等待 READY、`await join_room(room_id)`、`await leave_room()`。退出时 `close()`。网络请求返回 `{ok, payload, code?}`；退出房间保留当前大厅会话。
 

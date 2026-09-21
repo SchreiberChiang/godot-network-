@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Trusted permanent result rewards v1",
+  "description": "Internal host-calculated rewards, never a client-supplied payout. Each user_id may occur only once; storage enforces that semantic constraint atomically.",
+  "type": "array",
+  "maxItems": 256,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["user_id", "space_id", "credits", "experience"],
+    "properties": {
+      "user_id": {"type": "string", "pattern": "^[^\\x00-\\x1f\\x7f]{1,128}$"},
+      "space_id": {"$ref": "asset_catalog.schema.json#/properties/games/additionalProperties/properties/space"},
+      "credits": {"$ref": "#/$defs/amount"},
+      "experience": {"$ref": "#/$defs/amount"}
+    }
+  },
+  "$defs": {
+    "amount": {"type": "integer", "minimum": 0, "maximum": 1000000}
+  }
+}

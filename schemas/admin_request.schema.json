@@ -1,0 +1,1001 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local administrator HTTP request v1",
+  "description": "Strict per-action input contract. Transport and operator both validate this schema before authentication or side effects. Account and asset scalar rules reference their authoritative schemas.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "payload"
+  ],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "setup.status",
+        "admin.logout",
+        "status",
+        "server.start",
+        "invite.list",
+        "backup.list",
+        "logs.list",
+        "config.get",
+        "setup.create",
+        "admin.login",
+        "server.stop",
+        "server.restart",
+        "maintenance.set",
+        "room.create",
+        "room.stop",
+        "room.recreate",
+        "room.joinable",
+        "player.kick",
+        "account.unban",
+        "account.list",
+        "account.get",
+        "account.reset_password",
+        "account.ban",
+        "account.rename",
+        "invite.create",
+        "invite.revoke",
+        "asset.read",
+        "asset.adjust",
+        "asset.grant",
+        "asset.revoke",
+        "asset.select",
+        "backup.create",
+        "backup.restore",
+        "logs.read",
+        "audit.list",
+        "config.set"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "setup.status",
+            "admin.logout",
+            "status",
+            "server.start",
+            "invite.list",
+            "backup.list",
+            "logs.list",
+            "config.get"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/empty"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "setup.create",
+            "admin.login"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/credentials"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "server.stop",
+            "server.restart"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/server_stop"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "maintenance.set"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/maintenance"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "room.create"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/room_create"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "room.stop",
+            "room.recreate"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/room_action"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "room.joinable"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/room_joinable"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "player.kick",
+            "account.unban"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/user_reason"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "account.list"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/account_list"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "account.get"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/account_get"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "account.reset_password"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/account_password"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "account.ban"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/account_ban"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "account.rename"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/account_rename"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "invite.create"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/invite_create"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "invite.revoke"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/invite_revoke"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "asset.read"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/asset_read"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "asset.adjust"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/asset_adjust"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "asset.grant",
+            "asset.revoke"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/asset_item"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "asset.select"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/asset_select"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "backup.create"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/reason"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "backup.restore"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/backup_restore"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "logs.read"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/logs_read"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "audit.list"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/audit"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "config.set"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/config_set"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "empty": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {},
+      "required": []
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "username": {
+          "$ref": "account_request.schema.json#/properties/username"
+        },
+        "password": {
+          "$ref": "account_request.schema.json#/properties/password"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ]
+    },
+    "server_stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "immediate": {
+          "type": "boolean"
+        },
+        "restart": {
+          "type": "boolean"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "immediate",
+        "reason"
+      ]
+    },
+    "maintenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]*$"
+        }
+      },
+      "required": [
+        "enabled",
+        "message"
+      ]
+    },
+    "room_create": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "game_id": {
+          "$ref": "game_manifest.schema.json#/properties/game_id"
+        },
+        "mode": {
+          "$ref": "asset_command.schema.json#/properties/slot"
+        },
+        "map": {
+          "$ref": "asset_command.schema.json#/properties/slot"
+        },
+        "capacity": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      },
+      "required": [
+        "game_id",
+        "mode",
+        "map",
+        "capacity"
+      ]
+    },
+    "room_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "room_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "room_id",
+        "reason"
+      ]
+    },
+    "room_joinable": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "room_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "joinable": {
+          "type": "boolean"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "room_id",
+        "joinable",
+        "reason"
+      ]
+    },
+    "user_reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "user_id",
+        "reason"
+      ]
+    },
+    "account_list": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": []
+    },
+    "account_get": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "user_id"
+      ]
+    },
+    "account_password": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "password": {
+          "$ref": "account_request.schema.json#/properties/password"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "user_id",
+        "password",
+        "reason"
+      ]
+    },
+    "account_ban": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "hours": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 87600
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "user_id",
+        "hours",
+        "reason"
+      ]
+    },
+    "account_rename": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "display_name": {
+          "$ref": "account_request.schema.json#/properties/display_name"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "user_id",
+        "display_name",
+        "reason"
+      ]
+    },
+    "invite_create": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uses": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "expires_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8760
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "uses",
+        "expires_hours",
+        "reason"
+      ]
+    },
+    "invite_revoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "invite_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "invite_id",
+        "reason"
+      ]
+    },
+    "asset_read": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "game_id": {
+          "$ref": "game_manifest.schema.json#/properties/game_id"
+        }
+      },
+      "required": [
+        "user_id",
+        "game_id"
+      ]
+    },
+    "asset_adjust": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "game_id": {
+          "$ref": "game_manifest.schema.json#/properties/game_id"
+        },
+        "coins_delta": {
+          "$ref": "asset_command.schema.json#/properties/credits"
+        },
+        "xp_delta": {
+          "$ref": "asset_command.schema.json#/properties/experience"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        },
+        "operation_id": {
+          "$ref": "asset_command.schema.json#/properties/request_id"
+        }
+      },
+      "required": [
+        "user_id",
+        "game_id",
+        "coins_delta",
+        "xp_delta",
+        "reason",
+        "operation_id"
+      ]
+    },
+    "asset_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "game_id": {
+          "$ref": "game_manifest.schema.json#/properties/game_id"
+        },
+        "item_id": {
+          "$ref": "asset_command.schema.json#/properties/item_id"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        },
+        "operation_id": {
+          "$ref": "asset_command.schema.json#/properties/request_id"
+        }
+      },
+      "required": [
+        "user_id",
+        "game_id",
+        "item_id",
+        "reason",
+        "operation_id"
+      ]
+    },
+    "asset_select": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "game_id": {
+          "$ref": "game_manifest.schema.json#/properties/game_id"
+        },
+        "slot": {
+          "$ref": "asset_command.schema.json#/properties/slot"
+        },
+        "item_id": {
+          "$ref": "asset_command.schema.json#/properties/item_id"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        },
+        "operation_id": {
+          "$ref": "asset_command.schema.json#/properties/request_id"
+        }
+      },
+      "required": [
+        "user_id",
+        "game_id",
+        "slot",
+        "item_id",
+        "reason",
+        "operation_id"
+      ]
+    },
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "backup_restore": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backup_id": {
+          "type": "string",
+          "pattern": "^backup-[0-9]{17}-[a-f0-9]{8}$"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "backup_id",
+        "reason"
+      ]
+    },
+    "logs_read": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "enum": [
+            "operator",
+            "host"
+          ]
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": []
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lobby_bind": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 45,
+          "pattern": "^[0-9a-fA-F:.]+$"
+        },
+        "advertised_host": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 45,
+          "pattern": "^[0-9a-fA-F:.]+$"
+        },
+        "lobby_port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "max_rooms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "asset_spaces": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "shooter": {
+              "enum": [
+                "shooter",
+                "shared"
+              ]
+            },
+            "turns": {
+              "enum": [
+                "turns",
+                "shared"
+              ]
+            }
+          },
+          "required": [
+            "shooter",
+            "turns"
+          ]
+        }
+      },
+      "required": [
+        "lobby_bind",
+        "advertised_host",
+        "lobby_port",
+        "max_rooms",
+        "asset_spaces"
+      ]
+    },
+    "config_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/config"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "config",
+        "reason"
+      ]
+    }
+  }
+}

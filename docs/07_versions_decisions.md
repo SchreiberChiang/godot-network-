@@ -44,7 +44,13 @@ ADR-007：v0.1不保证崩溃续局。明确中止和清理政策比未实现的
 
 ## 4. 变更规则
 
-2026-09-21 后续实施：当前 SDK **0.4.0**，覆盖下方0.3.0历史记录。开发构建 minimal_room/dev-004（roomkit-minimal-dev-004）、blocks/blocks-dev-003（blocks-v3）、turns/turns-dev-003（turns-v3）。Windows正式模板独立构建为 blocks-win-001 / turns-win-001，兼容标识 blocks-win-v1 / turns-win-v1，清单引擎为4.7.2.stable.official.ed1daf0bf。源码开发引擎为4.7.2.stable.steam.ed1daf0bf。双端必须同构建/兼容标识，不接受旧产物混入。
+2026-09-22 通用管理分支：新增受管理账号/资产 SDK **0.5.0**。源码射击构建 shooter-dev-001（shooter-v1），受管理取石子构建 turns-managed-dev-001（turns-managed-v1）；取石子旧演示的0.4清单保留，构建时生成独立0.5清单。管理大厅使用独立 managed_lobby/account/admin Schema；不能把旧无密码开发身份当成账号登录。控制协议仍为1，但增加资产许可、已确认资产状态和异步刷新消息，启用这些能力必须成对升级宿主与房间。已确认资产包含服务端版本、所有权和游戏配置，客户端不能指定空间或任意装备属性。完整兼容和错误码见 docs/21_managed_protocol.md。
+
+ADR-011：管理服务独立于游戏宿主，只有管理服务持有账号与永久资产数据库。管理服务使用回环 HTTP 和认证的回环 TCP；游戏大厅使用 WSS，房间使用 DTLS/ENet。房间只通过注册的 GameAdapter 请求和接收资产；通用核心不识别枪械、死亡、复活或取石子主题。永久资产、比赛临时资产和具体玩法分层，后续战术模式不得复用永久钱包作为比赛经济。
+
+ADR-012：恢复必须先证明旧宿主及其已登记房间全部退出、UDP端口可以重新绑定，才清理已确认的旧进程记录并启动新宿主。内部恢复操作只撤销玩家会话，保留管理员；删除与恢复审计同事务，且不暴露为玩家消息或远程管理动作。备份恢复则撤销全部会话，要求管理员重新登录。确认失败保持隔离，不按旧PID强杀或继续开服。
+
+2026-09-21 后续实施（历史）：SDK **0.4.0**，覆盖下方0.3.0历史记录。开发构建 minimal_room/dev-004（roomkit-minimal-dev-004）、blocks/blocks-dev-003（blocks-v3）、turns/turns-dev-003（turns-v3）。Windows正式模板独立构建为 blocks-win-001 / turns-win-001，兼容标识 blocks-win-v1 / turns-win-v1，清单引擎为4.7.2.stable.official.ed1daf0bf。源码开发引擎为4.7.2.stable.steam.ed1daf0bf。双端必须同构建/兼容标识，不接受旧产物混入。
 
 框架包名0.1.0-candidate与SDK 0.4.0是不同版本轴。当前可复验组合是Windows10.0.26200、上述Steam编辑器/official模板、系统SQLite3.51.1；两种引擎都已实际跑十轮精确身份和句柄回收。模板全hash为ed1daf0bf001b61586d9930840f2f1394092c079；其它hash拒绝执行专用缓存句柄释放路径，不能只凭4.x标签宣称兼容。Linux official模板仅跑可移植检查。
 

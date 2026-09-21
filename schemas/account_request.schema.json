@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RoomKit account request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "op"
+  ],
+  "properties": {
+    "op": {
+      "enum": [
+        "setup.status",
+        "setup.admin",
+        "invite.create",
+        "invite.list",
+        "invite.revoke",
+        "account.register",
+        "account.login",
+        "session.authenticate",
+        "session.logout",
+        "account.change_password",
+        "account.rename",
+        "account.reset_password",
+        "account.ban",
+        "account.unban",
+        "account.list",
+        "account.get",
+        "session.revoke_all",
+        "audit.list"
+      ]
+    },
+    "token": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "username": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{2,31}$"
+    },
+    "password": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 128
+    },
+    "new_password": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 128
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "client_ip": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "invite_code": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "invite_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "user_id": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "uses": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "expires": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "until": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    },
+    "search": {
+      "type": "string",
+      "maxLength": 64
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "op": {
+          "const": "setup.status"
+        }
+      },
+      "required": []
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "setup.admin"
+        }
+      },
+      "required": [
+        "username",
+        "password",
+        "display_name"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.register"
+        }
+      },
+      "required": [
+        "username",
+        "password",
+        "display_name",
+        "invite_code",
+        "client_ip"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.login"
+        }
+      },
+      "required": [
+        "username",
+        "password",
+        "client_ip"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "session.authenticate"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "session.logout"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.change_password"
+        }
+      },
+      "required": [
+        "token",
+        "password",
+        "new_password",
+        "client_ip"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.rename"
+        }
+      },
+      "required": [
+        "token",
+        "display_name"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "invite.create"
+        }
+      },
+      "required": [
+        "token",
+        "reason"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "invite.list"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "invite.revoke"
+        }
+      },
+      "required": [
+        "token",
+        "invite_id",
+        "reason"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.list"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.get"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.reset_password"
+        }
+      },
+      "required": [
+        "token",
+        "user_id",
+        "password",
+        "reason"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.ban"
+        }
+      },
+      "required": [
+        "token",
+        "user_id",
+        "reason"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.unban"
+        }
+      },
+      "required": [
+        "token",
+        "user_id",
+        "reason"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "session.revoke_all"
+        }
+      },
+      "required": [
+        "token",
+        "user_id",
+        "reason"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "audit.list"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    }
+  ]
+}

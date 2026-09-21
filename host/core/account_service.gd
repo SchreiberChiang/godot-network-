@@ -1,0 +1,50 @@
+extends RefCounted
+## Windows private SQLite account adapter. Call execute() on a worker thread.
+## The network adapter must set client_ip from its accepted connection.
+const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
+const Helper = preload("res://host/platform/bounded_helper.gd")
+const Paths = preload("res://sdk/roomkit/shared/paths.gd")
+const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
+var root := ""
+var database := ""
+
+func initialize(directory: String) -> Dictionary:
+	if OS.get_name() != "Windows":
+		return Wire.failure("UNSUPPORTED_STORAGE")
+	root = Paths.absolute(directory)
+	database = root.path_join("accounts.sqlite")
+	var output: Array = []
+	var code := OS.execute("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", Paths.absolute("res://tools/protect_data.ps1"), "-ProjectRoot", Paths.absolute("res://"), "-DataRoot", root], output, false, false)
+	if code != 0:
+		return Wire.failure("PRIVATE_DATA_FAILED")
+	return _dispatch({"op": "init"})
+
+func execute(request: Dictionary) -> Dictionary:
+	if Validator.validate_file(request, "res://schemas/account_request.schema.json") != "":
+		return Wire.failure("INVALID_ACCOUNT_REQUEST")
+	return _dispatch(request)
+
+func authenticate(credential: String, _now: int = 0) -> Dictionary:
+	# Time is read inside the backend, never accepted from a client or caller.
+	return execute({"op": "session.authenticate", "token": credential})
+
+func reset_player_sessions() -> Dictionary:
+	# Trusted local lifecycle hook, deliberately absent from execute()'s public
+	# schema. The operator must first verify its old host and rooms have exited.
+	# The helper records a fixed recovery reason and never clears admin sessions.
+	return _dispatch({"op": "local.reset_player_sessions"})
+
+func _dispatch(request: Dictionary) -> Dictionary:
+	if root.is_empty():
+		return Wire.failure("STORAGE_UNAVAILABLE")
+	var path := root.path_join("account-request-" + Wire.uid() + ".json")
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return Wire.failure("STORAGE_UNAVAILABLE")
+	file.store_string(JSON.stringify(request))
+	file.close()
+	var result := Helper.execute("account_store.ps1", ["-Database", database, "-Request", path], root, 30000)
+	DirAccess.remove_absolute(path)
+	if str(result.get("code", "")).begins_with("HELPER_"):
+		return Wire.failure("STORAGE_UNAVAILABLE")
+	return result

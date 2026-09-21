@@ -1,0 +1,940 @@
+{
+  "version": 1,
+  "note": "仅用于契约示例。所有 token、密码、ID 均为占位值；Schema 通过不表示已认证、具备权限或实际联网成功。RPC typed account 例子额外验证内层账号 Schema。",
+  "cases": [
+    {
+      "name": "control.asset.initial",
+      "schema": "control.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "event",
+        "type": "asset.initial",
+        "event_id": "example_0",
+        "payload": {
+          "attempt_id": "attempt_example",
+          "user_id": "user_example",
+          "state": {
+            "revision": 1,
+            "credits": 100,
+            "experience": 0,
+            "owned": [
+              "rifle"
+            ],
+            "profiles": {
+              "shooter": {
+                "primary": "rifle"
+              }
+            }
+          }
+        },
+        "game_id": "shooter",
+        "build_id": "shooter-dev-001",
+        "room_id": "room_example",
+        "launch_id": "11111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "control.asset.begin",
+      "schema": "control.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "event",
+        "type": "asset.begin",
+        "event_id": "example_1",
+        "payload": {
+          "operation_id": "op_fence_example",
+          "attempt_id": "attempt_example",
+          "user_id": "user_example"
+        },
+        "game_id": "shooter",
+        "build_id": "shooter-dev-001",
+        "room_id": "room_example",
+        "launch_id": "11111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "control.asset.permit",
+      "schema": "control.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "event",
+        "type": "asset.permit",
+        "event_id": "example_2",
+        "payload": {
+          "operation_id": "op_fence_example",
+          "attempt_id": "attempt_example",
+          "user_id": "user_example",
+          "ok": true,
+          "context": {
+            "location": "room",
+            "life_state": "dead"
+          }
+        },
+        "game_id": "shooter",
+        "build_id": "shooter-dev-001",
+        "room_id": "room_example",
+        "launch_id": "11111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "control.asset.refresh",
+      "schema": "control.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "event",
+        "type": "asset.refresh",
+        "event_id": "example_3",
+        "payload": {
+          "operation_id": "refresh_example",
+          "attempt_id": "attempt_example",
+          "user_id": "user_example"
+        },
+        "game_id": "shooter",
+        "build_id": "shooter-dev-001",
+        "room_id": "room_example",
+        "launch_id": "11111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "control.asset.finish",
+      "schema": "control.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "event",
+        "type": "asset.finish",
+        "event_id": "example_4",
+        "payload": {
+          "operation_id": "op_fence_example",
+          "user_id": "user_example",
+          "ok": true,
+          "state": {
+            "revision": 1,
+            "credits": 100,
+            "experience": 0,
+            "owned": [
+              "rifle"
+            ],
+            "profiles": {
+              "shooter": {
+                "primary": "rifle"
+              }
+            }
+          }
+        },
+        "game_id": "shooter",
+        "build_id": "shooter-dev-001",
+        "room_id": "room_example",
+        "launch_id": "11111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "control.asset.finish.failed",
+      "schema": "control.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "event",
+        "type": "asset.finish",
+        "event_id": "example_5",
+        "payload": {
+          "operation_id": "op_fence_example",
+          "user_id": "user_example",
+          "ok": false,
+          "state": {}
+        },
+        "game_id": "shooter",
+        "build_id": "shooter-dev-001",
+        "room_id": "room_example",
+        "launch_id": "11111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "managed.account.register",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "account.register",
+        "request_id": "example_6",
+        "payload": {
+          "username": "example_player",
+          "password": "example-password-only",
+          "display_name": "示例玩家",
+          "invite_code": "22222222222222222222222222222222"
+        }
+      }
+    },
+    {
+      "name": "managed.account.login",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "account.login",
+        "request_id": "example_7",
+        "payload": {
+          "username": "example_player",
+          "password": "example-password-only"
+        }
+      }
+    },
+    {
+      "name": "managed.account.logout",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "account.logout",
+        "request_id": "example_8",
+        "payload": {}
+      }
+    },
+    {
+      "name": "managed.account.change_password",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "account.change_password",
+        "request_id": "example_9",
+        "payload": {
+          "password": "example-password-only",
+          "new_password": "example-new-password"
+        }
+      }
+    },
+    {
+      "name": "managed.account.rename",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "account.rename",
+        "request_id": "example_10",
+        "payload": {
+          "display_name": "新的昵称"
+        }
+      }
+    },
+    {
+      "name": "managed.asset.read",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "asset.read",
+        "request_id": "example_11",
+        "payload": {
+          "game_id": "shooter"
+        }
+      }
+    },
+    {
+      "name": "managed.asset.purchase",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "asset.purchase",
+        "request_id": "example_12",
+        "payload": {
+          "game_id": "shooter",
+          "item_id": "smg",
+          "operation_id": "purchase_example_1"
+        }
+      }
+    },
+    {
+      "name": "managed.asset.select",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "asset.select",
+        "request_id": "example_13",
+        "payload": {
+          "game_id": "shooter",
+          "slot": "primary",
+          "item_id": "smg",
+          "operation_id": "select_example_1"
+        }
+      }
+    },
+    {
+      "name": "managed.server.notice",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "server.notice",
+        "request_id": "example_14",
+        "payload": {}
+      }
+    },
+    {
+      "name": "managed.game.catalog",
+      "schema": "managed_lobby_request.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "type": "game.catalog",
+        "request_id": "example_15",
+        "payload": {}
+      }
+    },
+    {
+      "name": "managed.login.response",
+      "schema": "managed_lobby_response.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "response",
+        "type": "account.login",
+        "request_id": "example_16",
+        "payload": {
+          "ok": true,
+          "code": "",
+          "token": "0000000000000000000000000000000000000000000000000000000000000000",
+          "identity": {
+            "user_id": "user_example",
+            "display_name": "示例玩家",
+            "role": "player"
+          },
+          "expires": 2000000000
+        },
+        "ok": true
+      },
+      "checks": [
+        {
+          "path": [
+            "payload"
+          ],
+          "schema": "account_response.schema.json"
+        }
+      ]
+    },
+    {
+      "name": "managed.assets.response",
+      "schema": "managed_lobby_response.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "response",
+        "type": "asset.read",
+        "request_id": "example_17",
+        "payload": {
+          "state": {
+            "revision": 1,
+            "credits": 100,
+            "experience": 0,
+            "owned": [
+              "rifle"
+            ],
+            "profiles": {
+              "shooter": {
+                "primary": "rifle"
+              }
+            }
+          },
+          "space": "shooter",
+          "level": 1,
+          "catalog": {
+            "items": {
+              "rifle": {
+                "name": "步枪",
+                "price": 0
+              }
+            }
+          },
+          "slots": {
+            "primary": {
+              "allowed": [
+                "rifle"
+              ],
+              "default": "rifle"
+            }
+          }
+        },
+        "ok": true
+      },
+      "checks": [
+        {
+          "path": [
+            "payload",
+            "state"
+          ],
+          "schema": "asset_state.schema.json"
+        }
+      ]
+    },
+    {
+      "name": "managed.error.response",
+      "schema": "managed_lobby_response.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "response",
+        "type": "asset.purchase",
+        "request_id": "example_18",
+        "payload": {},
+        "ok": false,
+        "error": {
+          "code": "ASSET_OPERATION_DENIED",
+          "message": "ASSET_OPERATION_DENIED",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "rpc.hello",
+      "schema": "local_rpc.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "hello",
+        "token": "0000000000000000000000000000000000000000000000000000000000000000",
+        "launch_id": "11111111111111111111111111111111"
+      }
+    },
+    {
+      "name": "rpc.hello_ok",
+      "schema": "local_rpc.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "hello_ok"
+      }
+    },
+    {
+      "name": "rpc.heartbeat",
+      "schema": "local_rpc.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "heartbeat"
+      }
+    },
+    {
+      "name": "rpc.account.execute.typed",
+      "schema": "local_rpc.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "id": "rpc_account_example",
+        "action": "account.execute",
+        "payload": {
+          "op": "account.login",
+          "username": "example_player",
+          "password": "example-password-only",
+          "client_ip": "127.0.0.1"
+        }
+      },
+      "checks": [
+        {
+          "path": [
+            "payload"
+          ],
+          "schema": "account_request.schema.json"
+        }
+      ]
+    },
+    {
+      "name": "rpc.asset.initial",
+      "schema": "local_rpc.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "id": "rpc_initial_example",
+        "action": "asset.initial",
+        "payload": {
+          "user_id": "user_example",
+          "game_id": "shooter"
+        }
+      }
+    },
+    {
+      "name": "rpc.asset.player",
+      "schema": "local_rpc.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "request",
+        "id": "rpc_asset_example",
+        "action": "asset.player",
+        "payload": {
+          "token": "0000000000000000000000000000000000000000000000000000000000000000",
+          "identity": {
+            "user_id": "user_example",
+            "display_name": "示例玩家",
+            "role": "player"
+          },
+          "game_id": "shooter",
+          "action": "asset.purchase",
+          "command": {
+            "game_id": "shooter",
+            "item_id": "smg",
+            "operation_id": "purchase_example_1"
+          },
+          "context": {
+            "location": "room",
+            "life_state": "dead"
+          }
+        }
+      }
+    },
+    {
+      "name": "rpc.response",
+      "schema": "local_rpc.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "response",
+        "id": "rpc_initial_example",
+        "payload": {
+          "ok": true,
+          "payload": {
+            "state": {
+              "revision": 1,
+              "credits": 100,
+              "experience": 0,
+              "owned": [
+                "rifle"
+              ],
+              "profiles": {
+                "shooter": {
+                  "primary": "rifle"
+                }
+              }
+            },
+            "space": "shooter",
+            "level": 1
+          }
+        }
+      },
+      "checks": [
+        {
+          "path": [
+            "payload",
+            "payload",
+            "state"
+          ],
+          "schema": "asset_state.schema.json"
+        }
+      ]
+    },
+    {
+      "name": "rpc.account.revoked",
+      "schema": "local_rpc.schema.json",
+      "message": {
+        "version": 1,
+        "kind": "event",
+        "action": "account.revoked",
+        "payload": {
+          "user_id": "user_example"
+        }
+      }
+    },
+    {
+      "name": "admin.setup.status",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "setup.status",
+        "payload": {}
+      }
+    },
+    {
+      "name": "admin.setup.create",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "setup.create",
+        "payload": {
+          "username": "example_admin",
+          "password": "example-password-only"
+        }
+      }
+    },
+    {
+      "name": "admin.admin.login",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "admin.login",
+        "payload": {
+          "username": "example_admin",
+          "password": "example-password-only"
+        }
+      }
+    },
+    {
+      "name": "admin.admin.logout",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "admin.logout",
+        "payload": {}
+      }
+    },
+    {
+      "name": "admin.status",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "status",
+        "payload": {}
+      }
+    },
+    {
+      "name": "admin.server.start",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "server.start",
+        "payload": {}
+      }
+    },
+    {
+      "name": "admin.server.stop",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "server.stop",
+        "payload": {
+          "immediate": false,
+          "reason": "计划维护"
+        }
+      }
+    },
+    {
+      "name": "admin.server.restart",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "server.restart",
+        "payload": {
+          "immediate": true,
+          "reason": "重启测试"
+        }
+      }
+    },
+    {
+      "name": "admin.maintenance.set",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "maintenance.set",
+        "payload": {
+          "enabled": true,
+          "message": "维护中，请稍后加入"
+        }
+      }
+    },
+    {
+      "name": "admin.room.create",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "room.create",
+        "payload": {
+          "game_id": "shooter",
+          "mode": "ffa",
+          "map": "depot",
+          "capacity": 8
+        }
+      }
+    },
+    {
+      "name": "admin.room.stop",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "room.stop",
+        "payload": {
+          "room_id": "room_example",
+          "reason": "关闭测试房间"
+        }
+      }
+    },
+    {
+      "name": "admin.room.recreate",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "room.recreate",
+        "payload": {
+          "room_id": "room_example",
+          "reason": "重新开始"
+        }
+      }
+    },
+    {
+      "name": "admin.room.joinable",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "room.joinable",
+        "payload": {
+          "room_id": "room_example",
+          "joinable": false,
+          "reason": "维护房间"
+        }
+      }
+    },
+    {
+      "name": "admin.player.kick",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "player.kick",
+        "payload": {
+          "user_id": "user_example",
+          "reason": "管理员测试"
+        }
+      }
+    },
+    {
+      "name": "admin.account.list",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "account.list",
+        "payload": {
+          "query": "example",
+          "offset": 0,
+          "limit": 50
+        }
+      }
+    },
+    {
+      "name": "admin.account.get",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "account.get",
+        "payload": {
+          "user_id": "user_example"
+        }
+      }
+    },
+    {
+      "name": "admin.account.rename",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "account.rename",
+        "payload": {
+          "user_id": "user_example",
+          "display_name": "新昵称",
+          "reason": "玩家请求"
+        }
+      }
+    },
+    {
+      "name": "admin.account.reset_password",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "account.reset_password",
+        "payload": {
+          "user_id": "user_example",
+          "password": "example-new-password",
+          "reason": "人工恢复"
+        }
+      }
+    },
+    {
+      "name": "admin.account.ban",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "account.ban",
+        "payload": {
+          "user_id": "user_example",
+          "hours": 0,
+          "reason": "违规处理"
+        }
+      }
+    },
+    {
+      "name": "admin.account.unban",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "account.unban",
+        "payload": {
+          "user_id": "user_example",
+          "reason": "复核解除"
+        }
+      }
+    },
+    {
+      "name": "admin.invite.create",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "invite.create",
+        "payload": {
+          "uses": 10,
+          "expires_hours": 24,
+          "reason": "测试邀请"
+        }
+      }
+    },
+    {
+      "name": "admin.invite.list",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "invite.list",
+        "payload": {}
+      }
+    },
+    {
+      "name": "admin.invite.revoke",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "invite.revoke",
+        "payload": {
+          "invite_id": "invite_example",
+          "reason": "撤销测试邀请"
+        }
+      }
+    },
+    {
+      "name": "admin.asset.read",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "asset.read",
+        "payload": {
+          "user_id": "user_example",
+          "game_id": "shooter"
+        }
+      }
+    },
+    {
+      "name": "admin.asset.adjust",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "asset.adjust",
+        "payload": {
+          "user_id": "user_example",
+          "game_id": "shooter",
+          "coins_delta": 100,
+          "xp_delta": 0,
+          "reason": "测试奖励",
+          "operation_id": "admin_adjust_1"
+        }
+      }
+    },
+    {
+      "name": "admin.asset.grant",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "asset.grant",
+        "payload": {
+          "user_id": "user_example",
+          "game_id": "shooter",
+          "item_id": "smg",
+          "reason": "测试解锁",
+          "operation_id": "admin_grant_1"
+        }
+      }
+    },
+    {
+      "name": "admin.asset.revoke",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "asset.revoke",
+        "payload": {
+          "user_id": "user_example",
+          "game_id": "shooter",
+          "item_id": "smg",
+          "reason": "撤销测试解锁",
+          "operation_id": "admin_revoke_1"
+        }
+      }
+    },
+    {
+      "name": "admin.asset.select",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "asset.select",
+        "payload": {
+          "user_id": "user_example",
+          "game_id": "shooter",
+          "item_id": "rifle",
+          "slot": "primary",
+          "reason": "玩家请求恢复默认",
+          "operation_id": "admin_select_1"
+        }
+      }
+    },
+    {
+      "name": "admin.backup.create",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "backup.create",
+        "payload": {
+          "reason": "手动备份"
+        }
+      }
+    },
+    {
+      "name": "admin.backup.list",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "backup.list",
+        "payload": {}
+      }
+    },
+    {
+      "name": "admin.backup.restore",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "backup.restore",
+        "payload": {
+          "backup_id": "backup-20260922000000000-1234abcd",
+          "reason": "恢复测试"
+        }
+      }
+    },
+    {
+      "name": "admin.logs.list",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "logs.list",
+        "payload": {}
+      }
+    },
+    {
+      "name": "admin.logs.read",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "logs.read",
+        "payload": {
+          "label": "operator"
+        }
+      }
+    },
+    {
+      "name": "admin.audit.list",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "audit.list",
+        "payload": {
+          "limit": 100
+        }
+      }
+    },
+    {
+      "name": "admin.config.get",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "config.get",
+        "payload": {}
+      }
+    },
+    {
+      "name": "admin.config.set",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "config.set",
+        "payload": {
+          "config": {
+            "lobby_bind": "127.0.0.1",
+            "advertised_host": "127.0.0.1",
+            "lobby_port": 28290,
+            "max_rooms": 4,
+            "asset_spaces": {
+              "shooter": "shooter",
+              "turns": "turns"
+            }
+          },
+          "reason": "本机测试配置"
+        }
+      }
+    },
+    {
+      "name": "reward.batch",
+      "schema": "result_rewards.schema.json",
+      "message": [
+        {
+          "user_id": "user_example",
+          "space_id": "shooter",
+          "credits": 25,
+          "experience": 0
+        }
+      ]
+    }
+  ]
+}

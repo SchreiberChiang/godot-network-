@@ -1,0 +1,403 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Managed lobby requests v1",
+  "anyOf": [
+    {
+      "$ref": "lobby_request.schema.json"
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "account.register"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "username",
+                "password",
+                "display_name",
+                "invite_code"
+              ],
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 32
+                },
+                "password": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 128
+                },
+                "display_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                },
+                "invite_code": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "account.login"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "username",
+                "password"
+              ],
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 32
+                },
+                "password": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "account.logout"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [],
+              "properties": {}
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "account.change_password"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "password",
+                "new_password"
+              ],
+              "properties": {
+                "password": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 128
+                },
+                "new_password": {
+                  "type": "string",
+                  "minLength": 10,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "account.rename"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "display_name"
+              ],
+              "properties": {
+                "display_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                }
+              }
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "asset.read"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "game_id"
+              ],
+              "properties": {
+                "game_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "asset.purchase"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "game_id",
+                "item_id",
+                "operation_id"
+              ],
+              "properties": {
+                "game_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "item_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "operation_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                }
+              }
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "asset.select"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "game_id",
+                "item_id",
+                "slot",
+                "operation_id"
+              ],
+              "properties": {
+                "game_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "item_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "slot": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "operation_id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{1,64}$"
+                }
+              }
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "server.notice"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [],
+              "properties": {}
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "request"
+            },
+            "type": {
+              "const": "game.catalog"
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [],
+              "properties": {}
+            }
+          },
+          "not": {
+            "required": [
+              "idempotency_key"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

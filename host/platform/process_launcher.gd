@@ -120,7 +120,7 @@ func _reap_finished_handle(owned: Dictionary) -> void:
 func _inspect(mode: String, owned: Dictionary) -> Dictionary:
 	var arguments: Array = [
 		"-Mode", mode,
-		"-ProcessId", str(owned["pid"]), "-ExpectedParentPid", str(owned["parent_pid"]),
+		"-ProcessId", str(int(owned["pid"])), "-ExpectedParentPid", str(int(owned["parent_pid"])),
 		"-ExpectedExecutable", str(owned["executable"]), "-LaunchId", str(owned["launch_id"]),
 	]
 	if not str(owned["created_filetime"]).is_empty():

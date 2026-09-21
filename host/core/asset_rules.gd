@@ -38,7 +38,25 @@ static func apply(state: Dictionary, catalog, game_id: String, command: Dictiona
 				return Wire.failure("INSUFFICIENT_CREDITS")
 			next.credits = int(next.credits) - price
 			next.owned.append(command.item_id)
-		"select":
+		"grant", "revoke":
+			if not administrative:
+				return Wire.failure("ADMIN_REQUIRED")
+			if not catalog.allows(game_id, command.item_id):
+				return Wire.failure("UNKNOWN_ITEM")
+			if command.kind == "grant":
+				if command.item_id in next.owned:
+					return Wire.failure("ALREADY_OWNED")
+				next.owned.append(command.item_id)
+			else:
+				if command.item_id in catalog.default_items(game_id):
+					return Wire.failure("ASSET_OPERATION_DENIED")
+				if not command.item_id in next.owned:
+					return Wire.failure("ITEM_NOT_OWNED")
+				next.owned.erase(command.item_id)
+				next = project(next, catalog, game_id)
+		"select", "configure":
+			if command.kind == "configure" and not administrative:
+				return Wire.failure("ADMIN_REQUIRED")
 			var slot: Dictionary = catalog.game(game_id).slots.get(command.slot, {})
 			if not command.item_id in slot.get("allowed", []):
 				return Wire.failure("INVALID_CONFIGURATION")

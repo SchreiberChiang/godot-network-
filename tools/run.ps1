@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('unit','launcher','integration','demo','players','games','persistence','secure','stress','load','recovery','limits','template','panel','assets','all')][string]$Mode = 'demo',
+    [ValidateSet('unit','launcher','integration','demo','players','games','persistence','secure','stress','load','recovery','limits','template','panel','assets','accounts','admin_http','asset_callbacks','result_rewards','managed_contracts','shooter','all')][string]$Mode = 'demo',
     [switch]$Visual,
     [string]$Godot = 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe'
 )
@@ -14,6 +14,7 @@ foreach ($entry in $modes) {
     if ($entry -eq 'template') { & (Join-Path $PSScriptRoot 'new_game.ps1') -GameId 'template_probe' }
     $arguments = @('--headless','--path',$project,'--log-file',(Join-Path $logs "$entry-godot.log"))
     if ($entry -eq 'launcher') { $arguments += @('--script','res://tests/test_launcher_real.gd') }
+    elseif ($entry -eq 'shooter') { $arguments += @('--script','res://examples/shooter/test_runner.gd') }
     elseif ($entry -ne 'demo') { $arguments += @('--script',"res://tests/run_$entry.gd") }
     if ($entry -eq 'games' -and $Visual) { $arguments += @('--','--visual=true') }
     # This Godot binary uses Windows GUI subsystem: explicitly wait for its exit.
@@ -23,7 +24,7 @@ foreach ($entry in $modes) {
     $process = Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr
     # Retain this exact process handle; watchdog never kills by an enumerated PID.
     $ownedHandle = $process.Handle
-    $limit = if ($entry -eq 'stress') { 900000 } else { 240000 }
+    $limit = if ($entry -eq 'stress') { 900000 } elseif ($entry -in @('accounts','result_rewards')) { 360000 } else { 240000 }
     if (-not $process.WaitForExit($limit)) {
         $process.Kill()
         $process.WaitForExit()
@@ -37,6 +38,7 @@ foreach ($entry in $modes) {
     if (Select-String -LiteralPath $stderr -Pattern 'SCRIPT ERROR|Parse Error|Compile Error' -Quiet) { throw "Godot script error in $entry" }
     $marker = switch ($entry) { 'unit' { 'UNIT_RESULT passed=\d+ failed=0' }; 'launcher' { 'REAL_LAUNCHER_RESULT passed=\d+ failed=0' }; 'integration' { 'INTEGRATION_RESULT passed=\d+ failed=0' }; 'players' { 'PLAYERS_RESULT passed=\d+ failed=0' }; 'games' { 'GAMES_RESULT passed=\d+ failed=0' }; 'persistence' { 'PERSISTENCE_RESULT passed=\d+ failed=0' }; 'secure' { 'SECURE_RESULT passed=\d+ failed=0' }; 'stress' { 'STRESS_RESULT passed=\d+ failed=0 cycles=100' }; 'load' { 'LOAD_RESULT passed=\d+ failed=0' }; 'recovery' { 'RECOVERY_RESULT passed=\d+ failed=0' }; 'limits' { 'LIMITS_RESULT passed=\d+ failed=0' }; 'template' { 'TEMPLATE_RESULT passed=\d+ failed=0' }; 'panel' { 'PANEL_RESULT passed=\d+ failed=0' }; 'demo' { 'DEMO_PASS' } }
     if ($entry -eq 'assets') { $marker = 'ASSETS_RESULT passed=\d+ failed=0' }
+    if ($entry -in @('accounts','admin_http','asset_callbacks','result_rewards','managed_contracts','shooter')) { $marker = $entry.ToUpperInvariant() + '_RESULT passed=\d+ failed=0' }
     if (-not (Select-String -LiteralPath (Join-Path $logs "$entry-console.log") -Pattern $marker -Quiet)) { throw "Missing success marker for $entry" }
 }
 exit 0

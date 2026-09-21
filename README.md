@@ -1,6 +1,10 @@
 # RoomKit：独立的本地房间框架
 
-**当前开发分支：`codex/shooter-framework`。** 下一阶段采用“通用框架＋可选玩法模块＋具体游戏模式”，先交付横版射击示例。永久资产与比赛经济分别管理，后续可接战术射击或赛车。完整范围、阶段及验收见 [开发计划](docs/17_framework_shooter_plan.md)，已完成和未运行见 [STATUS](STATUS.md)。下方现有启动器仍对应已实现的双示例与只读面板，不代表新账号/射击已经交付。
+**当前开发分支：`codex/shooter-framework`。** 采用“通用框架＋可选玩法模块＋具体游戏模式”。新代码包含独立管理服务、账号、永久资产、横版射击及取石子示例。真实本机客户端循环、运维和原生服务器联调已通过；浏览器实际操作、导出客户端完整试玩和第二台设备仍待验收。永久资产与比赛经济分别管理，后续可接战术射击或赛车。完整范围、阶段及验收见 [开发计划](docs/17_framework_shooter_plan.md)，实际通过、失败和未运行见 [STATUS](STATUS.md)。
+
+**新管理面板：双击 `StartManagement.cmd`。** 首次在浏览器设置管理员账号，登录后点“启动服务器”，创建邀请码，再打开 `StartShooterClient.cmd` 注册玩家、创建或加入房间。取石子账号客户端为 `StartManagedTurns.cmd`。游戏服务器停止后管理面板继续运行；要关闭整个管理服务用 `StopManagement.cmd`。新入口使用本项目 `data/framework/`，不会导入旧演示身份或其它项目数据。源码入口需要下述 Godot。具体步骤和局域网配置见 [新分支启动说明](docs/22_framework_operations.md)。
+
+以下 `StartPanel.cmd` / `StartPlay.cmd` / `StartTurns.cmd` 是保留的旧演示入口。新管理服务和射击验收以以上新入口及 STATUS 为准。
 
 **中文状态面板：双击 [StartPanel.cmd](StartPanel.cmd)**，同时打开示例游戏和本机网页，查看宿主、每个房间、在线玩家与保存的对局成绩。使用与数据边界见[面板说明](docs/16_dashboard.md)。这是只读状态查看，不包含完整账号资产或网页停服操作。
 

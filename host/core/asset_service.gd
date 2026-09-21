@@ -40,7 +40,7 @@ func read(user_id: String, game_id: String) -> Dictionary:
 func perform(identity: Dictionary, game_id: String, command: Dictionary, policy, trusted_context: Dictionary) -> Dictionary:
 	if not _valid_identity(identity) or policy == null or not policy.has_method("authorize"):
 		return Wire.failure("AUTH_FAILED")
-	if Validator.validate_file(command, "res://schemas/asset_command.schema.json") != "" or command.get("kind", "") == "adjust":
+	if Validator.validate_file(command, "res://schemas/asset_command.schema.json") != "" or command.get("kind", "") not in ["purchase", "select"]:
 		return Wire.failure("INVALID_ASSET_COMMAND")
 	var denied: String = policy.authorize(identity.duplicate(true), trusted_context.duplicate(true), command.duplicate(true))
 	if denied != "":
@@ -51,6 +51,13 @@ func adjust(administrator: Dictionary, user_id: String, game_id: String, command
 	if not _valid_identity(administrator) or administrator.get("role", "") != "admin":
 		return Wire.failure("ADMIN_REQUIRED")
 	if command.get("kind", "") != "adjust":
+		return Wire.failure("INVALID_ASSET_COMMAND")
+	return _transact(user_id, game_id, command, str(administrator.user_id), true)
+
+func manage(administrator: Dictionary, user_id: String, game_id: String, command: Dictionary) -> Dictionary:
+	if not _valid_identity(administrator) or administrator.get("role", "") != "admin":
+		return Wire.failure("ADMIN_REQUIRED")
+	if command.get("kind", "") not in ["grant", "revoke", "configure", "adjust"]:
 		return Wire.failure("INVALID_ASSET_COMMAND")
 	return _transact(user_id, game_id, command, str(administrator.user_id), true)
 

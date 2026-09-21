@@ -1,1 +1,65 @@
-{"type":"object","additionalProperties":false,"required":["round","stones","turn","active_user","players"],"properties":{"round":{"type":"integer","minimum":1},"stones":{"type":"integer","minimum":1,"maximum":12},"turn":{"type":"integer","minimum":1},"active_user":{"type":"string","maxLength":128},"players":{"type":"array","maxItems":16,"items":{"type":"object","additionalProperties":false,"required":["user_id","display_name","score"],"properties":{"user_id":{"type":"string","minLength":1,"maxLength":128},"display_name":{"type":"string","maxLength":32},"score":{"type":"integer","minimum":0}}}}}}
+{
+    "type":  "object",
+    "additionalProperties":  false,
+    "required":  [
+                     "round",
+                     "stones",
+                     "turn",
+                     "active_user",
+                     "players"
+                 ],
+    "properties":  {
+                       "round":  {
+                                     "type":  "integer",
+                                     "minimum":  1
+                                 },
+                       "stones":  {
+                                      "type":  "integer",
+                                      "minimum":  1,
+                                      "maximum":  12
+                                  },
+                       "turn":  {
+                                    "type":  "integer",
+                                    "minimum":  1
+                                },
+                       "active_user":  {
+                                           "type":  "string",
+                                           "maxLength":  128
+                                       },
+                       "players":  {
+                                       "type":  "array",
+                                       "maxItems":  16,
+                                       "items":  {
+                                                     "type":  "object",
+                                                     "additionalProperties":  false,
+                                                     "required":  [
+                                                                      "user_id",
+                                                                      "display_name",
+                                                                      "score"
+                                                                  ],
+                                                     "properties":  {
+                                                                        "user_id":  {
+                                                                                        "type":  "string",
+                                                                                        "minLength":  1,
+                                                                                        "maxLength":  128
+                                                                                    },
+                                                                        "display_name":  {
+                                                                                             "type":  "string",
+                                                                                             "maxLength":  32
+                                                                                         },
+                                                                        "score":  {
+                                                                                      "type":  "integer",
+                                                                                      "minimum":  0
+                                                                                  },
+                                                                        "theme":  {
+                                                                                      "type":  "string",
+                                                                                      "enum":  [
+                                                                                                   "classic",
+                                                                                                   "jade"
+                                                                                               ]
+                                                                                  }
+                                                                    }
+                                                 }
+                                   }
+                   }
+}

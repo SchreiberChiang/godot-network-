@@ -16,6 +16,9 @@ func configure_room(context: Dictionary) -> bool:
 func on_player_admitted(identity: Dictionary) -> void:
 	world.admit(identity, resolve_peer.call(identity.user_id))
 
+func on_asset_state(user_id: String, state: Dictionary) -> void:
+	world.on_asset_state(user_id, state)
+
 func on_player_left(identity: Dictionary, _reason: String) -> void:
 	world.remove_player(identity.user_id)
 

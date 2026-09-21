@@ -5,6 +5,7 @@ var tickets: Dictionary = {}
 var seats: Dictionary = {}
 var ticket_ms := 30000
 var loading_ms := 15000
+var advertised_host := "127.0.0.1"
 
 func reserve(row: Dictionary, user: Dictionary, now: int) -> Dictionary:
 	if row.state != "READY":
@@ -21,7 +22,7 @@ func reserve(row: Dictionary, user: Dictionary, now: int) -> Dictionary:
 	var seat := {"user_id": user.user_id, "display_name": user.display_name, "room_id": row.room_id, "launch_id": row.launch_id, "game_id": row.game_id, "build_id": row.build_id, "compatibility_id": row.compatibility_id, "game_protocol": row.game_protocol, "state": "RESERVED", "attempt_id": "", "expires": now + ticket_ms, "digest": digest}
 	seats[digest] = seat
 	tickets[digest] = {"used": false, "expires": now + ticket_ms, "retire": now + ticket_ms + 60000}
-	return {"ok": true, "payload": {"ticket": token, "host": "127.0.0.1", "port": row.port, "room_id": row.room_id, "launch_id": row.launch_id, "expires_in_ms": ticket_ms}}
+	return {"ok": true, "payload": {"ticket": token, "host": advertised_host, "port": row.port, "room_id": row.room_id, "launch_id": row.launch_id, "expires_in_ms": ticket_ms}}
 
 func consume(row: Dictionary, payload: Dictionary, now: int) -> Dictionary:
 	var digest: String = str(payload.ticket).sha256_text()

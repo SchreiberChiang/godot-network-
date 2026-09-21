@@ -61,6 +61,12 @@ public sealed class RoomKitSqlite : IDisposable {
 $db=$null
 $transaction=$false
 function Query([string]$Sql,[string[]]$Values=@()) { return ,($db.Query($Sql,$Values)) }
+function RewardInteger($Value,[long]$Maximum) {
+    # JSON integer semantics allow 1.0, but never coerce strings/bools/null or
+    # silently round fractions through PowerShell's [long] conversion.
+    if ($Value -isnot [int] -and $Value -isnot [long] -and $Value -isnot [double] -and $Value -isnot [decimal]) { return $false }
+    return (-not [double]::IsNaN([double]$Value) -and -not [double]::IsInfinity([double]$Value) -and [double]$Value -ge 0 -and [double]$Value -le $Maximum -and [double]$Value -eq [math]::Floor([double]$Value))
+}
 try {
     $requestObject=Get-Content -Encoding UTF8 -LiteralPath $Request -Raw | ConvertFrom-Json
     $db=New-Object RoomKitSqlite($Database)
@@ -110,6 +116,10 @@ try {
         [void](Query 'COMMIT'); $transaction=$false
     } elseif ($requestObject.op -eq 'asset.audit') {
         $result.rows=@((Query 'SELECT request_id,space_id,actor_id,command,previous_body,body,created_at FROM asset_receipts WHERE user_id=? ORDER BY rowid DESC LIMIT 100' @($requestObject.user_id)).ToArray())
+    } elseif ($requestObject.op -eq 'asset.audit_all') {
+        # Trusted operator only. No user-supplied SQL, order, filter or limit.
+        if (@($requestObject.PSObject.Properties.Name).Count -ne 1) { $result=@{ok=$false;code='INVALID_ASSET_COMMAND'} }
+        else { $result.rows=@((Query 'SELECT user_id,request_id,space_id,actor_id,command,previous_body,body,created_at FROM asset_receipts ORDER BY rowid DESC LIMIT 100').ToArray()) }
     }
     elseif ($requestObject.op -eq 'grant') {
         $g=$requestObject.grant
@@ -129,7 +139,38 @@ try {
             $result.code=if ($result.ok) {'DUPLICATE'} else {'RESULT_CONFLICT'}
         } elseif ($match.Count -gt 0) { $result=@{ok=$false;code='MATCH_RESULT_CONFLICT'} }
         elseif ([int](Query 'SELECT count(*) AS count FROM results')[0]['count'] -ge 10000) { $result=@{ok=$false;code='STORAGE_CAPACITY_EXCEEDED'} }
-        else { [void](Query 'INSERT INTO results (result_id,game_id,match_id,result_kind,record_hash,body) VALUES (?,?,?,?,?,?)' @($r.result_id,$r.game_id,$r.match_id,$r.result_kind,$requestObject.record_hash,$requestObject.body)) }
+        else {
+            $rewards=@()
+            if ($null -ne $requestObject.PSObject.Properties['rewards']) {
+                if ($requestObject.rewards -isnot [Array] -or $requestObject.rewards.Count -gt 256) { throw 'INVALID_REWARD' }
+                $rewards=$requestObject.rewards
+            }
+            $rewardUsers=New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+            foreach($reward in $rewards) {
+                if ($reward -isnot [PSCustomObject] -or @($reward.PSObject.Properties.Name).Count -ne 4) { throw 'INVALID_REWARD' }
+                if ($reward.user_id -isnot [string] -or $reward.user_id.Length -lt 1 -or $reward.user_id.Length -gt 128 -or $reward.user_id -match '[\x00-\x1f\x7f]' -or $reward.space_id -isnot [string] -or $reward.space_id -cnotmatch '^[a-z][a-z0-9_]{1,63}$' -or -not (RewardInteger $reward.credits 1000000) -or -not (RewardInteger $reward.experience 1000000) -or -not $rewardUsers.Add($reward.user_id)) { throw 'INVALID_REWARD' }
+            }
+            if ($rewards.Count -gt 0 -and ([long](Query 'SELECT count(*) AS count FROM asset_receipts')[0]['count']+$rewards.Count) -gt 100000) {
+                $result=@{ok=$false;code='STORAGE_CAPACITY_EXCEEDED'}
+            } else {
+                [void](Query 'INSERT INTO results (result_id,game_id,match_id,result_kind,record_hash,body) VALUES (?,?,?,?,?,?)' @($r.result_id,$r.game_id,$r.match_id,$r.result_kind,$requestObject.record_hash,$requestObject.body))
+                foreach($reward in $rewards) {
+                    $rows=Query 'SELECT revision,body FROM asset_states WHERE user_id=? AND space_id=?' @($reward.user_id,$reward.space_id)
+                    $previous=if($rows.Count){$rows[0]['body']}else{''}
+                    $state=if($rows.Count){$previous|ConvertFrom-Json}else{[pscustomobject]@{revision=0;credits=0;experience=0;owned=@();profiles=@{}}}
+                    if ($state -isnot [PSCustomObject] -or -not (RewardInteger $state.credits 1000000000) -or -not (RewardInteger $state.experience 1000000000) -or -not (RewardInteger $state.revision 2147483647) -or ($rows.Count -and [long]$rows[0]['revision'] -ne [long]$state.revision)) { throw 'ASSET_LIMIT_EXCEEDED' }
+                    $state.credits=[long]$state.credits+[long]$reward.credits
+                    $state.experience=[long]$state.experience+[long]$reward.experience
+                    $state.revision=[long]$state.revision+1
+                    if($state.credits -gt 1000000000 -or $state.experience -gt 1000000000 -or $state.revision -gt 2147483647) {throw 'ASSET_LIMIT_EXCEEDED'}
+                    $body=$state|ConvertTo-Json -Compress -Depth 20
+                    if ($body.Length -gt 65536) { throw 'ASSET_LIMIT_EXCEEDED' }
+                    $command=@{kind='result_reward';result_id=$r.result_id;credits=$reward.credits;experience=$reward.experience}|ConvertTo-Json -Compress
+                    [void](Query 'INSERT INTO asset_states (user_id,space_id,revision,body) VALUES (?,?,?,?) ON CONFLICT(user_id,space_id) DO UPDATE SET revision=excluded.revision,body=excluded.body' @($reward.user_id,$reward.space_id,[string]$state.revision,$body))
+                    [void](Query 'INSERT INTO asset_receipts (user_id,request_id,fingerprint,space_id,actor_id,command,previous_body,body) VALUES (?,?,?,?,?,?,?,?)' @($reward.user_id,('result_'+$r.result_id),$requestObject.record_hash,$reward.space_id,('game:'+ $r.game_id),$command,$previous,$body))
+                }
+            }
+        }
         [void](Query 'COMMIT'); $transaction=$false
     } elseif ($requestObject.op -eq 'inspect') {
         $result.count=[int](Query 'SELECT count(*) AS count FROM results')[0]['count']
@@ -148,6 +189,10 @@ try {
 } catch {
     if ($transaction -and $db) { try { [void](Query 'ROLLBACK') } catch {} }
     # Do not log SQL, records or signing keys on failure.
+    if ($_.Exception.Message -in @('INVALID_REWARD','ASSET_LIMIT_EXCEEDED')) {
+        Write-Output ('{"ok":false,"code":"'+$_.Exception.Message+'"}')
+        exit 0
+    }
     Write-Output '{"ok":false,"code":"STORAGE_UNAVAILABLE"}'
     exit 1
 } finally { if ($db) { $db.Dispose() } }

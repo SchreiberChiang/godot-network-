@@ -59,7 +59,7 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 	var resolved: Dictionary = registry.resolve(game_id)
 	if not resolved.ok:
 		return resolved
-	if result_service != null and resolved.manifest.get("sdk_version", "") != "0.4.0":
+	if result_service != null and resolved.manifest.get("sdk_version", "") not in ["0.4.0", "0.5.0"]:
 		return {"ok": false, "code": "BUILD_MISMATCH"}
 	var valid: Dictionary = registry.validate_options(game_id, options)
 	if not valid.ok:
@@ -75,6 +75,7 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 	var row: Dictionary = {"room_id": room_id, "launch_id": launch_id, "game_id": game_id, "build_id": resolved.manifest.build_id, "state": "ALLOCATING", "history": ["ALLOCATING"], "code": "", "pid": 0, "port": 0, "registered": false, "heartbeats": 0, "last_sequence": -1, "last_step": -1, "last_heartbeat": 0, "last_progress": 0, "cleaned": false, "exit_confirmed": false, "stop_notice": false, "kill_attempted": false, "token": Crypto.new().generate_random_bytes(32).hex_encode(), "config_path": runtime_root.path_join(launch_id + ".json"), "created_at": Time.get_ticks_msec(), "cleanup_deadline": 0}
 	rooms[room_id] = row
 	row.capacity = int(valid.options.capacity)
+	row.options = valid.options.duplicate(true)
 	row.compatibility_id = resolved.manifest.compatibility_id
 	row.game_protocol = int(resolved.manifest.game_protocol)
 	row.port = ports.acquire(launch_id)
@@ -89,6 +90,8 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 	var private_config: Dictionary = {"room_id": room_id, "launch_id": launch_id, "token": row.token, "game_id": game_id, "build_id": row.build_id, "udp_port": row.port, "control_port": control_port, "heartbeat_ms": int(config.get("heartbeat_ms", 250)), "host_timeout_ms": int(config.get("heartbeat_timeout_ms", 8000)), "startup_timeout_ms": int(config.get("start_timeout_ms", 15000)), "options": options}
 	private_config.compatibility_id = row.compatibility_id
 	private_config.game_protocol = row.game_protocol
+	private_config.bind_ip = str(config.get("game_bind", "127.0.0.1"))
+	private_config.assets_enabled = bool(config.get("assets_enabled", false))
 	if config.has("security"):
 		private_config.security = config.security.duplicate(true)
 	if config.get("async_start", false):
@@ -370,6 +373,8 @@ func _begin_start(row: Dictionary, descriptor: Dictionary, private_config: Dicti
 			return {"ok": false, "code": row.code, "room_id": row.room_id}
 		grant = {"launch_id": row.launch_id, "room_id": row.room_id, "game_id": row.game_id, "build_id": row.build_id, "secret": Crypto.new().generate_random_bytes(32).hex_encode()}
 		store = {"root": result_service.repository.root, "database": result_service.repository.database}
+		if result_service.has_method("worker_store"):
+			store = result_service.worker_store()
 		private_config.results = {"directory": str(store.root).path_join("outbox").path_join(row.launch_id), "secret": grant.secret}
 	var task := Thread.new()
 	_transition(row, "STARTING")
@@ -382,10 +387,17 @@ func _begin_start(row: Dictionary, descriptor: Dictionary, private_config: Dicti
 
 static func _start_worker(descriptor: Dictionary, bootstrap: Dictionary, path: String, grant: Dictionary, store: Dictionary) -> Dictionary:
 	if not grant.is_empty():
-		var repository = preload("res://host/storage/sqlite_repository.gd").new()
-		repository.root = store.root
-		repository.database = store.database
-		var written: Dictionary = repository.execute({"op": "grant", "grant": grant})
+		var written: Dictionary
+		if store.has("rpc"):
+			var remote = preload("res://sdk/roomkit/shared/local_rpc.gd").new()
+			remote.connect_to(int(store.rpc.port), store.rpc.token, store.rpc.launch_id)
+			written = remote.blocking_request("result.grant", {"grant": grant})
+			remote.close()
+		else:
+			var repository = preload("res://host/storage/sqlite_repository.gd").new()
+			repository.root = store.root
+			repository.database = store.database
+			written = repository.execute({"op": "grant", "grant": grant})
 		if not written.ok:
 			return {"started": written, "owned": {}, "grant": {}}
 	var file := FileAccess.open(path, FileAccess.WRITE)

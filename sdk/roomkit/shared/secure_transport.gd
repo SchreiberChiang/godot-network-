@@ -7,11 +7,11 @@ static func server_options(settings: Dictionary) -> TLSOptions:
 		return null
 	return TLSOptions.server(key, certificate)
 
-static func client_options(ca_path: String) -> TLSOptions:
+static func client_options(ca_path: String, server_name: String = "") -> TLSOptions:
 	var certificate := X509Certificate.new()
 	if ca_path.is_empty() or certificate.load(ca_path) != OK:
 		return null
-	return TLSOptions.client(certificate)
+	return TLSOptions.client(certificate, server_name)
 
 static func create_local_certificate(directory: String) -> Dictionary:
 	if DirAccess.make_dir_recursive_absolute(directory) != OK:

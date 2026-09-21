@@ -12,7 +12,10 @@
       "enum": [
         "purchase",
         "select",
-        "adjust"
+        "adjust",
+        "grant",
+        "revoke",
+        "configure"
       ]
     },
     "request_id": {
@@ -140,6 +143,104 @@
             {
               "required": [
                 "slot"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "grant"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "item_id",
+          "reason"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "credits"
+              ]
+            },
+            {
+              "required": [
+                "experience"
+              ]
+            },
+            {
+              "required": [
+                "slot"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "revoke"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "item_id",
+          "reason"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "credits"
+              ]
+            },
+            {
+              "required": [
+                "experience"
+              ]
+            },
+            {
+              "required": [
+                "slot"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "configure"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "item_id",
+          "slot",
+          "reason"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "credits"
+              ]
+            },
+            {
+              "required": [
+                "experience"
               ]
             }
           ]

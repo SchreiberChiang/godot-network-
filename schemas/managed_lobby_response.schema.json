@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Managed lobby responses v1",
+  "anyOf": [
+    {
+      "$ref": "lobby_response.schema.json"
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "envelope.schema.json"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "response"
+            },
+            "type": {
+              "enum": [
+                "account.register",
+                "account.login",
+                "account.logout",
+                "account.change_password",
+                "account.rename",
+                "asset.read",
+                "asset.purchase",
+                "asset.select",
+                "server.notice",
+                "game.catalog"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "maxProperties": 64
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

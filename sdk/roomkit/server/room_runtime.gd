@@ -7,6 +7,8 @@ const NetRoom = preload("res://sdk/roomkit/shared/net_room.gd")
 const Outbox = preload("res://sdk/roomkit/server/result_outbox.gd")
 const ResultFormat = preload("res://sdk/roomkit/shared/result_format.gd")
 const Secure = preload("res://sdk/roomkit/shared/secure_transport.gd")
+const ASSET_OPERATION_TIMEOUT_MS := 60000
+const ASSET_INITIAL_TIMEOUT_MS := 60000
 var adapter
 var build_identity: Dictionary
 var context: Dictionary
@@ -31,6 +33,7 @@ var result_outbox
 var submitted_results: Dictionary = {}
 var last_result_send := -1000
 var last_result_error := ""
+var asset_operations: Dictionary = {}
 
 func _initialize() -> void:
 	var args: Dictionary = {}
@@ -63,6 +66,7 @@ func _initialize() -> void:
 		context.erase("results")
 	if adapter != null:
 		adapter.result_requested.connect(submit_result)
+		adapter.asset_refresh_requested.connect(_refresh_assets)
 	if adapter == null or not adapter.configure_room(public_context):
 		quit(2)
 		return
@@ -94,7 +98,7 @@ func _process(_delta: float) -> bool:
 			_send("room.register", {"token": context.token, "pid": OS.get_process_id()})
 			context.token = ""
 			registered = true
-			enet.set_bind_ip("127.0.0.1")
+			enet.set_bind_ip(str(context.get("bind_ip", "127.0.0.1")))
 			if enet.create_server(int(context.udp_port), int(context.options.capacity)) != OK:
 				_send("room.failed", {"code": "PORT_BIND_FAILED"})
 				stopping = true
@@ -117,6 +121,7 @@ func _process(_delta: float) -> bool:
 			_handle_control(message)
 		if ready and not stopping:
 			network.poll()
+			_expire_asset_operations(now)
 			step += 1
 			if now - last_beat >= int(context.heartbeat_ms):
 				last_beat = now
@@ -160,13 +165,21 @@ func _authenticate(peer_id: int, bytes: PackedByteArray) -> void:
 	if attempts.has(hello.attempt_id):
 		_disconnect(peer_id)
 		return
-	members[peer_id] = {"state": "AUTHENTICATING", "attempt_id": hello.attempt_id, "user_id": hello.user_id, "display_name": "", "deadline": Time.get_ticks_msec() + 12000, "revision": 0}
+	members[peer_id] = {"state": "AUTHENTICATING", "attempt_id": hello.attempt_id, "user_id": hello.user_id, "display_name": "", "deadline": Time.get_ticks_msec() + 12000, "revision": 0, "assets_ready": not context.get("assets_enabled", false)}
 	attempts[hello.attempt_id] = peer_id
 	_send("admission.consume", {"ticket": hello.ticket, "attempt_id": hello.attempt_id, "user_id": hello.user_id, "compatibility_id": hello.compatibility_id, "game_protocol": hello.game_protocol})
 
 func _handle_control(message: Dictionary) -> void:
 	var payload: Dictionary = message.payload
 	match message.type:
+		"asset.begin": _asset_begin(payload)
+		"asset.finish": _asset_finish(payload)
+		"asset.initial":
+			if attempts.has(payload.attempt_id):
+				var member: Dictionary = members[attempts[payload.attempt_id]]
+				if member.user_id == payload.user_id and member.state == "WAIT_HOST" and Time.get_ticks_msec() <= int(member.deadline) and not member.get("assets_ready", false):
+					adapter.on_asset_state(payload.user_id, payload.state)
+					member.assets_ready = true
 		"result.ack":
 			if result_outbox != null:
 				result_outbox.acknowledge(payload)
@@ -197,11 +210,14 @@ func _handle_control(message: Dictionary) -> void:
 			if not attempts.has(payload.attempt_id):
 				return
 			var peer_id: int = attempts[payload.attempt_id]
-			if not payload.ok:
-				_disconnect(peer_id)
-				return
 			var member: Dictionary = members[peer_id]
 			if member.state != "WAIT_HOST":
+				return
+			if not payload.ok or Time.get_ticks_msec() > int(member.deadline):
+				_disconnect(peer_id)
+				return
+			if context.get("assets_enabled", false) and not member.get("assets_ready", false):
+				_disconnect(peer_id)
 				return
 			member.state = "IN_ROOM"
 			revision += 1
@@ -228,12 +244,21 @@ func _loaded(peer_id: int, received_revision: int) -> void:
 		_prepare(peer_id)
 		return
 	members[peer_id].state = "WAIT_HOST"
+	if context.get("assets_enabled", false):
+		members[peer_id].deadline = Time.get_ticks_msec() + ASSET_INITIAL_TIMEOUT_MS
 	_send("member.joined", {"attempt_id": members[peer_id].attempt_id, "user_id": members[peer_id].user_id})
 
 func _peer_left(peer_id: int) -> void:
 	if not members.has(peer_id):
 		return
 	var member: Dictionary = members[peer_id]
+	for operation_id in asset_operations.keys():
+		var operation: Dictionary = asset_operations[operation_id]
+		if operation.user_id == member.user_id:
+			asset_operations.erase(operation_id)
+			adapter.set_asset_busy(member.user_id, false)
+			if operation.kind == "refresh":
+				adapter.cancel_asset_refresh(member.user_id, operation.operation)
 	_send("member.left", {"attempt_id": member.attempt_id, "user_id": member.user_id})
 	if member.state == "IN_ROOM":
 		adapter.on_player_left(_identity(member), "disconnected")
@@ -248,6 +273,76 @@ func _disconnect(peer_id: int) -> void:
 
 func _identity(member: Dictionary) -> Dictionary:
 	return {"user_id": member.user_id, "display_name": member.display_name}
+
+func _asset_begin(payload: Dictionary) -> void:
+	var valid := attempts.has(payload.attempt_id)
+	var member: Dictionary = members.get(attempts.get(payload.attempt_id, -1), {})
+	valid = valid and context.get("assets_enabled", false) and member.get("state", "") == "IN_ROOM" and member.get("user_id", "") == payload.user_id and not stopping and not asset_operations.has(payload.operation_id)
+	for operation in asset_operations.values():
+		valid = valid and operation.user_id != payload.user_id
+	if not valid:
+		_send("asset.permit", {"operation_id": payload.operation_id, "attempt_id": payload.attempt_id, "user_id": payload.user_id, "ok": false, "context": {}})
+		return
+	asset_operations[payload.operation_id] = {"user_id": payload.user_id, "attempt_id": payload.attempt_id, "kind": "transaction", "operation": "", "deadline": Time.get_ticks_msec() + ASSET_OPERATION_TIMEOUT_MS}
+	adapter.set_asset_busy(payload.user_id, true)
+	_send("asset.permit", {"operation_id": payload.operation_id, "attempt_id": payload.attempt_id, "user_id": payload.user_id, "ok": true, "context": adapter.asset_context(payload.user_id)})
+
+func _asset_finish(payload: Dictionary) -> void:
+	var operation: Dictionary = asset_operations.get(payload.operation_id, {})
+	if operation.is_empty() or operation.user_id != payload.user_id:
+		return
+	if Time.get_ticks_msec() > int(operation.deadline):
+		_expire_asset_operations(Time.get_ticks_msec())
+		return
+	asset_operations.erase(payload.operation_id)
+	var member: Dictionary = members.get(attempts.get(operation.attempt_id, -1), {})
+	if member.get("state", "") != "IN_ROOM" or member.get("user_id", "") != payload.user_id:
+		return
+	adapter.set_asset_busy(payload.user_id, false)
+	if payload.ok:
+		adapter.on_asset_state(payload.user_id, payload.state)
+	if operation.kind == "refresh":
+		if payload.ok:
+			adapter.complete_asset_refresh(payload.user_id, operation.operation, payload.state)
+		else:
+			adapter.cancel_asset_refresh(payload.user_id, operation.operation)
+
+func _refresh_assets(user_id: String, operation: String) -> void:
+	if not context.get("assets_enabled", false) or stopping or operation.is_empty() or operation.length() > 64:
+		adapter.cancel_asset_refresh(user_id, operation)
+		return
+	for existing in asset_operations.values():
+		if existing.user_id == user_id:
+			if existing.kind == "refresh" and existing.operation == operation:
+				return
+			adapter.cancel_asset_refresh(user_id, operation)
+			return
+	for member in members.values():
+		if member.user_id == user_id and member.state == "IN_ROOM":
+			var operation_id := Wire.uid()
+			asset_operations[operation_id] = {"user_id": user_id, "attempt_id": member.attempt_id, "kind": "refresh", "operation": operation, "deadline": Time.get_ticks_msec() + ASSET_OPERATION_TIMEOUT_MS}
+			adapter.set_asset_busy(user_id, true)
+			_send("asset.refresh", {"operation_id": operation_id, "attempt_id": member.attempt_id, "user_id": user_id})
+			return
+	adapter.cancel_asset_refresh(user_id, operation)
+
+func _expire_asset_operations(now: int) -> void:
+	for operation_id in asset_operations.keys():
+		var operation: Dictionary = asset_operations[operation_id]
+		if now <= int(operation.deadline):
+			continue
+		asset_operations.erase(operation_id)
+		var peer_id: int = attempts.get(operation.attempt_id, -1)
+		var member: Dictionary = members.get(peer_id, {})
+		if member.get("user_id", "") != operation.user_id:
+			continue
+		adapter.set_asset_busy(operation.user_id, false)
+		if operation.kind == "refresh":
+			adapter.cancel_asset_refresh(operation.user_id, operation.operation)
+		else:
+			# An uncertain write must not allow a live game transition before it resolves.
+			# End this membership; a later reply cannot affect a fresh admission attempt.
+			_disconnect(peer_id)
 
 func _snapshot() -> Dictionary:
 	var list: Array = []

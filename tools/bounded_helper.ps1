@@ -4,7 +4,7 @@ $process=$null
 try {
     $job=Get-Content -LiteralPath $Request -Raw -Encoding UTF8 | ConvertFrom-Json
     $helper=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot $job.helper))
-    if([IO.Path]::GetDirectoryName($helper) -ne $PSScriptRoot -or [IO.Path]::GetFileName($helper) -notin @('process_identity.ps1','sqlite_store.ps1')) { throw 'Invalid helper' }
+    if([IO.Path]::GetDirectoryName($helper) -ne $PSScriptRoot -or [IO.Path]::GetFileName($helper) -notin @('process_identity.ps1','sqlite_store.ps1','account_store.ps1','operator_maintenance.ps1')) { throw 'Invalid helper' }
     $arguments=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$helper)+@($job.arguments)
     $quoted=foreach($argument in $arguments) { '"'+([string]$argument -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }
     $start=New-Object Diagnostics.ProcessStartInfo

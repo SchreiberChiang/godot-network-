@@ -1,0 +1,276 @@
+{
+    "type":  "object",
+    "additionalProperties":  false,
+    "required":  [
+                     "ok",
+                     "code"
+                 ],
+    "properties":  {
+                       "ok":  {
+                                  "type":  "boolean"
+                              },
+                       "code":  {
+                                    "type":  "string"
+                                },
+                       "initialized":  {
+                                           "type":  "boolean"
+                                       },
+                       "token":  {
+                                     "type":  "string",
+                                     "pattern":  "^[a-f0-9]{64}$"
+                                 },
+                       "expires":  {
+                                       "type":  "integer",
+                                       "minimum":  1
+                                   },
+                       "identity":  {
+                                        "type":  "object",
+                                        "additionalProperties":  false,
+                                        "required":  [
+                                                         "user_id",
+                                                         "display_name",
+                                                         "role"
+                                                     ],
+                                        "properties":  {
+                                                           "user_id":  {
+                                                                           "type":  "string",
+                                                                           "minLength":  1,
+                                                                           "maxLength":  64
+                                                                       },
+                                                           "display_name":  {
+                                                                                "type":  "string",
+                                                                                "minLength":  1,
+                                                                                "maxLength":  32
+                                                                            },
+                                                           "role":  {
+                                                                        "enum":  [
+                                                                                     "player",
+                                                                                     "admin"
+                                                                                 ]
+                                                                    }
+                                                       }
+                                    },
+                       "account":  {
+                                       "type":  "object",
+                                       "additionalProperties":  false,
+                                       "required":  [
+                                                        "user_id",
+                                                        "username",
+                                                        "display_name",
+                                                        "role",
+                                                        "created_at",
+                                                        "ban_until",
+                                                        "ban_reason",
+                                                        "banned",
+                                                        "active"
+                                                    ],
+                                       "properties":  {
+                                                          "user_id":  {
+                                                                          "type":  "string",
+                                                                          "minLength":  1,
+                                                                          "maxLength":  64
+                                                                      },
+                                                          "display_name":  {
+                                                                               "type":  "string",
+                                                                               "minLength":  1,
+                                                                               "maxLength":  32
+                                                                           },
+                                                          "role":  {
+                                                                       "enum":  [
+                                                                                    "player",
+                                                                                    "admin"
+                                                                                ]
+                                                                   },
+                                                          "username":  {
+                                                                           "type":  "string"
+                                                                       },
+                                                          "created_at":  {
+                                                                             "type":  "integer",
+                                                                             "minimum":  0
+                                                                         },
+                                                          "ban_until":  {
+                                                                            "type":  "integer",
+                                                                            "minimum":  -1
+                                                                        },
+                                                          "ban_reason":  {
+                                                                             "type":  "string"
+                                                                         },
+                                                          "banned":  {
+                                                                         "type":  "boolean"
+                                                                     },
+                                                          "active":  {
+                                                                         "type":  "boolean"
+                                                                     }
+                                                      }
+                                   },
+                       "accounts":  {
+                                        "type":  "array",
+                                        "maxItems":  200,
+                                        "items":  {
+                                                      "type":  "object",
+                                                      "additionalProperties":  false,
+                                                      "required":  [
+                                                                       "user_id",
+                                                                       "username",
+                                                                       "display_name",
+                                                                       "role",
+                                                                       "created_at",
+                                                                       "ban_until",
+                                                                       "ban_reason",
+                                                                       "banned",
+                                                                       "active"
+                                                                   ],
+                                                      "properties":  {
+                                                                         "user_id":  {
+                                                                                         "type":  "string",
+                                                                                         "minLength":  1,
+                                                                                         "maxLength":  64
+                                                                                     },
+                                                                         "display_name":  {
+                                                                                              "type":  "string",
+                                                                                              "minLength":  1,
+                                                                                              "maxLength":  32
+                                                                                          },
+                                                                         "role":  {
+                                                                                      "enum":  [
+                                                                                                   "player",
+                                                                                                   "admin"
+                                                                                               ]
+                                                                                  },
+                                                                         "username":  {
+                                                                                          "type":  "string"
+                                                                                      },
+                                                                         "created_at":  {
+                                                                                            "type":  "integer",
+                                                                                            "minimum":  0
+                                                                                        },
+                                                                         "ban_until":  {
+                                                                                           "type":  "integer",
+                                                                                           "minimum":  -1
+                                                                                       },
+                                                                         "ban_reason":  {
+                                                                                            "type":  "string"
+                                                                                        },
+                                                                         "banned":  {
+                                                                                        "type":  "boolean"
+                                                                                    },
+                                                                         "active":  {
+                                                                                        "type":  "boolean"
+                                                                                    }
+                                                                     }
+                                                  }
+                                    },
+                       "total":  {
+                                     "type":  "integer",
+                                     "minimum":  0
+                                 },
+                       "invite_code":  {
+                                           "type":  "string",
+                                           "pattern":  "^[a-f0-9]{32}$"
+                                       },
+                       "invite_id":  {
+                                         "type":  "string"
+                                     },
+                       "uses":  {
+                                    "type":  "integer"
+                                },
+                       "invites":  {
+                                       "type":  "array",
+                                       "maxItems":  200,
+                                       "items":  {
+                                                     "type":  "object",
+                                                     "additionalProperties":  false,
+                                                     "required":  [
+                                                                      "invite_id",
+                                                                      "max_uses",
+                                                                      "used",
+                                                                      "expires",
+                                                                      "revoked",
+                                                                      "created_at",
+                                                                      "created_by"
+                                                                  ],
+                                                     "properties":  {
+                                                                        "invite_id":  {
+                                                                                          "type":  "string"
+                                                                                      },
+                                                                        "max_uses":  {
+                                                                                         "type":  "integer"
+                                                                                     },
+                                                                        "used":  {
+                                                                                     "type":  "integer"
+                                                                                 },
+                                                                        "expires":  {
+                                                                                        "type":  "integer"
+                                                                                    },
+                                                                        "revoked":  {
+                                                                                        "type":  "boolean"
+                                                                                    },
+                                                                        "created_at":  {
+                                                                                           "type":  "integer"
+                                                                                       },
+                                                                        "created_by":  {
+                                                                                           "type":  "string"
+                                                                                       }
+                                                                    }
+                                                 }
+                                   },
+                       "rows":  {
+                                    "type":  "array",
+                                    "maxItems":  200,
+                                    "items":  {
+                                                  "type":  "object",
+                                                  "additionalProperties":  false,
+                                                  "required":  [
+                                                                   "id",
+                                                                   "actor_id",
+                                                                   "action",
+                                                                   "target_id",
+                                                                   "reason",
+                                                                   "result",
+                                                                   "before_body",
+                                                                   "after_body",
+                                                                   "created_at"
+                                                               ],
+                                                  "properties":  {
+                                                                     "id":  {
+                                                                                "type":  "string"
+                                                                            },
+                                                                     "actor_id":  {
+                                                                                      "type":  "string"
+                                                                                  },
+                                                                     "action":  {
+                                                                                    "type":  "string"
+                                                                                },
+                                                                     "target_id":  {
+                                                                                       "type":  "string"
+                                                                                   },
+                                                                     "reason":  {
+                                                                                    "type":  "string"
+                                                                                },
+                                                                     "result":  {
+                                                                                    "type":  "string"
+                                                                                },
+                                                                     "before_body":  {
+                                                                                         "type":  "string"
+                                                                                     },
+                                                                     "after_body":  {
+                                                                                        "type":  "string"
+                                                                                    },
+                                                                     "created_at":  {
+                                                                                        "type":  "string"
+                                                                                    }
+                                                                 }
+                                              }
+                                },
+                       "reauthenticate":  {
+                                              "type":  "boolean"
+                                          },
+                       "sqlite_version":  {
+                                              "type":  "string"
+                                          },
+                       "payload":  {
+                                       "type":  "object",
+                                       "additionalProperties":  false
+                                   }
+                   }
+}

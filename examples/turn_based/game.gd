@@ -4,6 +4,7 @@ signal round_finished(round_index: int, scores: Array)
 var server := false
 var players: Dictionary = {}
 var peers: Dictionary = {}
+var themes: Dictionary = {}
 var order: Array = []
 var latest: Dictionary = {}
 var stones := 12
@@ -18,6 +19,7 @@ func admit(identity: Dictionary, peer: int) -> void:
 		return
 	peers[peer] = identity.user_id
 	players[identity.user_id] = {"user_id": identity.user_id, "display_name": identity.display_name, "score": 0}
+	players[identity.user_id].theme = themes.get(identity.user_id, "classic")
 	order.append(identity.user_id)
 	if active_user == "":
 		active_user = identity.user_id
@@ -26,6 +28,7 @@ func admit(identity: Dictionary, peer: int) -> void:
 func remove_player(user_id: String) -> void:
 	var previous := order.find(user_id)
 	players.erase(user_id)
+	themes.erase(user_id)
 	order.erase(user_id)
 	for peer in peers.keys():
 		if peers[peer] == user_id:
@@ -35,6 +38,13 @@ func remove_player(user_id: String) -> void:
 	# Invalidate queued inputs on membership changes too.
 	turn += 1
 	_publish()
+
+func on_asset_state(user_id: String, state: Dictionary) -> void:
+	var theme: String = state.get("profiles", {}).get("turns", {}).get("theme", "classic")
+	if theme not in ["classic", "jade"] or (theme != "classic" and theme not in state.get("owned", [])):
+		theme = "classic"
+	themes[user_id] = theme
+	# Selection is lobby-only; current seated appearance remains stable until next admission.
 
 func handle_input(peer: int, command: Dictionary) -> bool:
 	if not peers.has(peer) or Validator.validate_file(command, "res://schemas/turns_input.schema.json") != "":
@@ -99,11 +109,15 @@ func actions() -> Array:
 	return ["取 1 颗", "取 2 颗"]
 
 func draw_on(canvas: CanvasItem, user: String, font: Font) -> void:
+	var theme := "classic"
+	for player in latest.get("players", []):
+		if player.user_id == user:
+			theme = player.get("theme", "classic")
 	for i in int(latest.get("stones", 12)):
 		var position := Vector2(135 + (i % 6) * 90, 135 + (i / 6) * 80)
 		canvas.draw_circle(position + Vector2(0, 5), 24, Color(0, 0, 0, 0.25))
-		canvas.draw_circle(position, 22, Color("a3dbc4"))
-		canvas.draw_circle(position - Vector2(6, 7), 5, Color("d3f7e5"))
+		canvas.draw_circle(position, 22, Color("48cfae") if theme == "jade" else Color("c6beb0"))
+		canvas.draw_circle(position - Vector2(6, 7), 5, Color("bcffe6") if theme == "jade" else Color("efe5d2"))
 	var names: Array = []
 	for player in latest.get("players", []):
 		names.append("%s%s：%d 分" % [player.display_name, "（你）" if player.user_id == user else "", int(player.score)])

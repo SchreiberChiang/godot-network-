@@ -25,10 +25,14 @@ var _admission: Dictionary = {}
 var _attempt := ""
 var _disconnect_pending := false
 var _load_generation := 0
+var request_schema := "res://schemas/lobby_request.schema.json"
+var response_schema := "res://schemas/lobby_response.schema.json"
 
 func configure(settings: Dictionary) -> bool:
 	var url: String = settings.get("url", "")
-	if state != "CLOSED" or not (url.begins_with("ws://127.0.0.1:") or url.begins_with("wss://localhost:")):
+	var pattern := RegEx.new()
+	pattern.compile("^wss://[A-Za-z0-9.-]+:[0-9]{1,5}/?$")
+	if state != "CLOSED" or not (url.begins_with("ws://127.0.0.1:") or pattern.search(url) != null):
 		return false
 	if url.begins_with("wss:") and (not settings.has("ca_certificate") or not settings.get("secure_enet", false)):
 		return false
@@ -38,6 +42,9 @@ func configure(settings: Dictionary) -> bool:
 		if not settings.has(key):
 			return false
 	config = settings.duplicate(true)
+	if config.get("managed", false):
+		request_schema = "res://schemas/managed_lobby_request.schema.json"
+		response_schema = "res://schemas/managed_lobby_response.schema.json"
 	return true
 
 func open_session(display_name: String) -> Dictionary:
@@ -48,7 +55,7 @@ func open_session(display_name: String) -> Dictionary:
 	socket.max_queued_packets = 32
 	var tls: TLSOptions
 	if str(config.url).begins_with("wss:"):
-		tls = Secure.client_options(config.ca_certificate)
+		tls = Secure.client_options(config.ca_certificate, config.get("server_hostname", ""))
 		if tls == null:
 			return Wire.failure("AUTH_FAILED")
 	if socket.connect_to_url(config.url, tls) != OK:
@@ -129,7 +136,7 @@ func _connect_reserved(admission: Dictionary) -> Dictionary:
 			return Wire.failure("AUTH_FAILED")
 	network.multiplayer_peer = enet
 	_phase("CONNECTING")
-	var deadline := Time.get_ticks_msec() + 14000
+	var deadline := Time.get_ticks_msec() + (60000 if config.get("managed", false) else 14000)
 	while state != "IN_ROOM" and last_error == "" and Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
 	if state == "IN_ROOM":
@@ -165,7 +172,7 @@ func _request(type: String, payload: Dictionary, key: String = "") -> Dictionary
 	if socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		return Wire.failure("CONTROL_UNAVAILABLE")
 	var message := Wire.request(type, payload, key)
-	if Validator.validate_file(message, "res://schemas/lobby_request.schema.json") != "":
+	if Validator.validate_file(message, request_schema) != "":
 		return Wire.failure("INVALID_OPTIONS")
 	if _pending.size() >= 32:
 		return Wire.failure("RATE_LIMITED")
@@ -173,7 +180,7 @@ func _request(type: String, payload: Dictionary, key: String = "") -> Dictionary
 	if socket.send_text(JSON.stringify(message)) != OK:
 		_pending.erase(message.request_id)
 		return Wire.failure("CONTROL_UNAVAILABLE")
-	var deadline := Time.get_ticks_msec() + 10000
+	var deadline := Time.get_ticks_msec() + (60000 if config.get("managed", false) else 10000)
 	while not _answers.has(message.request_id) and Time.get_ticks_msec() < deadline and socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
 		await get_tree().process_frame
 	_pending.erase(message.request_id)
@@ -189,7 +196,7 @@ func _process(_delta: float) -> void:
 	while socket.get_ready_state() == WebSocketPeer.STATE_OPEN and socket.get_available_packet_count() > 0 and budget > 0:
 		budget -= 1
 		var bytes := socket.get_packet()
-		var message := Wire.decode(bytes, "res://schemas/lobby_response.schema.json") if socket.was_string_packet() else {}
+		var message := Wire.decode(bytes, response_schema) if socket.was_string_packet() else {}
 		if message.is_empty() or _pending.get(message.get("request_id", ""), "") != message.get("type", ""):
 			socket.close(1008, "invalid response")
 			break

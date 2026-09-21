@@ -10,6 +10,10 @@ var listener := TCPServer.new()
 var port := 0
 var peers: Array = []
 var owners: Dictionary = {}
+var request_schema := "res://schemas/lobby_request.schema.json"
+var listen_address := "127.0.0.1"
+var max_owned_rooms := 4
+var authentication_timeout_ms := 10000
 
 func start(room_manager, listen_port: int = 0, security: Dictionary = {}) -> int:
 	manager = room_manager
@@ -20,7 +24,7 @@ func start(room_manager, listen_port: int = 0, security: Dictionary = {}) -> int
 		if tls_options == null or identity_provider == null:
 			return ERR_UNAUTHORIZED
 	manager.control_handler = _control
-	var error := listener.listen(listen_port, "127.0.0.1")
+	var error := listener.listen(listen_port, listen_address)
 	if error == OK:
 		port = listener.get_local_port()
 	return error
@@ -47,7 +51,7 @@ func poll() -> void:
 		elif ws.accept_stream(tcp) != OK:
 			tcp.disconnect_from_host()
 			continue
-		peers.append({"ws": ws, "tcp": tcp, "tls": tls, "tls_ready": tls == null, "user": {}, "cache": {}, "created": now, "window": now, "requests": 0})
+		peers.append({"ws": ws, "tcp": tcp, "tls": tls, "tls_ready": tls == null, "user": {}, "cache": {}, "created": now, "window": now, "requests": 0, "pending": 0})
 	for connection in peers.duplicate():
 		var ws: WebSocketPeer = connection.ws
 		if connection.has("expires") and Time.get_unix_time_from_system() >= float(connection.expires):
@@ -71,7 +75,7 @@ func poll() -> void:
 		if ws.get_ready_state() == WebSocketPeer.STATE_CLOSED:
 			_drop(connection)
 			continue
-		if connection.user.is_empty() and now - int(connection.created) > 10000:
+		if connection.user.is_empty() and now - int(connection.created) > authentication_timeout_ms:
 			ws.close(1008, "session timeout")
 			_drop(connection)
 			continue
@@ -81,7 +85,7 @@ func poll() -> void:
 		while budget > 0 and ws.get_available_packet_count() > 0:
 			budget -= 1
 			var bytes := ws.get_packet()
-			var message := Wire.decode(bytes, "res://schemas/lobby_request.schema.json") if ws.was_string_packet() else {}
+			var message := Wire.decode(bytes, request_schema) if ws.was_string_packet() else {}
 			if message.is_empty():
 				ws.close(1008, "invalid request")
 				_drop(connection)
@@ -90,10 +94,22 @@ func poll() -> void:
 				connection.window = now
 				connection.requests = 0
 			connection.requests += 1
-			var result: Dictionary = Wire.failure("RATE_LIMITED") if connection.requests > 240 else handle(connection, message)
-			if ws.send_text(JSON.stringify(Wire.response(message, result))) != OK:
-				_drop(connection)
-				break
+			if connection.requests > 240 or int(connection.pending) >= 4:
+				ws.send_text(JSON.stringify(Wire.response(message, Wire.failure("RATE_LIMITED"))))
+			else:
+				connection.pending += 1
+				_dispatch.call_deferred(connection, message)
+
+func _dispatch(connection: Dictionary, message: Dictionary) -> void:
+	if not peers.has(connection):
+		return
+	var result: Dictionary = await handle_async(connection, message)
+	connection.pending = maxi(0, int(connection.pending) - 1)
+	if peers.has(connection) and connection.ws.send_text(JSON.stringify(Wire.response(message, result))) != OK:
+		_drop(connection)
+
+func handle_async(connection: Dictionary, message: Dictionary) -> Dictionary:
+	return handle(connection, message)
 
 func handle(connection: Dictionary, message: Dictionary) -> Dictionary:
 	if connection.has("expires") and Time.get_unix_time_from_system() >= float(connection.expires):
@@ -135,7 +151,7 @@ func handle(connection: Dictionary, message: Dictionary) -> Dictionary:
 			for id in owners:
 				if owners[id] == connection.user.user_id and not manager.rooms[id].cleaned:
 					owned_count += 1
-			if owned_count >= 4:
+			if owned_count >= max_owned_rooms:
 				return Wire.failure("HOST_CAPACITY_EXCEEDED")
 			var created: Dictionary = manager.create_room(payload.game_id, payload.options)
 			var result: Dictionary

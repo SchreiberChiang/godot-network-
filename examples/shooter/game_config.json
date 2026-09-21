@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "duration_ms": 300000,
+  "minimum_participation_ms": 60000,
+  "respawn_ms": 3000,
+  "completion_credits": 20,
+  "kill_credits": 5,
+  "weapons": {
+    "rifle": {"name": "基础步枪", "damage": 25, "cooldown_ms": 220, "pellets": 1, "spread": 0.0, "range": 850},
+    "smg": {"name": "冲锋枪", "damage": 12, "cooldown_ms": 90, "pellets": 1, "spread": 0.045, "range": 570},
+    "shotgun": {"name": "霰弹枪", "damage": 18, "cooldown_ms": 800, "pellets": 6, "spread": 0.24, "range": 350}
+  }
+}
