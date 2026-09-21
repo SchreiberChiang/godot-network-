@@ -43,3 +43,8 @@ unit 成功信号为 `UNIT_RESULT passed=... failed=0`；integration 为 `INTEGR
 ProcessLauncher 当前同步调用 PowerShell 辅助程序。CIM 查询设有 3 秒操作超时，但辅助程序整体尚无独立总超时；异常慢的系统调用可能阻塞宿主主循环。`run.ps1` 的总 watchdog 是测试/演示入口保护，不能代替未来常驻宿主的异步进程管理与总超时实现。
 
 2026-09-20 已使用同一精确引擎实际验证两名独立本机测试客户端经 WebSocket 大厅及 ENet 入房/退房；入口为 StartDemo.cmd 或 run.ps1 -Mode players。不能据此宣称 Linux、跨电脑、WSS/公网安全或正式发布就绪。实际测试和未运行项以 STATUS.md 为准。
+# 2026-09-21 本轮实测补充
+
+实际工作目录仍为F:\文档\GodotGame\Net\RoomKit，当前执行环境无文件沙箱限制；没有修改全局Git、Codex或系统证书配置。Git2.55.0.windows.3，Windows10.0.26200。使用原Godot4.7.2 Steam编辑器及同安装目录的4.7.2 official Windows/Linux模板，未升级或下载引擎。系统winsqlite3.dll实测3.51.1。
+
+Windows正式模板已经运行真实宿主/房间/客户端及十轮进程句柄检查；Linux模板在已安装WSL Ubuntu（内核6.6.87.2-microsoft-standard-WSL2、x86_64）通过215项协议/准入/玩法检查。Linux没有本项目进程/数据库适配，不能算Linux完整宿主通过。可重复入口见docs/15和STATUS。

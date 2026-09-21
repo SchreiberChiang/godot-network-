@@ -10,7 +10,7 @@ func _run() -> void:
 		var pair := argument.split("=", true, 1)
 		if pair.size() == 2:
 			args[pair[0]] = pair[1]
-	var directory: String = ProjectSettings.globalize_path(args.get("--store", "res://data/showcase-results"))
+	var directory: String = preload("res://sdk/roomkit/shared/paths.gd").absolute(args.get("--store", "res://data/showcase-results"))
 	if not FileAccess.file_exists(directory.path_join("results.sqlite")):
 		printerr("RESULTS_ERROR code=DATABASE_NOT_FOUND; play a complete round using StartTurns.cmd first.")
 		quit(1)

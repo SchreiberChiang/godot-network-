@@ -6,11 +6,15 @@
 
 **第二个游戏：双击 `StartTurns.cmd`。** 每回合取1或2颗石子，拿走最后一颗得1分并开始下一局。轮流在两个窗口点击按钮。两个启动器建议依次运行，便于分清窗口。每次会话最长30分钟。
 
-`StartDemo.cmd` 仍保留原来的纯文字自动入房/退房测试。所有入口都需要本机已安装下述 Godot；目前仅支持本机回环，不能直接给另一台电脑或公网玩家连接。
+`StartDemo.cmd` 仍保留原来的纯文字自动入房/退房测试。这些源码入口需要本机已安装下述 Godot；目前仅支持本机回环，不能直接给另一台电脑或公网玩家连接。
 
-**查看战绩：先运行 `StartTurns.cmd`，轮流取完一局石子，再关闭两个窗口，双击 `ShowResults.cmd`。** 会显示保存的局数与每局玩家分数；这些是本地开发身份的结果记录，重新进入后的实时分数仍按示例原规则计算，不是账号累计积分。数据库位于 `data/showcase-results/results.sqlite`，不会上传GitHub。完整路线见[docs/06_roadmap_acceptance.md](docs/06_roadmap_acceptance.md)，当前M4仅完成结果存储部分。
+**查看战绩：先运行 `StartTurns.cmd`，轮流取完一局石子，再关闭两个窗口，双击 `ShowResults.cmd`。** 会显示保存的局数与每局玩家分数；这些是本地开发身份的结果记录，重新进入后的实时分数仍按示例原规则计算，不是账号累计积分。数据库位于 `data/showcase-results/results.sqlite`，不会上传GitHub。完整路线见[docs/06_roadmap_acceptance.md](docs/06_roadmap_acceptance.md)，M4本机安全与恢复闭环、M5 Windows候选包的最新门禁见STATUS。
 
 **实际通过、失败和未运行项见 [STATUS.md](STATUS.md)。** 本文描述当前代码和启动入口，不代替验收记录。原文档包的 v0.2 是设计包编号；当前工程尚不代表正式框架发布版。
+
+## Windows 独立候选包
+
+运行 tools/build_release.ps1 和 tools/package_release.ps1 生成程序ZIP及SDK模板ZIP，最新绝对路径在 artifacts/delivery.json。独立包无需Godot编辑器，双击包内 StartRoomKit.cmd 试玩，StopRoomKit.cmd 停止，CheckRoomKit.cmd 校验。操作、升级和未通过门禁见 [发布操作说明](docs/15_release_operations.md)。
 
 ## 本机启动与验证
 
@@ -38,9 +42,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode player
 | `demo` | 自动创建一房，收到至少四次心跳后停止并退出 | `DEMO_PASS` |
 | `players` | 真实 WebSocket 大厅、两名独立 ENet 测试玩家进入/退房、非法票据/满员拒绝与资源回收 | `PLAYERS_RESULT passed=33 failed=0` |
 | `games` | 两个独立游戏、四名真实客户端、玩法/退房重入与实际回合结果落库 | `GAMES_RESULT passed=47 failed=0` |
+| `secure / stress / load / recovery / limits / template` | 加密与权限、100轮、实际输入并发、重启隔离、资源上限、新游戏接入 | 对应 RESULT failed=0 |
 | `persistence` | 真实SQLite、丢ACK重试、宿主终止/房间自退、离线补存、备份与中文读写 | `PERSISTENCE_RESULT passed=... failed=0` |
 
-每种模式还必须出现 `ROOMKIT_EXIT mode=<模式> code=0`。脚本检查真实退出码、脚本错误和成功标记，并设置整体超时。`-Mode all` 按 unit → launcher → integration → demo → players → games → persistence 运行。`-Mode games -Visual` 会打开真实图形窗口并额外保存4张截图。`-Godot '完整路径'` 可指定可执行文件，但更换引擎版本需要重新验收。所有入口让子进程使用当前启动宿主的Godot。
+每种模式还必须出现 `ROOMKIT_EXIT mode=<模式> code=0`。脚本检查真实退出码、脚本错误和成功标记，并设置整体超时。`-Mode all` 依次包含基础回归、secure、stress（100轮）、load（16+4玩家）、recovery、limits和template。`-Mode games -Visual` 会打开真实图形窗口并额外保存4张截图。`-Godot '完整路径'` 可指定可执行文件，但更换引擎版本需要重新验收。所有入口让子进程使用当前启动宿主的Godot。
 
 结果专项和本地管理命令：
 
@@ -76,15 +81,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\results.ps1 -Operati
 | `examples/showcase/` | 演示宿主、共享客户端外壳和中文窗口 |
 | `tools/build_games.ps1`、`tools/play.ps1` | 独立工程打包与可操作窗口启动 |
 | `tests/`、`tools/run.ps1` | 单元/模拟与真实进程验证入口 |
-| `templates/` | 尚未实现可分发项目模板 |
+| `templates/`、`tools/new_game.ps1` | 可生成独立 SDK 新工程模板，真实入房/离房验证 |
 
 私有启动配置放在仅当前用户可访问的 `run/`，注册成功后删除；控制凭据不放进命令行或公开快照。`run/` 和 `logs/` 不进入 Git。失败或停止通知都不能直接释放端口：必须确认对应子进程退出，且 UDP 端口可重新绑定。身份无法核验或端口仍占用时保持隔离。
 
 ## 当前范围与后续阶段
 
-M0/M1 房间生命周期与 M2 本地双端接入闭环已经实现。M2 使用标准 WebSocket JSON 大厅、开发会话身份、一次性入房票据和 ENet 认证；场景准备和初始名单确认完成后才成为正式成员。会话身份仅在当前连接内有效，不是账号系统。两人测试是 Windows 同机回环真实联机，不代表两台电脑或公网已经通过。
-
-游戏通过配置与 GameAdapter 接入，核心不依赖具体角色、枪械或地图。M3 的方块和第二玩法已实现，本轮未修改 host/core 或 SDK 核心。独立产物是带 SDK 的 Godot 开发工程，尚非服务器可执行文件导出。可分发插件、项目模板及正式发布包仍待实施。账号、商城、持久化和公网发布未实现；Linux、导出产物、16 人和100轮压力未验证。
+M0—M3闭环可用；M4补齐本地身份、WSS/DTLS、SQLite结果、异步工作、重启隔离和资源限制。M5已形成 Windows 独立候选包及 SDK 模板，实际完成双玩法导出、20名输入客户端与100轮开关房验证。完整正式发布门禁仍未全部满足。Linux只运行协议/玩法检查，没有Linux完整宿主；账号商城、公网和跨电脑未实现或未验证。详见 [本机发布使用说明](docs/15_release_operations.md) 和 [最新状态](STATUS.md)。
 
 新增接入方法见 [SDK 使用说明](sdk/roomkit/README.md)，契约和边界见 [M2 实施说明](docs/11_m2_implementation.md)。`logs/players-result.json` 保存两名玩家的阶段、名单和返回大厅结果；具体子进程日志目录在其 `evidence_dir` 字段。
 

@@ -65,7 +65,7 @@ func run() -> Dictionary:
 
 static func sample() -> Dictionary:
 	var launch := "a".repeat(32)
-	return {"game_id": "minimal_room", "build_id": "dev-003", "room_id": "r_test", "launch_id": launch, "match_id": "m_" + launch + "_one", "result_id": "b".repeat(32), "result_kind": "final", "result_version": 1, "status": "completed", "payload": {"round": 1, "players": []}}
+	return {"game_id": "minimal_room", "build_id": "dev-004", "room_id": "r_test", "launch_id": launch, "match_id": "m_" + launch + "_one", "result_id": "b".repeat(32), "result_kind": "final", "result_version": 1, "status": "completed", "payload": {"round": 1, "players": []}}
 
 func check(ok: bool, label: String) -> void:
 	if ok:

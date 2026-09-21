@@ -2,6 +2,7 @@ extends Node
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const NetRoom = preload("res://sdk/roomkit/shared/net_room.gd")
+const Secure = preload("res://sdk/roomkit/shared/secure_transport.gd")
 signal session_changed(identity: Dictionary)
 signal join_progress(phase: String)
 signal room_joined(snapshot: Dictionary)
@@ -26,7 +27,12 @@ var _disconnect_pending := false
 var _load_generation := 0
 
 func configure(settings: Dictionary) -> bool:
-	if state != "CLOSED" or not str(settings.get("url", "")).begins_with("ws://127.0.0.1:"):
+	var url: String = settings.get("url", "")
+	if state != "CLOSED" or not (url.begins_with("ws://127.0.0.1:") or url.begins_with("wss://localhost:")):
+		return false
+	if url.begins_with("wss:") and (not settings.has("ca_certificate") or not settings.get("secure_enet", false)):
+		return false
+	if not url.begins_with("wss:") and (settings.has("credential") or settings.get("secure_enet", false)):
 		return false
 	for key in ["game_id", "build_id", "compatibility_id", "game_protocol"]:
 		if not settings.has(key):
@@ -40,7 +46,12 @@ func open_session(display_name: String) -> Dictionary:
 	socket.inbound_buffer_size = 65536
 	socket.outbound_buffer_size = 65536
 	socket.max_queued_packets = 32
-	if socket.connect_to_url(config.url) != OK:
+	var tls: TLSOptions
+	if str(config.url).begins_with("wss:"):
+		tls = Secure.client_options(config.ca_certificate)
+		if tls == null:
+			return Wire.failure("AUTH_FAILED")
+	if socket.connect_to_url(config.url, tls) != OK:
 		return Wire.failure("CONTROL_UNAVAILABLE")
 	state = "CONNECTING_LOBBY"
 	var deadline := Time.get_ticks_msec() + 6000
@@ -51,7 +62,11 @@ func open_session(display_name: String) -> Dictionary:
 	if socket.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		state = "CLOSED"
 		return Wire.failure("CONTROL_UNAVAILABLE")
-	var result: Dictionary = await _request("session.create", {"display_name": display_name})
+	var payload := {"display_name": display_name}
+	if config.has("credential"):
+		payload.credential = config.credential
+		config.erase("credential")
+	var result: Dictionary = await _request("session.create", payload)
 	if result.ok:
 		identity = result.payload
 		state = "LOBBY"
@@ -107,6 +122,11 @@ func _connect_reserved(admission: Dictionary) -> Dictionary:
 	if enet.create_client(admission.host, int(admission.port)) != OK:
 		_clear_game()
 		return Wire.failure("CONTROL_UNAVAILABLE")
+	if config.get("secure_enet", false):
+		var tls := Secure.client_options(config.ca_certificate)
+		if tls == null or enet.host.dtls_client_setup(config.get("server_hostname", "localhost"), tls) != OK:
+			_clear_game()
+			return Wire.failure("AUTH_FAILED")
 	network.multiplayer_peer = enet
 	_phase("CONNECTING")
 	var deadline := Time.get_ticks_msec() + 14000

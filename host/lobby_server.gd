@@ -1,6 +1,9 @@
 extends RefCounted
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Admissions = preload("res://host/core/admission_store.gd")
+const Secure = preload("res://sdk/roomkit/shared/secure_transport.gd")
+var identity_provider
+var tls_options: TLSOptions
 var manager
 var admissions = Admissions.new()
 var listener := TCPServer.new()
@@ -8,8 +11,14 @@ var port := 0
 var peers: Array = []
 var owners: Dictionary = {}
 
-func start(room_manager, listen_port: int = 0) -> int:
+func start(room_manager, listen_port: int = 0, security: Dictionary = {}) -> int:
 	manager = room_manager
+	if identity_provider != null and security.is_empty():
+		return ERR_UNAUTHORIZED
+	if not security.is_empty():
+		tls_options = Secure.server_options(security)
+		if tls_options == null or identity_provider == null:
+			return ERR_UNAUTHORIZED
 	manager.control_handler = _control
 	var error := listener.listen(listen_port, "127.0.0.1")
 	if error == OK:
@@ -29,12 +38,35 @@ func poll() -> void:
 		ws.inbound_buffer_size = 65536
 		ws.outbound_buffer_size = 65536
 		ws.max_queued_packets = 16
-		if ws.accept_stream(tcp) != OK:
+		var tls: StreamPeerTLS
+		if tls_options != null:
+			tls = StreamPeerTLS.new()
+			if tls.accept_stream(tcp, tls_options) != OK:
+				tcp.disconnect_from_host()
+				continue
+		elif ws.accept_stream(tcp) != OK:
 			tcp.disconnect_from_host()
 			continue
-		peers.append({"ws": ws, "tcp": tcp, "user": {}, "cache": {}, "created": now, "window": now, "requests": 0})
+		peers.append({"ws": ws, "tcp": tcp, "tls": tls, "tls_ready": tls == null, "user": {}, "cache": {}, "created": now, "window": now, "requests": 0})
 	for connection in peers.duplicate():
 		var ws: WebSocketPeer = connection.ws
+		if connection.has("expires") and Time.get_unix_time_from_system() >= float(connection.expires):
+			ws.close(1008, "session expired")
+			_drop(connection)
+			continue
+		if not connection.tls_ready:
+			connection.tls.poll()
+			var tls_state: int = connection.tls.get_status()
+			if tls_state == StreamPeerTLS.STATUS_CONNECTED:
+				if ws.accept_stream(connection.tls) != OK:
+					_drop(connection)
+					continue
+				connection.tls_ready = true
+			elif tls_state != StreamPeerTLS.STATUS_HANDSHAKING or now - int(connection.created) > 5000:
+				_drop(connection)
+				continue
+			else:
+				continue
 		ws.poll()
 		if ws.get_ready_state() == WebSocketPeer.STATE_CLOSED:
 			_drop(connection)
@@ -64,11 +96,23 @@ func poll() -> void:
 				break
 
 func handle(connection: Dictionary, message: Dictionary) -> Dictionary:
+	if connection.has("expires") and Time.get_unix_time_from_system() >= float(connection.expires):
+		return Wire.failure("AUTH_FAILED")
 	var payload: Dictionary = message.payload
 	if message.type == "session.create":
 		if connection.user.is_empty():
-			connection.user = {"user_id": "u_" + Wire.uid(), "display_name": payload.display_name}
-		return {"ok": true, "payload": connection.user.duplicate()}
+			if identity_provider != null:
+				var authenticated: Dictionary = identity_provider.authenticate(payload.get("credential", ""), int(Time.get_unix_time_from_system()))
+				if not authenticated.ok:
+					return Wire.failure("AUTH_FAILED")
+				for existing in peers:
+					if existing != connection and existing.user.get("user_id", "") == authenticated.identity.user_id:
+						return Wire.failure("ALREADY_CONNECTED")
+				connection.user = authenticated.identity
+				connection.expires = authenticated.expires
+			else:
+				connection.user = {"user_id": "u_" + Wire.uid(), "display_name": payload.display_name}
+		return {"ok": true, "payload": {"user_id": connection.user.user_id, "display_name": connection.user.display_name}}
 	if connection.user.is_empty():
 		return Wire.failure("AUTH_REQUIRED")
 	if message.type in ["room.create", "room.reserve", "room.list"]:
@@ -116,7 +160,7 @@ func handle(connection: Dictionary, message: Dictionary) -> Dictionary:
 			if message.type == "room.get":
 				return {"ok": true, "payload": {"room": public_room(row)}}
 			if message.type == "room.stop":
-				if owners.get(payload.room_id, "") != connection.user.user_id:
+				if owners.get(payload.room_id, "") != connection.user.user_id and connection.user.get("role", "player") != "admin":
 					return Wire.failure("AUTH_FAILED")
 				manager.stop_room(payload.room_id, "owner_requested")
 				return {"ok": true, "payload": {}}

@@ -1,19 +1,297 @@
 [
-  {"label":"session.create", "schema":"lobby_request", "message":{"version":1,"kind":"request","type":"session.create","request_id":"q1","payload":{"display_name":"Player One"}}},
-  {"label":"room.list", "schema":"lobby_request", "message":{"version":1,"kind":"request","type":"room.list","request_id":"q2","payload":{"game_id":"minimal_room","build_id":"dev-003","compatibility_id":"roomkit-minimal-dev-003","game_protocol":1,"offset":0,"limit":50}}},
-  {"label":"room.create", "schema":"lobby_request", "message":{"version":1,"kind":"request","type":"room.create","request_id":"q3","idempotency_key":"create-once","payload":{"game_id":"minimal_room","build_id":"dev-003","compatibility_id":"roomkit-minimal-dev-003","game_protocol":1,"options":{"mode":"sandbox","map":"empty","capacity":2}}}},
-  {"label":"room.get", "schema":"lobby_request", "message":{"version":1,"kind":"request","type":"room.get","request_id":"q4","payload":{"room_id":"r_example"}}},
-  {"label":"room.reserve", "schema":"lobby_request", "message":{"version":1,"kind":"request","type":"room.reserve","request_id":"q5","payload":{"game_id":"minimal_room","build_id":"dev-003","compatibility_id":"roomkit-minimal-dev-003","game_protocol":1,"room_id":"r_example"}}},
-  {"label":"room.stop", "schema":"lobby_request", "message":{"version":1,"kind":"request","type":"room.stop","request_id":"q6","payload":{"room_id":"r_example"}}},
-  {"label":"session response", "schema":"lobby_response", "message":{"version":1,"kind":"response","type":"session.create","request_id":"q1","ok":true,"payload":{"user_id":"u_example","display_name":"Player One"}}},
-  {"label":"full room response", "schema":"lobby_response", "message":{"version":1,"kind":"response","type":"room.reserve","request_id":"q5","ok":false,"payload":{},"error":{"code":"ROOM_FULL","message":"ROOM_FULL","retryable":false}}},
-  {"label":"authentication hello", "schema":"admission_hello", "message":{"type":"hello","game_id":"minimal_room","build_id":"dev-003","compatibility_id":"roomkit-minimal-dev-003","game_protocol":1,"room_id":"r_example","launch_id":"l_example","user_id":"u_example","attempt_id":"a_example","ticket":"0000000000000000000000000000000000000000000000000000000000000000"}},
-  {"label":"authentication reply", "schema":"admission_reply", "message":{"ok":true,"attempt_id":"a_example"}},
-  {"label":"snapshot", "schema":"room_snapshot", "message":{"room_id":"r_example","revision":2,"members":[{"user_id":"u_example","display_name":"Player One"}]}},
-  {"label":"admission.consume", "schema":"control", "message":{"version":1,"kind":"event","type":"admission.consume","event_id":"e1","room_id":"r_example","launch_id":"l_example","game_id":"minimal_room","build_id":"dev-003","payload":{"ticket":"0000000000000000000000000000000000000000000000000000000000000000","attempt_id":"a_example","user_id":"u_example","compatibility_id":"roomkit-minimal-dev-003","game_protocol":1}}},
-  {"label":"admission.result", "schema":"control", "message":{"version":1,"kind":"event","type":"admission.result","event_id":"e2","room_id":"r_example","launch_id":"l_example","game_id":"minimal_room","build_id":"dev-003","payload":{"attempt_id":"a_example","ok":true,"user_id":"u_example","display_name":"Player One","code":""}}},
-  {"label":"admission.revoke", "schema":"control", "message":{"version":1,"kind":"event","type":"admission.revoke","event_id":"e3","room_id":"r_example","launch_id":"l_example","game_id":"minimal_room","build_id":"dev-003","payload":{"attempt_id":"a_example"}}},
-  {"label":"member.joined", "schema":"control", "message":{"version":1,"kind":"event","type":"member.joined","event_id":"e4","room_id":"r_example","launch_id":"l_example","game_id":"minimal_room","build_id":"dev-003","payload":{"attempt_id":"a_example","user_id":"u_example"}}},
-  {"label":"member.left", "schema":"control", "message":{"version":1,"kind":"event","type":"member.left","event_id":"e5","room_id":"r_example","launch_id":"l_example","game_id":"minimal_room","build_id":"dev-003","payload":{"attempt_id":"a_example","user_id":"u_example"}}},
-  {"label":"member.accepted", "schema":"control", "message":{"version":1,"kind":"event","type":"member.accepted","event_id":"e6","room_id":"r_example","launch_id":"l_example","game_id":"minimal_room","build_id":"dev-003","payload":{"attempt_id":"a_example","ok":true}}}
+    {
+        "label":  "session.create",
+        "schema":  "lobby_request",
+        "message":  {
+                        "version":  1,
+                        "kind":  "request",
+                        "type":  "session.create",
+                        "request_id":  "q1",
+                        "payload":  {
+                                        "display_name":  "Player One"
+                                    }
+                    }
+    },
+    {
+        "label":  "room.list",
+        "schema":  "lobby_request",
+        "message":  {
+                        "version":  1,
+                        "kind":  "request",
+                        "type":  "room.list",
+                        "request_id":  "q2",
+                        "payload":  {
+                                        "game_id":  "minimal_room",
+                                        "build_id":  "dev-004",
+                                        "compatibility_id":  "roomkit-minimal-dev-004",
+                                        "game_protocol":  1,
+                                        "offset":  0,
+                                        "limit":  50
+                                    }
+                    }
+    },
+    {
+        "label":  "room.create",
+        "schema":  "lobby_request",
+        "message":  {
+                        "version":  1,
+                        "kind":  "request",
+                        "type":  "room.create",
+                        "request_id":  "q3",
+                        "idempotency_key":  "create-once",
+                        "payload":  {
+                                        "game_id":  "minimal_room",
+                                        "build_id":  "dev-004",
+                                        "compatibility_id":  "roomkit-minimal-dev-004",
+                                        "game_protocol":  1,
+                                        "options":  {
+                                                        "mode":  "sandbox",
+                                                        "map":  "empty",
+                                                        "capacity":  2
+                                                    }
+                                    }
+                    }
+    },
+    {
+        "label":  "room.get",
+        "schema":  "lobby_request",
+        "message":  {
+                        "version":  1,
+                        "kind":  "request",
+                        "type":  "room.get",
+                        "request_id":  "q4",
+                        "payload":  {
+                                        "room_id":  "r_example"
+                                    }
+                    }
+    },
+    {
+        "label":  "room.reserve",
+        "schema":  "lobby_request",
+        "message":  {
+                        "version":  1,
+                        "kind":  "request",
+                        "type":  "room.reserve",
+                        "request_id":  "q5",
+                        "payload":  {
+                                        "game_id":  "minimal_room",
+                                        "build_id":  "dev-004",
+                                        "compatibility_id":  "roomkit-minimal-dev-004",
+                                        "game_protocol":  1,
+                                        "room_id":  "r_example"
+                                    }
+                    }
+    },
+    {
+        "label":  "room.stop",
+        "schema":  "lobby_request",
+        "message":  {
+                        "version":  1,
+                        "kind":  "request",
+                        "type":  "room.stop",
+                        "request_id":  "q6",
+                        "payload":  {
+                                        "room_id":  "r_example"
+                                    }
+                    }
+    },
+    {
+        "label":  "session response",
+        "schema":  "lobby_response",
+        "message":  {
+                        "version":  1,
+                        "kind":  "response",
+                        "type":  "session.create",
+                        "request_id":  "q1",
+                        "ok":  true,
+                        "payload":  {
+                                        "user_id":  "u_example",
+                                        "display_name":  "Player One"
+                                    }
+                    }
+    },
+    {
+        "label":  "full room response",
+        "schema":  "lobby_response",
+        "message":  {
+                        "version":  1,
+                        "kind":  "response",
+                        "type":  "room.reserve",
+                        "request_id":  "q5",
+                        "ok":  false,
+                        "payload":  {
+
+                                    },
+                        "error":  {
+                                      "code":  "ROOM_FULL",
+                                      "message":  "ROOM_FULL",
+                                      "retryable":  false
+                                  }
+                    }
+    },
+    {
+        "label":  "authentication hello",
+        "schema":  "admission_hello",
+        "message":  {
+                        "type":  "hello",
+                        "game_id":  "minimal_room",
+                        "build_id":  "dev-004",
+                        "compatibility_id":  "roomkit-minimal-dev-004",
+                        "game_protocol":  1,
+                        "room_id":  "r_example",
+                        "launch_id":  "l_example",
+                        "user_id":  "u_example",
+                        "attempt_id":  "a_example",
+                        "ticket":  "0000000000000000000000000000000000000000000000000000000000000000"
+                    }
+    },
+    {
+        "label":  "authentication reply",
+        "schema":  "admission_reply",
+        "message":  {
+                        "ok":  true,
+                        "attempt_id":  "a_example"
+                    }
+    },
+    {
+        "label":  "snapshot",
+        "schema":  "room_snapshot",
+        "message":  {
+                        "room_id":  "r_example",
+                        "revision":  2,
+                        "members":  [
+                                        {
+                                            "user_id":  "u_example",
+                                            "display_name":  "Player One"
+                                        }
+                                    ]
+                    }
+    },
+    {
+        "label":  "admission.consume",
+        "schema":  "control",
+        "message":  {
+                        "version":  1,
+                        "kind":  "event",
+                        "type":  "admission.consume",
+                        "event_id":  "e1",
+                        "room_id":  "r_example",
+                        "launch_id":  "l_example",
+                        "game_id":  "minimal_room",
+                        "build_id":  "dev-004",
+                        "payload":  {
+                                        "ticket":  "0000000000000000000000000000000000000000000000000000000000000000",
+                                        "attempt_id":  "a_example",
+                                        "user_id":  "u_example",
+                                        "compatibility_id":  "roomkit-minimal-dev-004",
+                                        "game_protocol":  1
+                                    }
+                    }
+    },
+    {
+        "label":  "admission.result",
+        "schema":  "control",
+        "message":  {
+                        "version":  1,
+                        "kind":  "event",
+                        "type":  "admission.result",
+                        "event_id":  "e2",
+                        "room_id":  "r_example",
+                        "launch_id":  "l_example",
+                        "game_id":  "minimal_room",
+                        "build_id":  "dev-004",
+                        "payload":  {
+                                        "attempt_id":  "a_example",
+                                        "ok":  true,
+                                        "user_id":  "u_example",
+                                        "display_name":  "Player One",
+                                        "code":  ""
+                                    }
+                    }
+    },
+    {
+        "label":  "admission.revoke",
+        "schema":  "control",
+        "message":  {
+                        "version":  1,
+                        "kind":  "event",
+                        "type":  "admission.revoke",
+                        "event_id":  "e3",
+                        "room_id":  "r_example",
+                        "launch_id":  "l_example",
+                        "game_id":  "minimal_room",
+                        "build_id":  "dev-004",
+                        "payload":  {
+                                        "attempt_id":  "a_example"
+                                    }
+                    }
+    },
+    {
+        "label":  "member.joined",
+        "schema":  "control",
+        "message":  {
+                        "version":  1,
+                        "kind":  "event",
+                        "type":  "member.joined",
+                        "event_id":  "e4",
+                        "room_id":  "r_example",
+                        "launch_id":  "l_example",
+                        "game_id":  "minimal_room",
+                        "build_id":  "dev-004",
+                        "payload":  {
+                                        "attempt_id":  "a_example",
+                                        "user_id":  "u_example"
+                                    }
+                    }
+    },
+    {
+        "label":  "member.left",
+        "schema":  "control",
+        "message":  {
+                        "version":  1,
+                        "kind":  "event",
+                        "type":  "member.left",
+                        "event_id":  "e5",
+                        "room_id":  "r_example",
+                        "launch_id":  "l_example",
+                        "game_id":  "minimal_room",
+                        "build_id":  "dev-004",
+                        "payload":  {
+                                        "attempt_id":  "a_example",
+                                        "user_id":  "u_example"
+                                    }
+                    }
+    },
+    {
+        "label":  "member.accepted",
+        "schema":  "control",
+        "message":  {
+                        "version":  1,
+                        "kind":  "event",
+                        "type":  "member.accepted",
+                        "event_id":  "e6",
+                        "room_id":  "r_example",
+                        "launch_id":  "l_example",
+                        "game_id":  "minimal_room",
+                        "build_id":  "dev-004",
+                        "payload":  {
+                                        "attempt_id":  "a_example",
+                                        "ok":  true
+                                    }
+                    }
+    },
+    {
+        "label":  "authenticated session.create",
+        "message":  {
+                        "request_id":  "q-secure",
+                        "payload":  {
+                                        "display_name":  "Player One",
+                                        "credential":  "0000000000000000000000000000000000000000000000000000000000000000"
+                                    },
+                        "version":  1,
+                        "type":  "session.create",
+                        "kind":  "request"
+                    },
+        "schema":  "lobby_request"
+    }
 ]

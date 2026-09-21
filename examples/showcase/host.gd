@@ -4,6 +4,10 @@ const Lobby = preload("res://host/lobby_server.gd")
 const Development = preload("res://host/development.gd")
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Results = preload("res://host/core/result_service.gd")
+const Secure = preload("res://sdk/roomkit/shared/secure_transport.gd")
+const Identity = preload("res://host/core/identity_provider.gd")
+var identities = Identity.new()
+var security: Dictionary = {}
 var manager = Manager.new()
 var results = Results.new()
 var result_root := ""
@@ -35,10 +39,10 @@ func _process(_delta: float) -> bool:
 	return false
 
 func _run() -> void:
-	work = ProjectSettings.globalize_path("res://logs/games-" + Wire.uid())
+	work = preload("res://sdk/roomkit/shared/paths.gd").absolute("res://logs/games-" + Wire.uid())
 	DirAccess.make_dir_recursive_absolute(work)
 	stop_file = work.path_join("stop.signal")
-	artifacts = Wire.decode(FileAccess.get_file_as_bytes("res://artifacts/games.json"))
+	artifacts = Wire.decode(FileAccess.get_file_as_bytes(args.get("--artifacts", "res://artifacts/games.json")))
 	if artifacts.size() != 2:
 		printerr("Run tools/build_games.ps1 first.")
 		quit(1)
@@ -46,10 +50,22 @@ func _run() -> void:
 	var config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/development.json"))
 	config.godot_executable = OS.get_executable_path()
 	config.heartbeat_timeout_ms = 10000
-	result_root = ProjectSettings.globalize_path("res://data/showcase-results" if not automated else "res://data/game-results-" + Wire.uid())
+	config.async_start = true
+	config.max_room_memory_mb = 512
+	result_root = preload("res://sdk/roomkit/shared/paths.gd").absolute("res://data/showcase-results" if not automated else "res://data/game-results-" + Wire.uid())
 	if not check(results.initialize(result_root, {"blocks": "res://schemas/summary_result.schema.json", "turns": "res://schemas/summary_result.schema.json"}).ok, "private SQLite result store initialized"):
 		quit(1)
 		return
+	security = {"key": result_root.path_join("server.key"), "certificate": result_root.path_join("server.crt"), "hostname": "localhost"}
+	if not FileAccess.file_exists(security.key) or not FileAccess.file_exists(security.certificate):
+		security = Secure.create_local_certificate(result_root)
+	if security.is_empty():
+		quit(1)
+		return
+	config.security = security
+	if args.get("--managed", "false") == "true":
+		config.control_port = 28290
+		config.process_journal = result_root.path_join("processes.json")
 	var recovery: Dictionary = results.recover()
 	print("RESULT_RECOVERY accepted=", recovery.accepted, " rejected=", recovery.rejected, " pending=", recovery.pending)
 	manager.result_service = results
@@ -58,7 +74,10 @@ func _run() -> void:
 		quit(1)
 		return
 	initialized = true
-	if not check(lobby.start(manager) == OK, "loopback WebSocket lobby bound"):
+	if args.get("--managed", "false") == "true" and not automated:
+		DirAccess.remove_absolute(result_root.path_join("stop.request"))
+	lobby.identity_provider = identities
+	if not check(lobby.start(manager, 0, security) == OK, "authenticated loopback WSS lobby bound"):
 		await finish()
 		return
 	for game in ["blocks", "turns"]:
@@ -116,30 +135,48 @@ func _run() -> void:
 		print("两个游戏窗口已经打开。关闭两个窗口后，宿主会回收房间。")
 		var deadline := Time.get_ticks_msec() + 1800000
 		while Time.get_ticks_msec() < deadline:
+			if args.get("--managed", "false") == "true" and FileAccess.file_exists(result_root.path_join("stop.request")):
+				break
 			var live := false
 			for process in processes:
 				live = live or manager.launcher.probe(process.launch_id) != "exited"
 			if not live:
 				break
 			await create_timer(0.5).timeout
+		var marker := FileAccess.open(stop_file, FileAccess.WRITE)
+		marker.close()
+		await until(func(): return interactive_clients_exited(), 12000)
 	await finish()
+
+func interactive_clients_exited() -> bool:
+	for process in processes:
+		if manager.launcher.probe(process.launch_id) != "exited":
+			return false
+	return true
 
 func start_client(game: String, role: String) -> void:
 	var launch := Wire.uid()
 	var label := game + "-" + role
 	var output := work.path_join(label + ".json")
 	var arguments: Array = ["--path", artifacts[game].project, "--log-file", work.path_join(label + ".log"), "--script", "res://client.gd"]
+	if artifacts[game].has("client_pack"):
+		arguments = ["--log-file", work.path_join(label + ".log")]
 	if automated and not visual:
 		arguments.push_front("--headless")
 	else:
 		arguments.append_array(["--resolution", "820x650", "--position", "40,60" if role == "one" else "890,60"])
 	arguments.append_array(["--", "--launch-id=" + launch, "--url=ws://127.0.0.1:" + str(lobby.port), "--role=" + role, "--room=" + rooms[game], "--other-room=" + rooms["turns" if game == "blocks" else "blocks"], "--output=" + output, "--stop-file=" + stop_file, "--automated=" + ("true" if automated else "false")])
 	arguments.append("--rejoin-file=" + work.path_join("rejoin.signal"))
+	var bootstrap := result_root.path_join("client-" + launch + ".json")
+	var credentials := FileAccess.open(bootstrap, FileAccess.WRITE)
+	credentials.store_string(JSON.stringify({"url": "wss://localhost:" + str(lobby.port), "secure_enet": true, "ca_certificate": security.certificate, "credential": identities.provision("showcase-" + game + "-" + role, "玩家一" if role == "one" else "玩家二", "player", int(Time.get_unix_time_from_system()) + 3600)}))
+	credentials.close()
+	arguments.append("--client-config=" + bootstrap)
 	if args.get("--smoke", "false") == "true":
 		arguments.append("--close-after-ms=3500")
 	if visual:
 		arguments.append("--screenshot=" + work.path_join(label + ".png"))
-	var result: Dictionary = manager.launcher.launch({"executable": OS.get_executable_path(), "args": arguments}, launch, PackedStringArray())
+	var result: Dictionary = manager.launcher.launch({"executable": artifacts[game].get("client_executable", OS.get_executable_path()), "args": arguments}, launch, PackedStringArray())
 	check(result.ok, "verified client launch " + label)
 	processes.append({"launch_id": launch, "output": output, "label": label, "game": game})
 
@@ -183,7 +220,7 @@ func finish() -> void:
 	var reports: Array = []
 	for process in processes:
 		reports.append(read_report(process))
-	var file := FileAccess.open("res://logs/games-result.json", FileAccess.WRITE)
+	var file := FileAccess.open(preload("res://sdk/roomkit/shared/paths.gd").absolute("res://logs/games-result.json"), FileAccess.WRITE)
 	file.store_string(JSON.stringify({"passed": passed, "failed": failed, "visual": visual, "automated": automated, "evidence_dir": work, "result_store": result_root, "reports": reports, "artifacts": artifacts}, "  "))
 	file.close()
 	print("GAMES_RESULT passed=", passed, " failed=", failed)

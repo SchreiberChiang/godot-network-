@@ -81,3 +81,11 @@ v0.1 建议采用高熵随机一次性票据：宿主保存票据摘要、user_i
 result.submit身份必须与已认证控制连接及持久启动授权一致；result.ack同时绑定result_id和record_hash。DUPLICATE是成功确认；RESULT_CONFLICT、MATCH_RESULT_CONFLICT、AUTH_FAILED、INVALID_RESULT是不可自动覆盖的失败，outbox保留为.rejected.json。STORAGE_UNAVAILABLE与STORAGE_CAPACITY_EXCEEDED保留文件重试。SDK本地未启用服务返回RESULTS_DISABLED；初始化可返回UNSUPPORTED_STORAGE或PRIVATE_DATA_FAILED，这些本地错误不作为线上ACK。
 
 正常停止最多额外等待1.5秒发送/确认；超时留存outbox，后续恢复。尚未生成、未成功写入outbox的内存结果不保证恢复。未实现奖励或外部业务副作用。
+
+## SDK 0.4.0 本机安全与恢复增量
+
+session.create 的可选 credential 为64个小写十六进制字符，唯一约束来源为 lobby_request.schema.json。无身份提供方的开发 WS 使用原流程；启用提供方必须为 WSS。示例见 m2_messages.example.json 的 authenticated session.create，全零值只演示格式。认证失败 AUTH_FAILED，同用户已连接 ALREADY_CONNECTED；会话到期后断开。session响应只含user_id/display_name，不把role、过期时间或凭据返回给游戏。普通玩家停房须为创建者，admin允许跨创建者停房；拒绝返回AUTH_FAILED。
+
+身份摘要文件契约为 identities.schema.json；重启端口/进程记录为 process_journal.schema.json。二者是私有宿主文件，不是客户端协议。身份文件最多128项；日志中的未知owned={}必须持续隔离。RECOVERY_REQUIRED表示日志不可安全恢复，ROOM_MEMORY_LIMIT表示采样超限，HELPER_TIMEOUT/HELPER_FAILED只在本地助手边界使用，存储边界转换为STORAGE_UNAVAILABLE。资源上限使用已有HOST_CAPACITY_EXCEEDED。客户端TLS错误统一表现为AUTH_FAILED或CONTROL_UNAVAILABLE，不回传密钥路径或底层敏感错误。
+
+控制协议仍为1、游戏协议仍为1；SDK和构建兼容标识同步升版。0.3.0旧宿主/旧客户端没有新安全功能，不声称跨版本互通。详细配对见docs/07；配置、过期及证书失败分别由单元和真实secure专项验证。

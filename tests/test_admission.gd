@@ -70,7 +70,7 @@ func run() -> Dictionary:
 	check(Validator.validate_file(Wire.request("room.create", compat), "res://schemas/lobby_request.schema.json") != "", "create requires idempotency key")
 	check(Validator.validate_file(Wire.request("room.create", compat, "key"), "res://schemas/lobby_request.schema.json") == "", "keyed create matches schema")
 	var examples: Array = JSON.parse_string(FileAccess.get_file_as_string("res://examples/m2_messages.example.json"))
-	check(examples.size() == 17, "all documented M2 examples loaded")
+	check(examples.size() == 18, "all documented M2 examples loaded")
 	for example in examples:
 		check(Validator.validate_file(example.message, "res://schemas/" + example.schema + ".schema.json") == "", "schema accepts M2 example " + example.label)
 	return {"passed": passed, "failed": failed}

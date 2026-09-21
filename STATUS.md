@@ -1,5 +1,137 @@
 # 实际开发状态
 
+更新：2026-09-21。本轮继续用户“一口气全做完”的后续授权，完成 Windows 本机 M4 安全/恢复闭环和 M5 发布候选交付；**不把 M4/M5 全部正式门禁标为通过**。Linux完整宿主、跨电脑与公网、最坏玩法容量边界、另一台干净机器仍未验收。只修改当前独立仓库，没有读取、复制或修改旧游戏/旧服务器，没有云部署或账号商城。
+
+## 现在可以直接用什么
+
+- Windows独立程序ZIP：`artifacts/RoomKit-0.1.0-windows-3b92cb9c4c7f471ab9162e6490f837b8.zip`，181.73 MiB。无需Godot编辑器；需要Windows PowerShell与系统winsqlite3.dll。
+- 已重新解压并测试的启动器：`artifacts/unpacked-3b92cb9c4c7f471ab9162e6490f837b8/StartRoomKit.cmd`。打开两个取石子窗口；传入`-Game blocks`玩方块。StopRoomKit.cmd正常停止，CheckRoomKit.cmd校验。
+- SDK 0.4.0与独立新工程模板：`artifacts/RoomKit-SDK-0.4.0-template-3b92cb9c4c7f471ab9162e6490f837b8.zip`。也可运行`tools/new_game.ps1 -GameId my_game`重新生成。
+- 源码原入口StartPlay.cmd、StartTurns.cmd、ShowResults.cmd保留。完整操作/备份/故障/升级见docs/15_release_operations.md，路线见docs/06_roadmap_acceptance.md。
+- ZIP与日志不上传Git，源码与可重建脚本沿用用户授权上传指定GitHub的codex/m4-results分支；精确提交及远端核对见本轮最终回执。未修改全局Git配置。
+
+## 本轮实现
+
+身份提供方预配高熵凭据，持久文件只存摘要和稳定user_id/角色/期限；管理员停房授权，同用户第二会话拒绝，过期会话关闭。演示与独立包默认WSS + ENet DTLS，固定证书和主机名验证，凭据禁止走明文WS；保留基础M1/M2的无账号回环开发夹具。未实现第三方账号服务。
+
+启动/终止/资源采样、结果写库改为工作线程/有界队列。助手超时只终止它自己创建并持有的原句柄；历史房间/并发启动/结果队列有限额，实测内存超限关闭房间。托管宿主在启动前记保留端口，重启隔离遗留实例，精确只读身份确认退出后才能释放；未知身份不猜测、不接管、不杀旧PID。
+
+建立真正的Windows宿主、两个服务器、两个客户端EXE/PCK，固定入口适应官方模板；只读PCK与可写外部路径分开。新增启动/停止/校验/结果查看/备份脚本，按构建文件白名单打包，禁止夹带data/run/logs或私钥。SDK和新工程模板只通过GameAdapter与注册配置接入。源码SDK为0.4.0，开发及正式构建分别有独立兼容标识，详见docs/07。
+
+## 实际命令与结果
+
+下表均为实际执行，退出码0；通过数是断言数，不是玩家或测试机数量。模拟与真进程分开描述。
+
+| 命令/阶段 | 结果与边界 |
+|---|---|
+| `powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run.ps1 -Mode all` | 整体退出0；依次结果如下，共1144断言，另含demo |
+| unit | 250/0；契约/分帧/Schema及模拟生命周期，不是250次真实联机 |
+| launcher | 64/0；十轮真实身份核验/终止/句柄回收，句柄320→320 |
+| integration | 133/0；22个真实子进程，包含端口/启动/超时/故障隔离 |
+| demo / players | demo四次心跳、leases=0；players 33/0，真实回环接入 |
+| games / persistence | 47/0双玩法四客户端及真实SQLite；42/0结果幂等/故障补存/在线备份 |
+| secure | 37/0；实际WSS/DTLS，错误CA、错误DTLS主机名和无效身份拒绝、权限；另含过期和明文配置拒绝检查 |
+| stress | 404/0；真实100次创建—READY—至少两次心跳—停止—确认退出/端口回收 |
+| load | 95/0；实际20个加密输入客户端，两房16+4人；第17人ROOM_FULL，各客户端移动并收到状态 |
+| recovery | 21/0；真实终止宿主后立即重新开房，旧端口隔离/旧房自退/确认回收，未知身份继续隔离 |
+| limits / template | 8/0真实工作集超限退出与历史上限；10/0生成独立新游戏、真实模板服务器和客户端入房离房 |
+| `./tools/test_helpers.ps1` | 3/0；真实慢助手超时、持有句柄的原助手退出、助手路径白名单拒绝。慢助手是隔离测试夹具，不是制造SQLite磁盘故障 |
+| `./tools/build_release.ps1` | 正式模板导出成功，检查出口和脚本错误；最终构建索引artifacts/release.json |
+| 正式模板 `LauncherCheck.exe --headless` | 64/0；official模板十轮句柄测试，325→326，不随轮数增长 |
+| WSL Ubuntu `PortableCheck.x86_64 --headless` | 215/0；实际Linux official引擎协议/准入/玩法与本地端口检查，未运行Linux完整宿主/存储/玩家联机 |
+| `./tools/package_release.ps1` | 两个ZIP成功，重新解压后的34个不可变文件摘要一致；程序ZIP35项、模板ZIP38项，私有运行文件0 |
+| `./tools/test_release.ps1 -Bundle <delivery.unpacked>` | 退出0；重新解压包用正式EXE跑双玩法47/0；再真实打开两个窗口，通过Stop脚本正常关闭18/0；结果查看、备份成功，监听False、启动日志0项。不是另一台机器或人工试玩 |
+
+100轮耗时142922ms，Godot静态分配25,887,396→27,020,300字节（保留100条历史记录，约增加1.13MB）；宿主poll间隔P95 7ms、最大27ms，不能解释为网络RTT。20玩家全加入后继续15秒，报告包含之前逐个入场阶段：每人输入298—665次，快照165—375个，快照间隔P95 104—110ms；两个房间工作集97,923,072/96,854,016字节。应用层收发字节见load-result.json，不是包含DTLS/IP开销的链路带宽，也未测到全局安全容量上限。测试期间本机也执行构建任务，不是专门隔离的性能实验。
+
+主要证据：logs/completion-final-all.txt、completion-helpers.txt、completion-final-export.txt、completion-package.txt、completion-unpacked-release.txt、native-launcher-console.log、completion-linux-portable.txt、release-stop-console.log及对应stderr；机器报告stress-result.json、load-result.json、各*-lifecycle-result.json、completion-audit.json。最终审计当前项目Godot残留0、run顶层私有启动JSON 0、最终脚本/编译/退出泄漏错误日志0；常见凭据模式扫描命中0。此扫描不等于独立安全审计。
+
+## 本轮失败、修复及未运行
+
+- 导出初次使用--main-pack/--path被official模板拒绝；只去掉路径但保留--script仍不能选择所需入口。改固定MainLoop后又发现必须有主场景，最终固定类+空场景通过。没有把这些失败计为导出通过；早期失败日志仍在logs/及对应旧artifacts目录。
+- 本轮扩充文档消息例子后，unit首次249通过/1失败，因为例子数量断言仍为17。同步为18并保留逐项Schema校验，最终250/0；失败证据completion-example-count-failed.txt。
+- 一次WSL路径转换丢失Windows反斜杠，程序未启动（127）；改为明确/mnt/f路径后实际Linux退出0。首次进程残留审计遇到空ExecutablePath，修正为空字符串处理后重新执行，最终审计无错误。
+- 单元恶意指数产生预期Exponent too high警告；负向证书用例产生预期TLS握手失败。未隐藏这些输出。完整回归最终无GDScript编译错误或退出资源泄漏。
+- Windows正式程序已验证，Linux只有可移植测试：ProcessLauncher、RoomManager保护目录和SQLite适配仍为Windows实现，Linux宿主缺失；未将它伪装为环境测试通过。
+- 没有跨电脑/LAN/公网部署、外部身份服务、长期满载、最坏玩法/实体规模、容量边界、真实网络丢包、证书轮换、硬CPU/内存配额、磁盘满或断电测试。尚未成功写入outbox的结果不能承诺恢复。凭据仅本地预配，不是完整账号系统。
+- 资源上限是应用层采样/队列上限，初始化和离线管理仍有同步调用。数据授权/结果容量有限且无自动归档，不宣称生产长驻已完成。任意跨路径/跨机器数据迁移未验证。
+
+## 本轮实际修改文件
+
+- `docs/02_contracts.md`
+- `docs/03_sdk_integration.md`
+- `docs/06_roadmap_acceptance.md`
+- `docs/07_versions_decisions.md`
+- `docs/10_environment.md`
+- `docs/13_m4_results.md`
+- `docs/14_completion_work.md`
+- `docs/15_release_operations.md`
+- `examples/blocks/game_manifest.json`
+- `examples/m2_messages.example.json`
+- `examples/minimal/multiplayer_manifest.json`
+- `examples/result_messages.example.json`
+- `examples/showcase/client.gd`
+- `examples/showcase/host.gd`
+- `examples/turn_based/game_manifest.json`
+- `host/core/identity_provider.gd`
+- `host/core/recovery_guard.gd`
+- `host/core/result_service.gd`
+- `host/core/room_manager.gd`
+- `host/development.gd`
+- `host/lobby_server.gd`
+- `host/platform/bounded_helper.gd`
+- `host/platform/process_launcher.gd`
+- `host/storage/sqlite_repository.gd`
+- `README.md`
+- `release/CheckRoomKit.cmd`
+- `release/host.gd`
+- `release/Manage.ps1`
+- `release/README.md`
+- `release/Run.ps1`
+- `release/StartRoomKit.cmd`
+- `release/StopRoomKit.cmd`
+- `schemas/identities.schema.json`
+- `schemas/lobby_request.schema.json`
+- `schemas/process_journal.schema.json`
+- `sdk/roomkit/client/room_client.gd`
+- `sdk/roomkit/README.md`
+- `sdk/roomkit/server/room_runtime.gd`
+- `sdk/roomkit/shared/paths.gd`
+- `sdk/roomkit/shared/secure_transport.gd`
+- `STATUS.md`
+- `templates/game/adapter.gd`
+- `templates/game/client.gd`
+- `templates/game/README.md`
+- `templates/game/room.gd`
+- `tests/fixtures/load_client.gd`
+- `tests/fixtures/recovery_host.gd`
+- `tests/fixtures/secure_client.gd`
+- `tests/run_limits.gd`
+- `tests/run_load.gd`
+- `tests/run_portable.gd`
+- `tests/run_recovery.gd`
+- `tests/run_secure.gd`
+- `tests/run_stress.gd`
+- `tests/run_template.gd`
+- `tests/test_admission.gd`
+- `tests/test_launcher_real.gd`
+- `tests/test_results.gd`
+- `tools/bounded_helper.ps1`
+- `tools/build_release.ps1`
+- `tools/new_game.ps1`
+- `tools/package_release.ps1`
+- `tools/process_identity.ps1`
+- `tools/results.gd`
+- `tools/run.ps1`
+- `tools/test_helpers.ps1`
+- `tools/test_release.ps1`
+
+---
+
+# 以下是先前阶段历史记录，当前结论以上方为准
+
+# 实际开发状态
+
 更新：2026-09-21。M0—M3已有本机验证；本轮继续实现M4第一部分：SQLite结果保存、幂等确认、持久outbox、宿主退出后的结果补存和在线备份。M4整体未完成。仅在当前独立仓库开发，未读取、复制或修改旧项目。
 
 ## 本轮M4第一部分：结果可保存、重发、恢复与备份

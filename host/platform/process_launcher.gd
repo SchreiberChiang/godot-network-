@@ -3,6 +3,7 @@ extends RefCounted
 ## Records exist only for children spawned by this launcher instance.
 
 const HELPER_PATH := "res://tools/process_identity.ps1"
+const Helper = preload("res://host/platform/bounded_helper.gd")
 var _records: Dictionary = {}
 
 func launch(descriptor: Dictionary, launch_id: String, extra_args: PackedStringArray) -> Dictionary:
@@ -99,12 +100,12 @@ func _reap_finished_handle(owned: Dictionary) -> void:
 	# finished child still present in its HANDLE map. OS_Windows::kill removes
 	# that entry and closes both handles even when TerminateProcess on the
 	# already-finished process fails. No other code may call OS.kill for these
-	# children; this entire launcher runs synchronously on the main thread.
+	# children; each launch record has one owner, including worker transfers.
 	# Source: github.com/godotengine/godot/blob/4.7.2-stable/platform/windows/os_windows.cpp
 	# Microsoft PROCESS_INFORMATION: an open process handle prevents PID reuse.
 	# Refuse all unverified engine versions instead of risking kill's PID fallback.
 	var version := Engine.get_version_info()
-	if OS.get_name() != "Windows" or int(version.major) != 4 or int(version.minor) != 7 or int(version.patch) != 2 or str(version.status) != "stable" or str(version.build) != "steam" or str(version.hash) != "ed1daf0bf001b61586d9930840f2f1394092c079":
+	if OS.get_name() != "Windows" or int(version.major) != 4 or int(version.minor) != 7 or int(version.patch) != 2 or str(version.status) != "stable" or str(version.build) not in ["steam", "official"] or str(version.hash) != "ed1daf0bf001b61586d9930840f2f1394092c079":
 		return
 	if not _records.has(str(owned["launch_id"])) or not bool(owned["exited"]):
 		return
@@ -117,20 +118,21 @@ func _reap_finished_handle(owned: Dictionary) -> void:
 	OS.kill(child_pid)
 
 func _inspect(mode: String, owned: Dictionary) -> Dictionary:
-	var arguments := PackedStringArray([
-		"-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-File", ProjectSettings.globalize_path(HELPER_PATH), "-Mode", mode,
+	var arguments: Array = [
+		"-Mode", mode,
 		"-ProcessId", str(owned["pid"]), "-ExpectedParentPid", str(owned["parent_pid"]),
 		"-ExpectedExecutable", str(owned["executable"]), "-LaunchId", str(owned["launch_id"]),
-	])
+	]
 	if not str(owned["created_filetime"]).is_empty():
 		arguments.append_array(PackedStringArray(["-ExpectedCreationFileTime", str(owned["created_filetime"])]))
-	var output: Array = []
-	var exit_code := OS.execute(_powershell_path(), arguments, output, false, false)
-	if exit_code != 0 or output.is_empty():
-		return {"state": "unknown"}
-	var parsed: Variant = JSON.parse_string(str(output[0]).strip_edges())
-	return parsed if parsed is Dictionary else {"state": "unknown"}
+	return Helper.execute("process_identity.ps1", arguments, preload("res://sdk/roomkit/shared/paths.gd").absolute("res://run"))
+
+func import_owned(record_value: Dictionary) -> bool:
+	# Internal transfer from an isolated worker that launched this exact child.
+	if record_value.is_empty() or _records.has(record_value.launch_id) or int(record_value.parent_pid) != OS.get_process_id():
+		return false
+	_records[record_value.launch_id] = record_value.duplicate(true)
+	return true
 
 func _powershell_path() -> String:
 	return OS.get_environment("SystemRoot").path_join("System32/WindowsPowerShell/v1.0/powershell.exe")

@@ -2,6 +2,7 @@ extends SceneTree
 ## Focused real Windows process-identity and cached-HANDLE reclamation test.
 ## Child mode owns no sockets/files and exits itself if its test parent vanishes.
 const Launcher = preload("res://host/platform/process_launcher.gd")
+const Paths = preload("res://sdk/roomkit/shared/paths.gd")
 var child_mode := false
 var child_started := 0
 var passed := 0
@@ -31,9 +32,13 @@ func _process(_delta: float) -> bool:
 
 func _run() -> void:
 	print("ENGINE_VERSION_INFO=", JSON.stringify(Engine.get_version_info()))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://logs"))
+	DirAccess.make_dir_recursive_absolute(Paths.absolute("res://logs"))
+	var protection: Array = []
+	_check(OS.execute("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", Paths.absolute("res://tools/protect_runtime.ps1"), "-ProjectRoot", Paths.absolute("res://")], protection) == 0, "private helper directory initialized")
 	var launcher = Launcher.new()
 	var descriptor := {"executable": OS.get_executable_path(), "args": ["--headless", "--path", ProjectSettings.globalize_path("res://"), "--log-file", ProjectSettings.globalize_path("res://logs/launcher-real-child.log"), "--script", "res://tests/test_launcher_real.gd", "--", "--launcher-child"]}
+	if not OS.has_feature("editor"):
+		descriptor.args = ["--headless", "--", "--launcher-child"]
 	# Warm the count helper before taking a baseline.
 	_handle_count()
 	var before := _handle_count()

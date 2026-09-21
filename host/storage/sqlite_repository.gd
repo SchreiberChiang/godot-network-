@@ -1,5 +1,6 @@
 extends RefCounted
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
+const Helper = preload("res://host/platform/bounded_helper.gd")
 var root := ""
 var database := ""
 var version := ""
@@ -7,10 +8,10 @@ var version := ""
 func initialize(directory: String, database_name: String = "results.sqlite") -> Dictionary:
 	if OS.get_name() != "Windows" or database_name.get_file() != database_name:
 		return Wire.failure("UNSUPPORTED_STORAGE")
-	root = ProjectSettings.globalize_path(directory)
+	root = preload("res://sdk/roomkit/shared/paths.gd").absolute(directory)
 	database = root.path_join(database_name)
 	var output: Array = []
-	var code := OS.execute("powershell.exe", PackedStringArray(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ProjectSettings.globalize_path("res://tools/protect_data.ps1"), "-ProjectRoot", ProjectSettings.globalize_path("res://"), "-DataRoot", root]), output, false, false)
+	var code := OS.execute("powershell.exe", PackedStringArray(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://tools/protect_data.ps1"), "-ProjectRoot", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://"), "-DataRoot", root]), output, false, false)
 	if code != 0:
 		return Wire.failure("PRIVATE_DATA_FAILED")
 	var result := execute({"op": "init"})
@@ -24,10 +25,8 @@ func execute(request: Dictionary) -> Dictionary:
 		return Wire.failure("STORAGE_UNAVAILABLE")
 	file.store_string(JSON.stringify(request))
 	file.close()
-	var output: Array = []
-	var code := OS.execute("powershell.exe", PackedStringArray(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ProjectSettings.globalize_path("res://tools/sqlite_store.ps1"), "-Database", database, "-Request", path]), output, false, false)
+	var result := Helper.execute("sqlite_store.ps1", ["-Database", database, "-Request", path], root)
 	DirAccess.remove_absolute(path)
-	if code != 0 or output.is_empty():
+	if result.get("code", "").begins_with("HELPER_"):
 		return Wire.failure("STORAGE_UNAVAILABLE")
-	var result: Variant = JSON.parse_string(str(output[0]))
-	return result if result is Dictionary else Wire.failure("STORAGE_UNAVAILABLE")
+	return result

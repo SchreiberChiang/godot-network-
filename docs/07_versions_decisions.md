@@ -44,6 +44,14 @@ ADR-007：v0.1不保证崩溃续局。明确中止和清理政策比未实现的
 
 ## 4. 变更规则
 
+2026-09-21 后续实施：当前 SDK **0.4.0**，覆盖下方0.3.0历史记录。开发构建 minimal_room/dev-004（roomkit-minimal-dev-004）、blocks/blocks-dev-003（blocks-v3）、turns/turns-dev-003（turns-v3）。Windows正式模板独立构建为 blocks-win-001 / turns-win-001，兼容标识 blocks-win-v1 / turns-win-v1，清单引擎为4.7.2.stable.official.ed1daf0bf。源码开发引擎为4.7.2.stable.steam.ed1daf0bf。双端必须同构建/兼容标识，不接受旧产物混入。
+
+框架包名0.1.0-candidate与SDK 0.4.0是不同版本轴。当前可复验组合是Windows10.0.26200、上述Steam编辑器/official模板、系统SQLite3.51.1；两种引擎都已实际跑十轮精确身份和句柄回收。模板全hash为ed1daf0bf001b61586d9930840f2f1394092c079；其它hash拒绝执行专用缓存句柄释放路径，不能只凭4.x标签宣称兼容。Linux official模板仅跑可移植检查。
+
+ADR-009：正式模板使用固定MainLoop+空主场景，宿主/房间/客户端各自PCK；不能把开发期--script或路径覆盖当成正式入口。外部可写路径明确基于EXE目录，PCK只读契约仍从res://读取。
+
+ADR-010：托管重启保守隔离旧端口，不认领或终止前一宿主的进程。持有有效身份且确认退出后才可回收；缺失身份永久隔离直到人工核验。当前资源限制为有界队列、采样工作集和超时，不承诺OS硬配额。
+
 2026-09-21 M4第一部分：源码SDK标识0.3.0，control_protocol=1增加可选result.submit/result.ack，正文result_version=1。结果服务要求宿主与房间同步升级，当前仅接受SDK 0.3.0；旧宿主不支持新事件。M1夹具使用原消息子集，未启用结果服务的M2流程不发送结果事件。当前示例构建更新为minimal_room/dev-003、blocks/blocks-dev-002、turns/turns-dev-002；兼容标识分别roomkit-minimal-dev-003、blocks-v2、turns-v2，避免将旧产物误当新构建。game_protocol仍为1；未承诺与旧客户端交叉互通。以上是开发源码版本，不是发行包。
 
 ADR-008：Windows SQLite适配通过系统winsqlite3.dll及宿主PowerShell助手实现。数据库Schema user_version=1，从空库初始化或打开已有v1库，未知版本拒绝。result_id及(game_id,match_id,result_kind)双重唯一约束，提交完成才ACK。密钥、数据库与持久outbox在项目data/下，排除Git；结果恢复不等于恢复房间进程或对局。同步助手延迟、资源限额和断电限制见docs/13。

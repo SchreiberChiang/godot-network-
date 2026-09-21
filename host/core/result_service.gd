@@ -14,6 +14,9 @@ var manager:
 		_manager = weakref(value) if value != null else null
 var accepted_count := 0
 var ack_count := 0
+var pending: Array = []
+var worker: Thread
+var current: Dictionary = {}
 
 func initialize(root: String, payload_schemas: Dictionary) -> Dictionary:
 	schemas = payload_schemas.duplicate()
@@ -38,6 +41,15 @@ func prepare_launch(row: Dictionary) -> Dictionary:
 	return {"ok": true, "config": {"directory": repository.root.path_join("outbox").path_join(row.launch_id), "secret": grant.secret}}
 
 func accept(submission: Dictionary) -> Dictionary:
+	var validated := validate_submission(submission)
+	if not validated.ok:
+		return validated
+	var result: Dictionary = repository.execute(validated.request)
+	if result.ok:
+		accepted_count += 1
+	return result
+
+func validate_submission(submission: Dictionary) -> Dictionary:
 	if Validator.validate_file(submission, "res://schemas/result_submission.schema.json") != "" or not Format.valid_record(submission.get("record", {})):
 		return Wire.failure("INVALID_RESULT")
 	var record: Dictionary = submission.record
@@ -51,10 +63,7 @@ func accept(submission: Dictionary) -> Dictionary:
 		return Wire.failure("AUTH_FAILED")
 	if not schemas.has(record.game_id) or Validator.validate_file(record.payload, schemas[record.game_id]) != "":
 		return Wire.failure("INVALID_RESULT")
-	var result: Dictionary = repository.execute({"op": "accept", "record": record, "record_hash": Format.hash_record(record), "body": Format.canonical(record)})
-	if result.ok:
-		accepted_count += 1
-	return result
+	return {"ok": true, "request": {"op": "accept", "record": record.duplicate(true), "record_hash": Format.hash_record(record), "body": Format.canonical(record)}}
 
 func handle(row: Dictionary, message: Dictionary) -> bool:
 	if message.type != "result.submit":
@@ -62,9 +71,37 @@ func handle(row: Dictionary, message: Dictionary) -> bool:
 	var record: Dictionary = message.payload.record
 	var result: Dictionary = Wire.failure("AUTH_FAILED")
 	if record.launch_id == row.launch_id and record.room_id == row.room_id and row.registered:
-		result = accept(message.payload)
+		result = validate_submission(message.payload)
+		if result.ok:
+			var job := {"room_id": row.room_id, "result_id": record.result_id, "record_hash": result.request.record_hash, "request": result.request}
+			for existing in pending + ([current] if not current.is_empty() else []):
+				if existing.result_id == job.result_id and existing.record_hash == job.record_hash:
+					return true
+			if pending.size() < 64:
+				pending.append(job)
+				return true
+			result = Wire.failure("STORAGE_CAPACITY_EXCEEDED")
 	_send_ack(row.room_id, {"result_id": record.result_id, "record_hash": Format.hash_record(record), "ok": result.ok, "code": result.code})
 	return true
+
+func poll() -> void:
+	if worker != null and not worker.is_alive():
+		var result: Dictionary = worker.wait_to_finish()
+		worker = null
+		if result.ok:
+			accepted_count += 1
+		_send_ack(current.room_id, {"result_id": current.result_id, "record_hash": current.record_hash, "ok": result.ok, "code": result.code})
+		current = {}
+	if worker == null and not pending.is_empty():
+		current = pending.pop_front()
+		worker = Thread.new()
+		if worker.start(repository.execute.bind(current.request)) != OK:
+			worker = null
+			_send_ack(current.room_id, {"result_id": current.result_id, "record_hash": current.record_hash, "ok": false, "code": "STORAGE_UNAVAILABLE"})
+			current = {}
+
+func busy() -> bool:
+	return worker != null or not pending.is_empty()
 
 func _send_ack(room_id: String, payload: Dictionary) -> void:
 	ack_count += 1

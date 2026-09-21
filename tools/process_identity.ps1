@@ -44,6 +44,10 @@ try {
             $result = @{ state = 'exited'; code = '' }
         } elseif ($matchesIdentity) {
             $result = @{ state = 'running'; code = ''; created_filetime = $creation }
+            if ($Mode -eq 'inspect') {
+                $result.working_set_bytes = $ownedProcess.WorkingSet64
+                $result.cpu_ms = [int64]$ownedProcess.TotalProcessorTime.TotalMilliseconds
+            }
             if ($Mode -eq 'terminate') {
                 Add-Type -TypeDefinition @'
 using System;

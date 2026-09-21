@@ -80,3 +80,8 @@ Godot 高层RPC要求两端对应节点路径一致；RPC配置也有兼容性�
 把新项目接入说明交给未参与框架开发的人，仅按文档新增配置与适配器，就能本地启动宿主、房间和两个客户端并完成一次完整流程。无需修改 host/core、SDK核心或继承射击角色。
 
 网页实时游戏另做传输配置与认证/导出测试；仅大厅改WSS不代表整个ENet游戏已支持浏览器。Godot网页平台不提供原始TCP/UDP，支持范围与原生端不同。[S7]
+# 2026-09-21 SDK 0.4.0 补充
+
+当前已提供可复制的SDK及空工程模板：`tools/new_game.ps1 -GameId my_game`，生成路径见artifacts/template.json。`tools/run.ps1 -Mode template`真实验证独立房间与模板客户端，无需修改宿主核心。
+
+安全连接配置在已有清单字段之外提供`url=wss://localhost:<port>`、`secure_enet=true`、`ca_certificate=<固定验证证书文件>`和`credential=<预配随机凭据>`。私钥只在宿主/服务器，客户端只收自己的凭据和公开证书。不得把凭据写进代码、命令行或日志；示例通过当前用户私有文件一次性交付。缺失/不受信任证书或错误主机名拒绝连接；过期会话关闭。详细身份提供方接口、独立包与维护限制见docs/15_release_operations.md。以下原设计/早期实施说明应结合此补充与STATUS阅读。

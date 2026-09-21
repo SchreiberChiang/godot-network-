@@ -44,6 +44,11 @@ func _run() -> void:
 	root.add_child(view)
 	var config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://game_manifest.json"))
 	config.url = args.get("--url", "")
+	if args.has("--client-config"):
+		var bootstrap: Variant = JSON.parse_string(FileAccess.get_file_as_string(args["--client-config"]))
+		DirAccess.remove_absolute(args["--client-config"])
+		if bootstrap is Dictionary:
+			config.merge(bootstrap, true)
 	if not client.configure(config):
 		await _finish(false, "CONFIGURE_FAILED")
 		return
@@ -91,6 +96,9 @@ func _process(delta: float) -> bool:
 	if finishing or client == null:
 		return false
 	var now := Time.get_ticks_msec()
+	if not automated and FileAccess.file_exists(args.get("--stop-file", "")):
+		_close()
+		return false
 	if args.has("--close-after-ms") and now - started >= int(args["--close-after-ms"]):
 		_close()
 		return false

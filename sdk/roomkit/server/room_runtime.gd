@@ -6,6 +6,7 @@ const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const NetRoom = preload("res://sdk/roomkit/shared/net_room.gd")
 const Outbox = preload("res://sdk/roomkit/server/result_outbox.gd")
 const ResultFormat = preload("res://sdk/roomkit/shared/result_format.gd")
+const Secure = preload("res://sdk/roomkit/shared/secure_transport.gd")
 var adapter
 var build_identity: Dictionary
 var context: Dictionary
@@ -52,6 +53,7 @@ func _initialize() -> void:
 	var public_context := context.duplicate(true)
 	public_context.erase("token")
 	public_context.erase("results")
+	public_context.erase("security")
 	public_context.results_enabled = context.has("results")
 	if context.has("results"):
 		result_outbox = Outbox.new()
@@ -98,6 +100,12 @@ func _process(_delta: float) -> bool:
 				stopping = true
 				stop_at = now + 150
 			else:
+				if context.has("security"):
+					var tls := Secure.server_options(context.security)
+					context.erase("security")
+					if tls == null or enet.host.dtls_server_setup(tls) != OK:
+						_shutdown("CONTROL_UNAVAILABLE")
+						return false
 				network.multiplayer_peer = enet
 				ready = true
 				_send("room.ready", {"udp_port": int(context.udp_port)})
