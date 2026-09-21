@@ -1,0 +1,18 @@
+[
+  {
+    "request": {"action": "backup.list", "payload": {}},
+    "response": {"ok": true, "payload": {"ok": true, "code": "", "backups": [{"backup_id": "backup-20260922000000000-0123abcd", "created_at": 1790035200, "automatic": false, "kind": "manual", "size_bytes": 105394}]}}
+  },
+  {
+    "request": {"action": "logs.read", "payload": {"label": "operator"}},
+    "response": {"ok": true, "payload": {"text": ""}}
+  },
+  {
+    "request": {"action": "logs.read", "payload": {"label": "host"}},
+    "response": {"ok": false, "code": "LOG_NOT_FOUND"}
+  },
+  {
+    "request": {"action": "logs.read", "payload": {"label": "operator"}},
+    "response": {"ok": false, "code": "LOG_READ_FAILED"}
+  }
+]

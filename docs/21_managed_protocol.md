@@ -67,6 +67,29 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 
 密码采用系统 .NET PBKDF2-HMAC-SHA256、600000 次迭代及独立随机盐；数据库仅保存派生值，session token 和邀请码仅保存摘要。账号请求通过受保护的短期请求文件传给 helper，不把密码放在进程命令行。登录、注册及改密失败计数按用户名和真实 IP 独立持久化；当前窗口 900 秒，用户名 5 次、IP 20 次。限流跨用户名/IP 的测试属于账号后台专项，不属于本页契约测试。
 
+## 维护、停服公告与准入竞争
+
+已登录玩家发送 `server.notice`，payload 为 `{}`，成功响应的 payload 仍只有 `maintenance` 和 `message`，例如：
+
+```json
+{"maintenance":true,"message":"服务器将在 57 秒后停止，请保存操作。"}
+```
+
+普通维护返回管理员设置的公告；优雅停服时，宿主保存单调时钟截止时间，每次处理 `server.notice` 都以当前服务端时间重新计算剩余秒数：`max(0, ceil((deadline - now) / 1000))`。客户端显示服务端给出的 `message`，不依赖客户端时钟，也不把第一次读到的秒数长期缓存。管理 `status.host.countdown` 是现有的整数秒快照，更新频率与取整可能和刚读取的文本相差一秒。
+
+这次修复没有新增或改名请求字段、响应字段、错误码或协议版本；继续使用现有 `server.notice.payload.message` 和 `ROOM_DRAINING`。SDK 0.5 客户端不需要解析新增倒计时字段。对应 Schema 仍以本页契约表为准。
+
+宿主一旦接受停服，重复优雅停服不能延后原截止时间；立即停服可以将其提前。此时 `maintenance.set` 无论开启或关闭，都返回 `ROOM_DRAINING`，不能解除停止期间的准入限制，也不能用自定义维护公告覆盖停服公告。普通维护在尚未停服时仍可开启和关闭，已连接成员不会仅因维护开关被立即踢下线。
+
+准入限制覆盖实际生命周期，而不仅是大厅按钮：
+
+1. 维护或停服期间，玩家新建房间和申请预订返回 `ROOM_DRAINING`；禁止加入的房间拒绝新预订。
+2. 房间消费已经签发的票据时，再检查当前维护/停服状态、房间 READY、joinable 和 launch 身份。先取得票据不代表之后仍可进入；拒绝时只回收该票据匹配的待准入席位。
+3. 初始资产读取跨越异步等待。宿主在读取前、结果返回后都检查当前准入条件，再确认 `member.accepted`；中途停服或禁止加入不能让旧请求完成 CONNECTED。失败会清理对应 ADMITTING 席位。这个阶段的拒绝通过房间控制和 ENet 断开体现，SDK 不保证所有晚到的失败都以大厅 `ROOM_DRAINING` 返回。
+4. `room.recreate` 等待旧进程退出之后还会重新检查停服状态。如果此时已经停服，返回 `ROOM_DRAINING`，不创建替代房间。
+
+上述行为的真实 WSS/DTLS 客户端及子进程专项见 [22_framework_operations.md](22_framework_operations.md) 中的 `managed_shutdown`。其中账号/资产/成绩的可信内部 RPC 响应使用测试夹具；该专项不替代账号数据库验证。
+
 ## 永久资产与房间内授权
 
 公共玩家资产请求只有以下输入；所有目标用户、资产空间、价格、授予权限来自服务器。
@@ -123,7 +146,7 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 | --- | --- |
 | 首次设置/登录 | `setup.status {}`；`setup.create/admin.login {username,password}`；`admin.logout {}` |
 | 总览/进程 | `status {}`；`server.start {}`；`server.stop/server.restart {immediate,reason}` |
-| 维护入口 | `maintenance.set {enabled,message}`；维护期间拒绝新建/加入，公告可通过 `server.notice` 读取 |
+| 维护入口 | `maintenance.set {enabled,message}`；维护期间拒绝新建/加入，公告可通过 `server.notice` 读取；已接受停服后返回 `ROOM_DRAINING` |
 | 房间 | `room.create {game_id,mode,map,capacity}`；`room.stop/room.recreate {room_id,reason}`；`room.joinable {room_id,joinable,reason}` |
 | 玩家 | `player.kick {user_id,reason}`；`account.list {query?,offset?,limit?}`；`account.get {user_id}` |
 | 账号修改 | `account.rename {user_id,display_name,reason}`；`account.reset_password {user_id,password,reason}`；`account.ban {user_id,hours,reason}`；`account.unban {user_id,reason}` |
@@ -137,7 +160,9 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 
 常见响应形状是 `{ok:true,payload:{...}}` 或 `{ok:false,code,payload:{}}`；账号 helper 原生 `ok/code/identity/...` 常嵌套于外层 payload。HTTP 200 本身不代表业务成功；AUTH_FAILED/AUTH_REQUIRED 通常返回 401，其他业务失败可能仍是 200。`status.payload` 包含 host、rooms、players、metrics、games；room 行还含 pid、port、heartbeats、heartbeat_age_ms、cleaned、joinable、options。这里的玩家在线状态来自托管宿主快照，账号列表的 active 则来自有效会话。
 
-优雅停服设置最多 60 秒倒计时，立即停服跳过倒计时，随后仍走房间退出和资源确认流程。启动成功的操作回复、READY 状态、进程确认退出是不同阶段；使用 status 查看最终结果。`room.recreate` 先等待旧房间清理再创建，不能凭旧 pid 猜测资源可复用。`config.set` 需要服务停止；更换共享资产空间选择已有空间，不自动复制余额。
+管理员身份检查必须区分凭据无效与暂时无法检查：账号 helper 返回的 `STORAGE_UNAVAILABLE` 或工作线程入口的 `RATE_LIMITED` 原样作为业务错误返回，不转换为 `AUTH_FAILED`，也不撤销浏览器会话。真正的 `AUTH_FAILED/AUTH_REQUIRED/SESSION_EXPIRED/ADMIN_REQUIRED` 才使管理页面回到登录页并显示原因。每次浏览器请求绑定发送时的 token；旧请求晚到的认证失败不得清除后来成功登录的新 token。
+
+优雅停服设置最多 60 秒倒计时，立即停服跳过倒计时，随后仍走房间退出和资源确认流程。重复请求不会延长已经接受的停止期限，维护开关也不能取消停服。启动成功的操作回复、READY 状态、进程确认退出是不同阶段；使用 status 查看最终结果。`room.recreate` 先等待旧房间清理，再次确认尚未停服才创建，不能凭旧 pid 猜测资源可复用。`config.set` 需要服务停止；更换共享资产空间选择已有空间，不自动复制余额。
 
 审计把操作者、目标、动作、原因和结果归档。账号审计不会记录原始密码、密码派生值、token 或邀请码明文；资产流水包含可审阅的原状态与新状态。内部仓储只读操作 `{"op":"asset.audit_all"}` 使用固定 SQL 返回最近 100 条，每行字段为 `user_id/request_id/space_id/actor_id/command/previous_body/body/created_at`。其中 command、previous_body、body 是 JSON 字符串；无额外 SQL、筛选、排序、limit 入参。Operator 将账户、资产与操作审计合并成 `audit.list.payload.entries`，资产前后状态解码为对象。这个仓储入口自身不是鉴权边界，只能由已验证管理员的 Operator 调用。
 
@@ -163,7 +188,7 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 
 这是内部 helper 调用约定，不是客户端 API，也不是独立 Schema。root 必须是当前项目 `data` 的子目录，ACL 仅允许当前用户，并拒绝路径中的 reparse point。调用方不能指定任意源数据库、备份目标、SQL 或 shell。生产目录通常是 `data/framework`。
 
-备份包含原生 SQLite 在线备份得到的 `accounts.sqlite/assets.sqlite`，以及存在时的 `config.json/server.crt/server.key`。数据库必需，配置与 TLS 文件按实际存在情况纳入；私有 manifest 记录校验值。列表返回 `{backup_id,created_at,automatic,kind}`，不返回凭据或密钥。Operator 当前每 30 分钟安排自动备份，最多保留 48 个自动备份；手工备份与恢复前备份不随此策略删除。
+备份包含原生 SQLite 在线备份得到的 `accounts.sqlite/assets.sqlite`，以及存在时的 `config.json/server.crt/server.key`。数据库必需，配置与 TLS 文件按实际存在情况纳入；私有 manifest 记录校验值。列表返回 `{backup_id,created_at,automatic,kind,size_bytes}`；大小来自已验证 manifest 的文件字节数总和，不包含 manifest 本身，不返回文件路径、凭据或密钥。Operator 当前每 30 分钟安排自动备份，最多保留 48 个自动备份；手工备份与恢复前备份不随此策略删除。
 
 恢复要求 Operator 已停止并确认自己持有的宿主及房间退出，排空存储工作。helper 会独立拒绝仍存在的 `host-running.json` 标记，不会以用户声称停服为依据。恢复依次校验已列举 ID、文件校验值及两库 integrity_check，创建恢复前备份，检查数据库/文件占用，用暂存目录和持久日志替换已关闭文件，并撤销恢复库的全部会话（包括管理员）。恢复完成后必须重新登录，不能继续使用备份中的旧 token。
 
@@ -179,6 +204,7 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 | --- | --- |
 | `INVALID_REQUEST/INVALID_ACCOUNT_REQUEST/INVALID_ASSET_COMMAND/INVALID_OPTIONS` | 输入类型、额外字段或动作不合法；修正请求后再发 |
 | `AUTH_REQUIRED/AUTH_FAILED/ADMIN_REQUIRED` | 缺少登录、会话无效或角色不足；账号和管理入口各自认证 |
+| `LOG_NOT_FOUND/LOG_READ_FAILED` | 管理后台允许的日志尚未生成或当前不可读；合法空文件返回成功和空 text，不伪装为读取失败 |
 | `SETUP_REQUIRED/SETUP_COMPLETE` | 尚未首次设置，或已完成首次设置不能再次创建管理员 |
 | `INVITE_INVALID/INVITE_NOT_FOUND/USERNAME_UNAVAILABLE` | 邀请过期/撤销/耗尽、未知邀请或用户名已占用 |
 | `ACCOUNT_NOT_FOUND/ACCOUNT_BANNED/ADMIN_SELF_PROTECTION` | 未知账号、封禁中，或管理员自身保护规则拒绝操作 |

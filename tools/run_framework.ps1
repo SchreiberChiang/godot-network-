@@ -54,7 +54,7 @@ if(Test-Path -LiteralPath $metadata) {
 & (Join-Path $PSScriptRoot 'protect_data.ps1') -ProjectRoot $project -DataRoot $dataRoot | Out-Null
 $logs=Join-Path $dataRoot 'logs'
 New-Item -ItemType Directory -Path $logs -Force | Out-Null
-$arguments=@('--headless','--path',$project,'--log-file',(Join-Path $logs 'operator.log'),'--script','res://host/operator.gd','--',('--data-root='+$dataRoot))
+$arguments=@('--headless','--path',$project,'--log-file',(Join-Path $logs 'operator.log'),'--script','res://host/operator.gd','--',('--data-root='+$dataRoot),('--operator-log-path='+(Join-Path $logs 'operator.log')))
 $process=Start-Process -FilePath $Godot -ArgumentList (Quote-Arguments $arguments) -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logs 'console.log') -RedirectStandardError (Join-Path $logs 'stderr.log')
 $ownedHandle=$process.Handle
 $deadline=[DateTime]::UtcNow.AddSeconds(45)

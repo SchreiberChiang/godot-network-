@@ -16,6 +16,17 @@ func run() -> Dictionary:
 	var config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://examples/asset_catalog.example.json"))
 	var catalog = Catalog.new()
 	check(catalog.configure(config) == "", "trusted catalog schema and defaults")
+	check(catalog.level_for(0) == 1 and catalog.level_for(99) == 1, "experience below first level threshold")
+	check(catalog.level_for(100) == 2 and catalog.level_for(249) == 2 and catalog.level_for(250) == 3, "exact nonlinear experience thresholds")
+	check(catalog.level_for(1000000000) == config.level_thresholds.size(), "experience beyond last threshold caps at table level")
+	for invalid in [[1, 100], [0, 100, 50], [0, 100, 100], [0, 0.5], []]:
+		var bad_curve := config.duplicate(true)
+		bad_curve.level_thresholds = invalid
+		check(catalog.configure(bad_curve) == "INVALID_ASSET_CATALOG" and catalog.level_for(250) == 3, "invalid curve rejected without changing active thresholds " + str(invalid))
+	var legacy := config.duplicate(true)
+	legacy.erase("level_thresholds")
+	var legacy_catalog = Catalog.new()
+	check(legacy_catalog.configure(legacy) == "" and legacy_catalog.level_for(500) == 1, "legacy catalog without level table has no progression")
 	var broken := config.duplicate(true)
 	broken.games.shooter.space = "unknown"
 	check(catalog.configure(broken) == "UNKNOWN_ASSET_SPACE" and catalog.space_for("shooter") == "shooter", "invalid reload preserves original catalog")

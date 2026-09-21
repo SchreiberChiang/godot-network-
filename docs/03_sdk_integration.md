@@ -1,5 +1,15 @@
 # 03 SDK与项目接入契约
 
+## 当前分支指引（2026-09-22）
+
+当前实际 SDK 为 `sdk/roomkit/` 下的 SDK 0.5，使用步骤见 [SDK README](../sdk/roomkit/README.md)，协议见 [21_managed_protocol.md](21_managed_protocol.md)。托管账号客户端、真实房间准入与资产初始状态、许可和异步刷新已经接通；下方 S0 时点的“与实际联网角色状态的绑定仍未实现”是历史记录。
+
+游戏通过自己的 policy 和 GameAdapter 定义允许操作的条件、确认资产后的投影及刷新完成/取消行为。框架负责身份、进程和通用资产事务，不识别死亡、复活、武器或赛车规则；比赛内存钱包不代替永久账户余额。分层路线见 [17_framework_shooter_plan.md](17_framework_shooter_plan.md)，启动入口见 [22_framework_operations.md](22_framework_operations.md)，真实导出、交互和跨设备的分别验收状态见 [STATUS](../STATUS.md)。
+
+## 初始设计与历史阶段记录
+
+以下保留接入设计及早期阶段说明；建议的插件目录、交付形式和当时未完成项不应作为当前 SDK 已实现能力的清单。新增接入优先遵循上述现行 SDK 文档与 `schemas/`。
+
 2026-09-21 分支补充：新增可选服务端 `asset_policy.gd`（默认拒绝，游戏覆写规则）与 `match_wallet.gd`（仅本场内存经济）。永久资产使用宿主内部服务，射击/取石子通过各自策略接入；与实际联网角色状态的绑定仍未实现。见[18](18_asset_foundation.md)，完整分层路线见[17](17_framework_shooter_plan.md)。不要将这些接口标为可直接在客户端调用。
 
 ## 1. 交付形态

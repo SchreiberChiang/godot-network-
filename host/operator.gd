@@ -18,6 +18,7 @@ var launcher = Launcher.new()
 var http = Http.new()
 var bus
 var root_path := ""
+var operator_log_path := ""
 var settings: Dictionary = {}
 var catalog_config: Dictionary = {}
 var games: Dictionary = {}
@@ -50,6 +51,7 @@ func _initialize() -> void:
 		if pair.size() == 2:
 			args[pair[0]] = pair[1]
 	root_path = Paths.absolute(args.get("--data-root", "res://data/framework"))
+	operator_log_path = _operator_log_path(args.get("--operator-log-path", ""), root_path.path_join("logs/operator.log"))
 	_run.call_deferred()
 
 func _run() -> void:
@@ -307,8 +309,12 @@ func _admin(request: Dictionary) -> Dictionary:
 			return Wire.failure("ADMIN_REQUIRED")
 		return _payload(reply)
 	var auth: Dictionary = await _work(accounts.execute.bind({"op": "session.authenticate", "token": token}))
-	if not auth.ok or auth.identity.role != "admin":
-		return Wire.failure("AUTH_FAILED")
+	if not auth.ok:
+		# Admission/storage failure is not evidence that the credential is invalid.
+		# Preserve the safe error code so the browser can retry its existing session.
+		return Wire.failure(str(auth.get("code", "STORAGE_UNAVAILABLE")))
+	if auth.get("identity", {}).get("role", "") != "admin":
+		return Wire.failure("ADMIN_REQUIRED")
 	if action == "admin.logout":
 		return _payload(await _work(accounts.execute.bind({"op": "session.logout", "token": token})))
 	if action == "status":
@@ -392,19 +398,12 @@ func _admin(request: Dictionary) -> Dictionary:
 		"logs.list": result = {"ok": true, "payload": {"logs": [{"label": "operator"}, {"label": "host"}]}}
 		"logs.read":
 			if payload.get("label", "") in ["operator", "host"]:
-				var path := root_path.path_join("logs/operator.log" if payload.label == "operator" else "logs/managed-host.log")
-				result = {"ok": true, "payload": {"text": _tail(path)}}
+				var path: String = operator_log_path if payload.label == "operator" else root_path.path_join("logs/managed-host.log")
+				result = _read_log(path)
 		"audit.list":
 			var records: Dictionary = await _work(accounts.execute.bind({"op": "audit.list", "token": token, "limit": 100}))
-			var rows: Array = audit.slice(maxi(0, audit.size() - 100))
-			for entry in records.get("rows", []):
-				rows.append({"created_at": entry.created_at, "actor_id": entry.actor_id, "action": entry.action, "user_id": entry.target_id, "reason": entry.reason, "code": entry.result, "before": entry.before_body, "after": entry.after_body})
 			var asset_audit: Dictionary = await _work(assets.repository.execute.bind({"op": "asset.audit_all"}))
-			for entry in asset_audit.get("rows", []):
-				var command := Wire.decode(str(entry.command).to_utf8_buffer())
-				rows.append({"created_at": Time.get_unix_time_from_datetime_string(str(entry.created_at).replace(" ", "T")), "actor_id": entry.actor_id, "action": "asset." + str(command.get("kind", "transaction")), "user_id": entry.user_id, "reason": command.get("reason", ""), "code": "OK", "before": Wire.decode(str(entry.previous_body).to_utf8_buffer(), "", 65536), "after": Wire.decode(str(entry.body).to_utf8_buffer(), "", 65536)})
-			rows.sort_custom(func(a, b): return int(a.get("created_at", a.get("time", 0))) < int(b.get("created_at", b.get("time", 0))))
-			result = {"ok": true, "payload": {"entries": rows.slice(maxi(0, rows.size() - 100))}}
+			result = _merged_audit(audit, records, asset_audit)
 	if action not in ["status", "asset.read", "config.get", "backup.list", "logs.list", "logs.read", "audit.list", "account.list", "account.get", "invite.list"]:
 		_audit(auth.identity.user_id, action, payload.get("reason", ""), result.get("code", "OK" if result.ok else "FAILED"), str(payload.get("user_id", payload.get("room_id", payload.get("backup_id", "")))))
 	return result
@@ -464,7 +463,7 @@ func _asset_read(user_id: String, game_id: String) -> Dictionary:
 	var result: Dictionary = await _work(assets.read.bind(user_id, game_id))
 	if not result.ok:
 		return result
-	return {"ok": true, "payload": {"state": result.state, "space": result.space_id, "level": 1 + int(result.state.experience) / 100, "catalog": {"items": assets.catalog.items_for(game_id)}, "slots": assets.catalog.game(game_id).get("slots", {})}}
+	return {"ok": true, "payload": {"state": result.state, "space": result.space_id, "level": assets.catalog.level_for(int(result.state.experience)), "catalog": {"items": assets.catalog.items_for(game_id)}, "slots": assets.catalog.game(game_id).get("slots", {})}}
 
 func _rewards(record: Dictionary) -> Array:
 	var rows: Array = []
@@ -527,9 +526,29 @@ func _maintenance(request: Dictionary) -> Dictionary:
 
 func _metrics() -> void:
 	var result: Dictionary = await _maintenance({"op": "metrics"})
-	if result.ok:
-		snapshot.metrics = result.get("metrics", {})
+	snapshot.metrics = _metric_snapshot(result)
 	metrics_busy = false
+
+static func _metric_snapshot(result: Dictionary) -> Dictionary:
+	var available: bool = result.get("ok", false) and result.get("metrics") is Dictionary
+	var value: Dictionary = result.metrics.duplicate(true) if available else {}
+	value.available = available
+	value.sampled_at = int(Time.get_unix_time_from_system())
+	if not available:
+		value.error = str(result.get("code", "METRICS_UNAVAILABLE"))
+	return value
+
+static func _merged_audit(local_rows: Array, account_result: Dictionary, asset_result: Dictionary) -> Dictionary:
+	if not account_result.get("ok", false) or not asset_result.get("ok", false):
+		return Wire.failure("STORAGE_UNAVAILABLE")
+	var rows: Array = local_rows.slice(maxi(0, local_rows.size() - 100))
+	for entry in account_result.get("rows", []):
+		rows.append({"created_at": entry.created_at, "actor_id": entry.actor_id, "action": entry.action, "user_id": entry.target_id, "reason": entry.reason, "code": entry.result, "before": entry.before_body, "after": entry.after_body})
+	for entry in asset_result.get("rows", []):
+		var command := Wire.decode(str(entry.command).to_utf8_buffer())
+		rows.append({"created_at": Time.get_unix_time_from_datetime_string(str(entry.created_at).replace(" ", "T")), "actor_id": entry.actor_id, "action": "asset." + str(command.get("kind", "transaction")), "user_id": entry.user_id, "reason": command.get("reason", ""), "code": "OK", "before": Wire.decode(str(entry.previous_body).to_utf8_buffer(), "", 65536), "after": Wire.decode(str(entry.body).to_utf8_buffer(), "", 65536)})
+	rows.sort_custom(func(a, b): return int(a.get("created_at", a.get("time", 0))) < int(b.get("created_at", b.get("time", 0))))
+	return {"ok": true, "payload": {"entries": rows.slice(maxi(0, rows.size() - 100))}}
 
 func _backup(automatic: bool, reason: String) -> Dictionary:
 	if storage_maintenance:
@@ -628,12 +647,39 @@ func _recover_previous() -> void:
 	recovery_next = Time.get_ticks_msec() + 10000
 	recovery_busy = false
 
-static func _tail(path: String) -> String:
+static func _operator_log_path(startup_path: String, fallback: String) -> String:
+	# Godot consumes --log-file before exposing get_cmdline_args. Our trusted
+	# launchers repeat that same path once as --operator-log-path. Browser
+	# requests can only choose operator/host labels, never a filesystem path.
+	if startup_path.is_empty():
+		return fallback
+	if not startup_path.is_absolute_path() or startup_path.begins_with("res://") or startup_path.begins_with("user://") or startup_path.contains("\n") or startup_path.contains("\r"):
+		return ""
+	return startup_path.simplify_path()
+
+static func _read_log(path: String) -> Dictionary:
+	if path.is_empty():
+		return Wire.failure("LOG_READ_FAILED")
+	if not FileAccess.file_exists(path):
+		return Wire.failure("LOG_NOT_FOUND")
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		return "暂无日志"
-	file.seek(maxi(0, file.get_length() - 60000))
-	return file.get_buffer(60000).get_string_from_utf8()
+		return Wire.failure("LOG_READ_FAILED")
+	var length := file.get_length()
+	var count := mini(length, 60000)
+	file.seek(maxi(0, length - count))
+	var data := file.get_buffer(count)
+	var failed := data.size() != count or file.get_error() not in [OK, ERR_FILE_EOF]
+	file.close()
+	if failed:
+		return Wire.failure("LOG_READ_FAILED")
+	return {"ok": true, "payload": {"text": data.get_string_from_utf8()}}
+
+static func _tail(path: String) -> String:
+	# Internal audit bootstrap tolerates an absent optional journal. HTTP callers
+	# use _read_log directly so missing/unreadable and empty are distinguishable.
+	var result := _read_log(path)
+	return result.payload.text if result.ok else ""
 
 static func _write_json(path: String, value: Dictionary) -> bool:
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())

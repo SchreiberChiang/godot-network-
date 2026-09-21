@@ -88,8 +88,6 @@ func _process(_delta: float) -> bool:
 				bus.close()
 				quit(0)
 				return false
-		else:
-			lobby.announcement = "服务器将在 %d 秒后停止，请保存操作。" % int(ceil(float(deadline - Time.get_ticks_msec()) / 1000.0))
 	if initialized and Time.get_ticks_msec() - last_status > 1000:
 		_publish()
 	return false
@@ -99,8 +97,11 @@ func _request(peer_id: String, request_id: String, action: String, payload: Dict
 	match action:
 		"server.stop": _begin_stop(0 if payload.get("immediate", false) else 60000)
 		"maintenance.set":
-			lobby.maintenance = payload.enabled
-			lobby.announcement = payload.get("message", "") if payload.enabled else ""
+			if stopping:
+				result = Wire.failure("ROOM_DRAINING")
+			else:
+				lobby.maintenance = payload.enabled
+				lobby.announcement = payload.get("message", "") if payload.enabled else ""
 		"room.create":
 			if stopping:
 				result = Wire.failure("ROOM_DRAINING")
@@ -127,7 +128,10 @@ func _request(peer_id: String, request_id: String, action: String, payload: Dict
 				var end := Time.get_ticks_msec() + 30000
 				while not manager.rooms[row.room_id].cleaned and Time.get_ticks_msec() < end:
 					await process_frame
-				result = manager.create_room(row.game_id, options) if manager.rooms[row.room_id].cleaned else Wire.failure("CONTROL_UNAVAILABLE")
+				if stopping:
+					result = Wire.failure("ROOM_DRAINING")
+				else:
+					result = manager.create_room(row.game_id, options) if manager.rooms[row.room_id].cleaned else Wire.failure("CONTROL_UNAVAILABLE")
 		"player.kick": lobby.kick(payload.user_id, payload.get("reason", "operator"))
 		_: result = Wire.failure("INVALID_OPTIONS")
 	_publish()
@@ -145,9 +149,11 @@ func _event(action: String, payload: Dictionary) -> void:
 		lobby.kick(payload.user_id, "account_revoked")
 
 func _begin_stop(delay: int) -> void:
+	var requested_deadline := Time.get_ticks_msec() + delay
+	# A repeated stop can shorten the grace period, never postpone an accepted stop.
+	deadline = mini(deadline, requested_deadline) if stopping else requested_deadline
 	stopping = true
-	deadline = Time.get_ticks_msec() + delay
-	lobby.maintenance = true
+	lobby.begin_shutdown(deadline)
 
 func _publish() -> void:
 	last_status = Time.get_ticks_msec()
@@ -167,4 +173,4 @@ func _publish() -> void:
 			continue
 		var seat: Dictionary = lobby._seat(connection.user.user_id)
 		players.append({"user_id": connection.user.user_id, "display_name": connection.user.display_name, "room_id": seat.get("room_id", ""), "game_id": seat.get("game_id", ""), "state": seat.get("state", "LOBBY")})
-	bus.broadcast("host.status", {"host": {"state": "DRAINING" if stopping else "RUNNING", "pid": OS.get_process_id(), "uptime": (last_status - started) / 1000, "maintenance": lobby.maintenance, "maintenance_message": lobby.announcement, "countdown": maxi(0, (deadline - last_status) / 1000) if stopping else 0, "error": ""}, "rooms": rooms, "players": players})
+	bus.broadcast("host.status", {"host": {"state": "DRAINING" if stopping else "RUNNING", "pid": OS.get_process_id(), "uptime": (last_status - started) / 1000, "maintenance": lobby.is_draining(), "maintenance_message": lobby.notice_message(), "countdown": maxi(0, (deadline - last_status) / 1000) if stopping else 0, "error": ""}, "rooms": rooms, "players": players})

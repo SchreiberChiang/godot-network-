@@ -6,6 +6,12 @@ var _config: Dictionary = {}
 func configure(value: Dictionary) -> String:
 	if Validator.validate_file(value, "res://schemas/asset_catalog.schema.json") != "":
 		return "INVALID_ASSET_CATALOG"
+	var thresholds: Array = value.get("level_thresholds", [0])
+	if int(thresholds[0]) != 0:
+		return "INVALID_ASSET_CATALOG"
+	for index in range(1, thresholds.size()):
+		if int(thresholds[index]) <= int(thresholds[index - 1]):
+			return "INVALID_ASSET_CATALOG"
 	for game in value.games.values():
 		if not value.spaces.has(game.space):
 			return "UNKNOWN_ASSET_SPACE"
@@ -23,6 +29,15 @@ func configure(value: Dictionary) -> String:
 
 func game(game_id: String) -> Dictionary:
 	return _config.get("games", {}).get(game_id, {}).duplicate(true)
+
+func level_for(experience: int) -> int:
+	var level := 1
+	var thresholds: Array = _config.get("level_thresholds", [0])
+	for index in range(1, thresholds.size()):
+		if experience < int(thresholds[index]):
+			break
+		level = index + 1
+	return level
 
 func space_for(game_id: String) -> String:
 	return str(game(game_id).get("space", ""))

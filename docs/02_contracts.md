@@ -1,5 +1,15 @@
 # 02 控制协议与生命周期
 
+## 当前分支指引（2026-09-22）
+
+`codex/shooter-framework` 已接入账号 WSS 大厅、房间永久资产授权/初始状态/异步刷新、管理员 HTTP 和本机 RPC；不能再用早期“内部资产尚未接网络”描述当前实现。现行消息、错误处理与 SDK 0.5 兼容边界见 [21_managed_protocol.md](21_managed_protocol.md)，唯一机器可读契约仍是 [`schemas/`](../schemas/)。结构校验通过不代替身份、权限、生命周期或数据库事务验证。
+
+开发范围见 [17_framework_shooter_plan.md](17_framework_shooter_plan.md)，逐项真实结果及未运行边界见 [STATUS](../STATUS.md)，可复跑命令见 [22_framework_operations.md](22_framework_operations.md)。当前公共资产操作的持久幂等键为 `payload.operation_id`，不要把下方早期通用操作表中的字段直接套到所有新接口。
+
+## 初始设计与历史阶段记录
+
+以下保留整体设计与 M1/S0 时点说明；“尚未接入”“后续阶段”等描述仅代表原记录时点，不覆盖上面的当前分支协议与验收记录。
+
 2026-09-21 新分支增加内部资产目录、永久状态和交易命令 Schema，见 [18_asset_foundation.md](18_asset_foundation.md)。这些尚未接入大厅/控制网络消息，现有线协议保持严格拒绝未知消息，不能把内部服务当作已上线账号接口。
 
 状态：以下为整体设计。M1 已实现的 control_protocol=1 子集、payload 与错误码见 [09_m1_control.md](09_m1_control.md) 和 `schemas/control.schema.json`；其余操作仍为后续阶段设计。JSON Schema 不能替代认证与生命周期语义检查。

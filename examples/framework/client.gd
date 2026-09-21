@@ -423,9 +423,12 @@ func _sync_life_view() -> void:
 		return
 	var life: String = world.player_view(client.identity.get("user_id", "")).get("life_state", "")
 	if life != last_life:
+		var previous_life := last_life
 		last_life = life
 		if life == "alive":
 			inventory_open = false
+			if previous_life == "dead":
+				message = "已复活，可以继续战斗"
 		if life == "dead":
 			message = "你已阵亡，可以打开背包解锁或选枪"
 

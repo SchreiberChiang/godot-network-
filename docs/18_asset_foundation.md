@@ -1,6 +1,6 @@
 # S0/S3 内部资产基础：已实现接口与测试边界
 
-此模块是 `docs/17_framework_shooter_plan.md` 的第一批代码，不是账号/背包 UI 或射击游戏交付。当前大厅和控制协议未开放资产消息；现有只读面板也没有写按钮。房间身份许可、成员代次、复活串行门禁将在 S3/S4 集成，不能用本阶段的纯规则检查宣称已经防住真实联机伪造请求。
+本文件记录 `docs/17_framework_shooter_plan.md` 最初 S0/S3 的内部资产基础。下文关于“后续网络接入”的描述属于该阶段历史；当前账号、可操作后台、房间许可与背包已经集成，网络协议见 docs/21_managed_protocol.md，实际验收及缺项见 STATUS。本阶段的纯规则检查仍不能替代真实联机验收。
 
 ## 契约与调用
 
@@ -8,6 +8,8 @@
 - `schemas/asset_state.schema.json`：永久状态。`credits`/`experience`、非堆叠 `owned`、按 game_id 隔离的 `profiles`、乐观并发 `revision`。默认免费物品在读取时投影，首次成功交易写入；读取本身不制造交易。
 - `schemas/asset_command.schema.json`：内部命令 `purchase`、`select`、`adjust`。价格只来自可信目录；调整需要独立管理员入口与原因。客户端不能指定 space_id、价格或任意状态。
 - 目录例子在 `examples/asset_catalog.example.json`；射击和取石子各有自己的策略，核心不认识枪械、主题或死亡。
+
+2026-09-22 补齐等级表：目录可提供 `level_thresholds`，数组第一个值必须为0，其后严格递增，最多1000项，阈值为0至10亿的整数。第n项是到达等级n所需的累计经验，达到最高阈值后等级封顶，经验仍按原资产上限累计。当前例子采用 `[0,100,250,500,1000,1750,2750,4000,5500,7500,10000]`。整份目录共享同一经验表，独立或共享空间都由服务端计算等级；客户端显示服务返回值，不自行推算。旧v1目录可以省略此可选字段，此时保持等级1，表示没有启用等级成长。非法表返回原有 `INVALID_ASSET_CATALOG`，不覆盖已生效目录。数据库只保存经验，不增加另一个可直接篡改的等级列。
 
 `host/core/asset_service.gd` 的 `initialize(directory, configuration)` 打开本项目私有 data 下的 `assets.sqlite`；`read(user_id, game_id)` 查询永久资产；`perform(identity, game_id, command, policy, trusted_context)` 调用服务端规则后提交购买/选择；`adjust(administrator, user_id, game_id, command)` 提交管理调整。这些是**进程内部的受信任接口**，不是对客户端开放的授权 API。调用者必须先认证身份并取得当前服务端上下文；不能把网络传入的 identity/context/admin 字段直接传进去。
 

@@ -88,7 +88,11 @@ function BackupManifests {
     return ,$list
 }
 function PublicBackups {
-    return @(foreach($item in ((BackupManifests) | Sort-Object created_at,backup_id -Descending)) { @{backup_id=$item.backup_id;created_at=[long]$item.created_at;automatic=[bool]$item.automatic;kind=$item.kind} })
+    return @(foreach($item in ((BackupManifests) | Sort-Object created_at,backup_id -Descending)) {
+        $bytes=0L
+        foreach($entry in $item.files.PSObject.Properties) { $bytes+=[long]$entry.Value.size }
+        @{backup_id=$item.backup_id;created_at=[long]$item.created_at;automatic=[bool]$item.automatic;kind=$item.kind;size_bytes=$bytes}
+    })
 }
 function RemovePrivateTree([string]$Directory) {
     # Enumerate, validate, and delete using only native .NET filesystem methods.

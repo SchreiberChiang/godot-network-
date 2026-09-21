@@ -204,7 +204,7 @@ try{
     $settings=@{lobby_bind='127.0.0.1';advertised_host='127.0.0.1';lobby_port=$lobbyPort;game_bind='127.0.0.1';control_port=$controlPort;udp_first=$udpFirst;udp_last=($udpFirst+7);max_rooms=4;asset_spaces=@{shooter='shooter';turns='turns'}}
     SaveJson (Join-Path $private 'config.json') $settings
     $script:baseUrl='http://127.0.0.1:'+$panelPort
-    $script:operator=StartOwned (Join-Path $package 'Operator.exe') @('--headless','--log-file',(Join-Path $evidence 'operator.log'),'--',('--data-root='+$private),('--panel-port='+$panelPort)) 'operator'
+    $script:operator=StartOwned (Join-Path $package 'Operator.exe') @('--headless','--log-file',(Join-Path $evidence 'operator.log'),'--',('--data-root='+$private),('--panel-port='+$panelPort),('--operator-log-path='+(Join-Path $evidence 'operator.log'))) 'operator'
     $deadline=[DateTime]::UtcNow.AddSeconds(60)
     $ready=$false
     do{
@@ -227,6 +227,12 @@ try{
     $login=Api 'admin.login' $credentials -Anonymous
     Check ($login.ok -and $login.payload.token) 'native administrator login'
     $script:token=$login.payload.token
+    $operatorLog=Api 'logs.read' @{label='operator'}
+    Check ($operatorLog.ok -and $operatorLog.payload.text -is [string]) 'native log API reads actual startup-selected operator log'
+    $backup=Api 'backup.create' @{reason='native observability acceptance'}
+    $backupList=Api 'backup.list'
+    $backupRow=@($backupList.payload.backups | Where-Object backup_id -eq $backup.payload.backup_id)[0]
+    Check ($backup.ok -and $backupList.ok -and $backupRow.size_bytes -gt 0) 'native backup list exposes actual positive payload byte size'
     Check ((Api 'status').payload.host.state -eq 'STOPPED') 'native operator remains available with host stopped'
     Check (Api 'server.start').ok 'native managed host starts'
     CaptureKnownChildren

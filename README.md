@@ -1,6 +1,6 @@
 # RoomKit：独立的本地房间框架
 
-**当前开发分支：`codex/shooter-framework`。** 采用“通用框架＋可选玩法模块＋具体游戏模式”。新代码包含独立管理服务、账号、永久资产、横版射击及取石子示例。真实本机客户端循环、运维和原生服务器联调已通过；浏览器实际操作、导出客户端完整试玩和第二台设备仍待验收。永久资产与比赛经济分别管理，后续可接战术射击或赛车。完整范围、阶段及验收见 [开发计划](docs/17_framework_shooter_plan.md)，实际通过、失败和未运行见 [STATUS](STATUS.md)。
+**当前开发分支：`codex/shooter-framework`。** 采用“通用框架＋可选玩法模块＋具体游戏模式”。已有独立管理面板、邀请码账号、永久资产、横版射击及取石子示例。本机已实际操作浏览器开服/建房/发币/封禁/备份恢复/停服，并在导出客户端完成射击背包与复活、整局奖励和回合制主题/对局；16人真实客户端满房及第17人拒绝也已验证。各构建版本与测试范围见 [STATUS](STATUS.md)，这些结果不等于跨电脑联机或长期压测。第二台实体设备仍待验收。永久资产与比赛经济分别管理，后续可接战术射击或赛车；完整范围、阶段见 [开发计划](docs/17_framework_shooter_plan.md)。
 
 **新管理面板：双击 `StartManagement.cmd`。** 首次在浏览器设置管理员账号，登录后点“启动服务器”，创建邀请码，再打开 `StartShooterClient.cmd` 注册玩家、创建或加入房间。取石子账号客户端为 `StartManagedTurns.cmd`。游戏服务器停止后管理面板继续运行；要关闭整个管理服务用 `StopManagement.cmd`。新入口使用本项目 `data/framework/`，不会导入旧演示身份或其它项目数据。源码入口需要下述 Godot。具体步骤和局域网配置见 [新分支启动说明](docs/22_framework_operations.md)。
 
@@ -22,7 +22,9 @@
 
 ## Windows 独立候选包
 
-运行 tools/build_release.ps1 和 tools/package_release.ps1 生成程序ZIP及SDK模板ZIP，最新绝对路径在 artifacts/delivery.json。独立包无需Godot编辑器，双击包内 StartRoomKit.cmd 试玩，StopRoomKit.cmd 停止，CheckRoomKit.cmd 校验。操作、升级和未通过门禁见 [发布操作说明](docs/15_release_operations.md)。
+**当前账号/管理/射击分支：** 运行 `tools/build_framework_release.ps1`，最新干净ZIP与解压位置在 `artifacts/framework-release.json`。无需Godot编辑器：解压后先运行 `CheckFramework.cmd`，再运行 `StartPanel.cmd` 设置管理员并启动服务器；玩家用 `StartShooter.cmd` 或 `StartTurns.cmd`，整体关闭用 `StopFramework.cmd`。启动后台后用 `PublishClients.cmd` 生成玩家分发配置；只转发对应 `clients` 游戏目录。已测试的服务器解压目录含私有测试数据，分发服务器请使用构建时的干净ZIP。详细步骤见 [当前启动说明](docs/22_framework_operations.md)。
+
+下列为早期方块/开发身份示例的独立包流程：`tools/build_release.ps1` 和 `tools/package_release.ps1` 生成程序ZIP及SDK模板ZIP，位置在 `artifacts/delivery.json`；其 `StartRoomKit.cmd / StopRoomKit.cmd / CheckRoomKit.cmd` 对应 [早期发布说明](docs/15_release_operations.md)，不作为新账号射击分支的入口。
 
 ## 本机启动与验证
 
@@ -68,9 +70,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\results.ps1 -Operati
 
 日志位于 `logs/`：每种模式的 `*-console.log`、`*-stderr.log`、`*-godot.log`，集成测试另写 `integration-result.json`。分帧部分写入由可控写入器模拟；它不等于证明操作系统此次真实发生部分写入。进程集成测试运行开发工程，不等于专用服务器导出验证。
 
-## 配置与核心边界
+## 早期演示配置与核心边界
 
-[config/development.json](config/development.json) 的默认 UDP 范围为 `28100–28131`，控制 TCP 端口 `0` 表示由系统分配空闲端口；启动、心跳失联和停止宽限分别为 `15000 / 5000 / 3000` 毫秒。集成测试会使用专门的测试超时。所有网络监听只绑定 `127.0.0.1`。
+[config/development.json](config/development.json) 的默认 UDP 范围为 `28100–28131`，控制 TCP 端口 `0` 表示由系统分配空闲端口；启动、心跳失联和停止宽限分别为 `15000 / 5000 / 3000` 毫秒。集成测试会使用专门的测试超时。这份早期演示配置只监听 `127.0.0.1`；当前账号分支的玩家局域网配置见 [启动说明](docs/22_framework_operations.md)，管理后台仍只监听回环。
 
 游戏清单位于 [examples/minimal/game_manifest.json](examples/minimal/game_manifest.json)。清单引用产物标签，由宿主本地配置映射成可信程序和参数数组；创建请求只能提供已登记的游戏、模式、地图与容量，不能指定可执行路径。
 
@@ -93,9 +95,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\results.ps1 -Operati
 
 私有启动配置放在仅当前用户可访问的 `run/`，注册成功后删除；控制凭据不放进命令行或公开快照。`run/` 和 `logs/` 不进入 Git。失败或停止通知都不能直接释放端口：必须确认对应子进程退出，且 UDP 端口可重新绑定。身份无法核验或端口仍占用时保持隔离。
 
-## 当前范围与后续阶段
+## 早期 M0–M5 成果与发布边界
 
-M0—M3闭环可用；M4补齐本地身份、WSS/DTLS、SQLite结果、异步工作、重启隔离和资源限制。M5已形成 Windows 独立候选包及 SDK 模板，实际完成双玩法导出、20名输入客户端与100轮开关房验证。完整正式发布门禁仍未全部满足。Linux只运行协议/玩法检查，没有Linux完整宿主；账号商城、公网和跨电脑未实现或未验证。详见 [本机发布使用说明](docs/15_release_operations.md) 和 [最新状态](STATUS.md)。
+早期 M0—M3闭环可用；M4补齐开发身份、WSS/DTLS、SQLite结果、异步工作、重启隔离和资源限制。M5形成 Windows 独立候选包及通用传输 SDK 模板，实际完成双玩法导出、20名输入客户端与100轮开关房验证。当前分支在其基础上增加账号、永久资产、管理后台和射击示例；尚未把这些业务接成新的账号工程生成向导。完整正式发布门禁仍未全部满足：Linux只运行协议/玩法检查，没有Linux完整宿主，跨电脑仍待验证；真实支付商城和公网部署不在本轮范围。早期入口见 [本机发布使用说明](docs/15_release_operations.md)，当前结果见 [最新状态](STATUS.md)。
 
 新增接入方法见 [SDK 使用说明](sdk/roomkit/README.md)，契约和边界见 [M2 实施说明](docs/11_m2_implementation.md)。`logs/players-result.json` 保存两名玩家的阶段、名单和返回大厅结果；具体子进程日志目录在其 `evidence_dir` 字段。
 

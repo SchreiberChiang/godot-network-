@@ -50,6 +50,8 @@ ADR-011：管理服务独立于游戏宿主，只有管理服务持有账号与�
 
 ADR-012：恢复必须先证明旧宿主及其已登记房间全部退出、UDP端口可以重新绑定，才清理已确认的旧进程记录并启动新宿主。内部恢复操作只撤销玩家会话，保留管理员；删除与恢复审计同事务，且不暴露为玩家消息或远程管理动作。备份恢复则撤销全部会话，要求管理员重新登录。确认失败保持隔离，不按旧PID强杀或继续开服。
 
+2026-09-22 候选包续验：正式构建的 `build_id` 与 `server_artifact` 使用 `<game>-framework-win-<本次构建唯一ID>`，避免不同源码的包重复使用 win-001 标识。`compatibility_id` 仍描述协议兼容族，不能代替精确构建配对。客户端和房间必须来自同一次构建；旧开发清单保留原标识。资产目录v1增加可选 `level_thresholds` 经验表，省略时不启用等级成长，范围与兼容见 docs/18。
+
 2026-09-21 后续实施（历史）：SDK **0.4.0**，覆盖下方0.3.0历史记录。开发构建 minimal_room/dev-004（roomkit-minimal-dev-004）、blocks/blocks-dev-003（blocks-v3）、turns/turns-dev-003（turns-v3）。Windows正式模板独立构建为 blocks-win-001 / turns-win-001，兼容标识 blocks-win-v1 / turns-win-v1，清单引擎为4.7.2.stable.official.ed1daf0bf。源码开发引擎为4.7.2.stable.steam.ed1daf0bf。双端必须同构建/兼容标识，不接受旧产物混入。
 
 框架包名0.1.0-candidate与SDK 0.4.0是不同版本轴。当前可复验组合是Windows10.0.26200、上述Steam编辑器/official模板、系统SQLite3.51.1；两种引擎都已实际跑十轮精确身份和句柄回收。模板全hash为ed1daf0bf001b61586d9930840f2f1394092c079；其它hash拒绝执行专用缓存句柄释放路径，不能只凭4.x标签宣称兼容。Linux official模板仅跑可移植检查。

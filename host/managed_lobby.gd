@@ -2,10 +2,24 @@ extends "res://host/lobby_server.gd"
 var bus
 var maintenance := false
 var announcement := ""
+var shutdown_deadline := -1
 var asset_jobs: Dictionary = {}
 var permits: Dictionary = {}
 var account_tokens: Dictionary = {}
 var joining: Dictionary = {}
+
+func begin_shutdown(deadline: int) -> void:
+	shutdown_deadline = mini(shutdown_deadline, deadline) if shutdown_deadline >= 0 else deadline
+	maintenance = true
+
+func is_draining() -> bool:
+	return maintenance or shutdown_deadline >= 0
+
+func notice_message() -> String:
+	if shutdown_deadline >= 0:
+		var seconds := maxi(0, int(ceil(float(shutdown_deadline - Time.get_ticks_msec()) / 1000.0)))
+		return "服务器将在 %d 秒后停止，请保存操作。" % seconds
+	return announcement
 
 func configure(local_bus, bind_address: String, advertised_address: String) -> void:
 	bus = local_bus
@@ -59,12 +73,12 @@ func handle_async(connection: Dictionary, message: Dictionary) -> Dictionary:
 	if message.type == "session.create":
 		return Wire.failure("AUTH_FAILED")
 	if message.type == "server.notice":
-		return {"ok": true, "payload": {"maintenance": maintenance, "message": announcement}}
+		return {"ok": true, "payload": {"maintenance": is_draining(), "message": notice_message()}}
 	if message.type == "game.catalog":
 		return await bus.request("game.catalog", {})
 	if str(message.type).begins_with("asset."):
 		return await _asset_request(connection, message)
-	if maintenance and message.type in ["room.create", "room.reserve"]:
+	if is_draining() and message.type in ["room.create", "room.reserve"]:
 		return Wire.failure("ROOM_DRAINING")
 	if asset_jobs.has(connection.user.user_id) and message.type in ["room.create", "room.reserve"]:
 		return Wire.failure("RATE_LIMITED")
@@ -115,6 +129,14 @@ func _asset_request(connection: Dictionary, message: Dictionary) -> Dictionary:
 
 func _control(row: Dictionary, message: Dictionary) -> bool:
 	var payload: Dictionary = message.payload
+	if message.type == "admission.consume" and not _admission_open(row):
+		# Match the presented ticket before freeing its pending seat. Other users and
+		# already connected members must survive a rejected admission attempt.
+		var seat: Dictionary = admissions.seats.get(str(payload.ticket).sha256_text(), {})
+		if seat.get("room_id", "") == row.room_id and seat.get("launch_id", "") == row.launch_id and seat.get("user_id", "") == payload.user_id and seat.get("state", "") in ["RESERVED", "ADMITTING"]:
+			admissions.leave(row.room_id, seat.user_id, seat.attempt_id)
+		manager.send_control(row.room_id, "admission.result", {"attempt_id": payload.attempt_id, "ok": false, "user_id": "", "display_name": "", "code": "ROOM_DRAINING"})
+		return true
 	if message.type == "asset.permit":
 		var pending: Dictionary = permits.get(payload.operation_id, {})
 		if not pending.is_empty() and pending.room_id == row.room_id and pending.launch_id == row.launch_id and pending.attempt_id == payload.attempt_id and pending.user_id == payload.user_id:
@@ -131,14 +153,24 @@ func _control(row: Dictionary, message: Dictionary) -> bool:
 		return true
 	return super._control(row, message)
 
+func _admission_open(row: Dictionary) -> bool:
+	var current: Dictionary = manager.rooms.get(row.room_id, {})
+	return not is_draining() and current.get("state", "") == "READY" and current.get("launch_id", "") == row.launch_id and current.get("joinable", true)
+
 func _admit_with_assets(row: Dictionary, payload: Dictionary) -> void:
 	var seat := _seat(payload.user_id)
 	var result: Dictionary = Wire.failure("AUTH_FAILED")
-	if seat.get("attempt_id", "") == payload.attempt_id and seat.room_id == row.room_id:
+	if _admission_open(row) and seat.get("attempt_id", "") == payload.attempt_id and seat.get("room_id", "") == row.room_id and seat.get("launch_id", "") == row.launch_id:
 		result = await bus.request("asset.initial", {"user_id": payload.user_id, "game_id": row.game_id})
-	var valid: bool = result.ok and manager.rooms.get(row.room_id, {}).get("state", "") == "READY" and admissions.joined(row.room_id, payload.user_id, payload.attempt_id, Time.get_ticks_msec())
+	# Asset loading crosses an await: stop/maintenance/joinability can change while
+	# the account worker replies. Recheck the live launch and gate before CONNECTED.
+	var valid: bool = result.ok and _admission_open(row) and admissions.joined(row.room_id, payload.user_id, payload.attempt_id, Time.get_ticks_msec())
 	if valid:
 		manager.send_control(row.room_id, "asset.initial", {"user_id": payload.user_id, "attempt_id": payload.attempt_id, "state": result.payload.state})
+	else:
+		var pending := _seat(payload.user_id)
+		if pending.get("state", "") == "ADMITTING":
+			admissions.leave(row.room_id, payload.user_id, payload.attempt_id)
 	manager.send_control(row.room_id, "member.accepted", {"attempt_id": payload.attempt_id, "ok": valid})
 	joining.erase(payload.attempt_id)
 

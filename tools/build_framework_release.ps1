@@ -88,9 +88,9 @@ foreach($game in @('shooter','turns')) {
     $entry=$games.$game
     $entry.manifest.godot_version='4.7.2.stable.official.ed1daf0bf'
     $entry.manifest.sdk_version='0.5.0'
-    $entry.manifest.build_id=$game+'-framework-win-001'
+    $entry.manifest.build_id=$game+'-framework-win-'+$id
     $entry.manifest.compatibility_id=$game+'-framework-win-v1'
-    $entry.manifest.server_artifact=$game+'-framework-win-v1'
+    $entry.manifest.server_artifact=$game+'-framework-win-'+$id
     $manifestText=$entry.manifest | ConvertTo-Json -Depth 20
     WriteUtf8 (Join-Path $entry.project 'game_manifest.json') $manifestText
     WriteUtf8 (Join-Path $entry.project 'game\game_manifest.json') $manifestText
@@ -192,7 +192,7 @@ if(Test-Path -LiteralPath $descriptor) {
     }
 }
 if($null -eq $existing) {
-    $arguments=QuoteArgs @('--headless','--log-file',(Join-Path $packageRoot 'logs\operator.log'),'--',('--panel-port='+$PanelPort))
+    $arguments=QuoteArgs @('--headless','--log-file',(Join-Path $packageRoot 'logs\operator.log'),'--',('--panel-port='+$PanelPort),('--operator-log-path='+(Join-Path $packageRoot 'logs\operator.log')))
     $process=Start-Process -FilePath (Join-Path $packageRoot 'Operator.exe') -ArgumentList $arguments -WorkingDirectory $packageRoot -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $packageRoot 'logs\operator-console.log') -RedirectStandardError (Join-Path $packageRoot 'logs\operator-stderr.log')
     $ownedHandle=$process.Handle
     $deadline=[DateTime]::UtcNow.AddSeconds(90)

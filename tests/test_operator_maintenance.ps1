@@ -59,6 +59,12 @@ try {
     $backupDir=Join-Path (Join-Path $testRoot 'backups') $backup.backup_id
     Check ((Test-Path -LiteralPath (Join-Path $backupDir 'server.key')) -and (Test-Path -LiteralPath (Join-Path $backupDir 'config.json'))) 'private TLS and operator config included'
     Check ((ConvertTo-Json -InputObject $backup -Depth 12) -notmatch 'fixture-private-key|fixture-token-digest') 'backup response redacts credentials'
+    $listed=InvokeMaintenance @{op='backup.list'}
+    $publicBackup=@($listed.backups | Where-Object backup_id -eq $backup.backup_id)[0]
+    $actualBytes=0L
+    foreach($file in Get-ChildItem -LiteralPath $backupDir -File | Where-Object Name -ne 'manifest.json') { $actualBytes+=$file.Length }
+    Check ($listed.ok -and $publicBackup.size_bytes -eq $actualBytes -and $actualBytes -gt 0) 'public backup size equals actual payload bytes without manifest overhead'
+    Check (@($publicBackup.PSObject.Properties.Name | Where-Object { $_ -notin @('backup_id','created_at','automatic','kind','size_bytes') }).Count -eq 0 -and (ConvertTo-Json -InputObject $publicBackup -Depth 8) -notmatch 'fixture-private-key|fixture-token-digest|server.key|sqlite|[\\/]') 'backup list exposes only metadata, never paths or private contents'
     $assets=New-Object RoomKitSqlite((Join-Path $testRoot 'assets.sqlite'))
     try { [void]$assets.Query('UPDATE asset_states SET body=''{"credits":999}''',@()) } finally { $assets.Dispose() }
     [IO.File]::WriteAllText((Join-Path $testRoot 'config.json'),'{"marker":"changed"}',$utf8)

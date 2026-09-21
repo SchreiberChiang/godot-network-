@@ -1,6 +1,8 @@
 # 当前进展：通用管理服务、账号、资产与射击集成
 
-2026-09-22，分支 codex/shooter-framework。开发规格继续以 docs/17_framework_shooter_plan.md 为准。已按“通用框架 → 可选能力 → 游戏模式”实施；宿主/SDK 不包含枪械、死亡或取石子规则。本段覆盖下方 S0 历史状态。源码运维与独立包后台联调已通过，浏览器实际操作、最新导出客户端完整试玩及第二台设备仍未验收，因此未把整个分支标为完成。
+2026-09-22用户要求暂停以便验收：当前交付为下述已验证的f4 Windows独立候选包及对应源码。新托管游戏模板尚未完成，进行中的18个文件已校验保存至 artifacts/managed-template-wip-20260922-299f0c53cca342e2bbc685e103879878/，并从验收源码中撤下；没有丢弃其工作。该模板仅生成过工程，未运行Godot编译/联机；客户端registration报告与测试尚需对齐。继续时先读该目录snapshot.json，不能把WIP当作可用模板。用户验收前不再新增功能。
+
+2026-09-22，分支 codex/shooter-framework。开发规格继续以 docs/17_framework_shooter_plan.md 为准。已按“通用框架 → 可选能力 → 游戏模式”实施；宿主/SDK 不包含枪械、死亡或取石子规则。本段覆盖下方 S0 历史状态。已补充真实浏览器、导出客户端双玩法操作及本机16人容量验收；复活提示、备份大小和空日志显示已用导出包实际复验。第二台实体设备仍未验收，不把本机多进程结果当作跨电脑联机。
 
 ## 已实现并分别验证
 
@@ -17,31 +19,40 @@
 
 | 命令或专项 | 已核实结果 | 范围/证据 |
 |---|---:|---|
-| tools/run.ps1 -Mode unit | 284/0 | Godot 规则/契约，保留恶意指数预期警告；logs/unit-console.log |
+| tools/run.ps1 -Mode unit | 293/0 | Godot 规则/契约，增加等级表边界，保留恶意指数预期警告；最终logs/final-regression-20260922-accounts/unit-console.log |
 | tests/run_accounts.gd | 81/0 | 真实 SQLite/PBKDF2/会话/邀请码；logs/accounts-console.log |
 | tests/run_account_recovery.gd | 30/0 | 真实SQLite重开、清理玩家会话/保留管理员、恢复审计失败回滚；logs/account-recovery-console.log |
 | tests/run_admin_http.gd | 138/0 | 真实 TCP/HTTP 与严格 action Schema，业务处理为夹具；logs/admin-http-strict-final-console.log |
-| tools/run.ps1 -Mode assets | 74/0 | 真实资产仓储与并发/CAS/回滚；logs/assets-console.log |
+| tools/run.ps1 -Mode assets | 83/0 | 等级表逻辑、真实资产仓储与并发/CAS/回滚；logs/assets-level-regression.txt |
 | tests/run_result_rewards.gd | 74/0 | 成绩＋奖励＋流水同事务、并发重试/失败回滚/容量；logs/result-rewards-console.log |
-| tests/test_operator_maintenance.ps1 | 33/0 | 实际 SQLite 在线备份/WAL/恢复/文件占用/junction/48份保留；logs/maintenance-console.log |
+| tests/test_operator_maintenance.ps1 | 35/0 | 实际 SQLite 在线备份/WAL/恢复/文件占用/junction/48份保留，补备份大小与路径不泄露检查；原33项证据仍保留 |
 | tests/test_asset_audit.ps1 | 14/0 | 真实最近100条固定SQL审计，只读与前后值；logs/asset-audit-console.log |
 | examples/shooter/test_runner.gd | 68/0 | Godot 玩法逻辑与配置验证；logs/shooter-console.log |
 | tests/run_asset_callbacks.gd | 32/0 | 通用回调、超时与成员代次的可控测试；logs/asset-callbacks-console.log |
-| tests/run_managed_contracts.gd | 241/0 | 64个协议正例及权限/畸形负例，纯契约；logs/managed-contracts-console.log |
+| tools/run.ps1 -Mode managed_contracts | 241/0 | 64个协议正例及权限/畸形负例，纯契约；最终logs/final-regression-20260922-accounts/managed_contracts-console.log |
 | tools/run.ps1 -Mode players | 33/0 | 原真实 WS/ENet 双客户端回归；logs/framework-regression-players.txt |
 | tools/run.ps1 -Mode integration | 133/0、22子进程 | 生命周期、失败路径与回收；logs/framework-regression-integration.txt |
 | tools/run.ps1 -Mode recovery | 24/0 | 真实旧进程退出、未知身份隔离与新房间；logs/recovery-fix-console.log |
 | tests/test_framework_clients.ps1 -Visual | 47/0 | 真实 WSS＋DTLS/ENet、两个玩法、未缩短的300秒射击局及准确到账 |
 | tests/test_operator.ps1 -Lifecycle | 29/0 | 真实60秒优雅重启、已核验宿主崩溃、房间退出/UDP回收、共享空间、备份恢复与后台持续存活；logs/operator-lifecycle-final2.txt |
-| tools/build_framework_release.ps1 | 6个EXE/PCK，退出0 | Godot官方模板真实导出；logs/framework-export-d9096683953f43f29e878ff44bbddf4c-* |
-| tests/test_framework_release.ps1 -Bundle <新包绝对目录> | 42/0 | 35项哈希、原生管理/宿主/双房间、实际WSS/ENet及回收；logs/framework-release-f8a2ec6a2970415c9cb29c33d0d4536a/result.json |
+| tools/run.ps1 -Mode operator_projection | 9/0 | 指标失败不沿用旧值、审计查询失败不返回半份成功，纯响应投影；logs/operator-projection-check.txt |
+| tests/test_managed_shutdown.ps1 | 55/0 | 真实宿主/双房间/WSS/DTLS客户端，维护与停服竞争门禁、59→57秒公告；账号/资产RPC使用夹具；logs/managed-shutdown-2cf23012230d4a928f6f17878062952b |
+| tests/test_operator_schedules.ps1 | 52/0 | 7个真实宿主，三次崩溃自动重启/第四次拒绝，4次真实SQLite自动备份；到期和历史时间受控，不是30分钟墙钟测试；data/test-operator-schedules-691ba27c01ae4828b4a50cc1b46796e2/schedule-result.json |
+| tests/test_framework_capacity.ps1 | 174/0 | 16真实账号/客户端满房，第17人ROOM_FULL；17.528秒同步/心跳/移动，空位复用与全部进程/端口回收；logs/capacity-0f1e2cdae67c42a79129524c40530eef/result.json |
+| tests/run_framework_feedback.gd | 7/0 | 复活确认后的提示更新，Godot纯界面状态回归；logs/framework-feedback-console.log |
+| tests/test_operator_logs.ps1 | 14/0 | 实际Godot启动日志、合法空日志、缺失及真实Windows独占锁不可读；详见docs/19_admin_ui.md |
+| tests/run_operator_auth_errors.gd | 6/0 | 实际Operator线程准入/管理请求/HTTP映射，账号响应与HTTP输出使用替身；临时存储失败不误撤销会话；logs/operator-auth-errors-after-console.log |
+| node tests/test_admin_auth_errors.cjs | 12/0 | 执行真实HTML api函数，fetch/DOM为可控替身；重试、失效提示和晚到旧请求隔离，不是浏览器故障注入；logs/admin-auth-errors-after.log |
+| tests/test_asset_response_loss.ps1 | 25/0 | 真实源码Operator/宿主/WSS/SQLite：提交购买后测试发送边界丢弃成功回复并断开TCP，重连同operation_id得DUPLICATE、只扣一次；data/test-asset-response-loss-201117a964ef48558280a20d3569e42d/response-loss-result.json |
+| tools/build_framework_release.ps1 | 6个EXE/PCK，退出0 | Godot官方模板真实导出；logs/framework-export-f4f40384083d45e28ffa38bcb5dea472-* |
+| tests/test_framework_release.ps1 -Bundle <新包绝对目录> | 44/0 | 35项哈希、原生管理/宿主/双房间、实际WSS/ENet及回收，补日志路径与备份大小；logs/framework-release-0316ee0928e647b8b324ddd6a43e37b9/result.json |
 | tools/run_framework.ps1 -Mode panel -NoBrowser / -Mode stop | 分别退出0 | 实际源码启动和关闭，stderr空；logs/framework-source-launcher.txt、framework-source-stop.txt；没有浏览器操作 |
 
 完整客户端证据：logs/operator-68c27ae5f8bb40de977cdebca3ac19c6/clients-a982c3c81bb5453e9e802048a58c0068/result.json，以及该目录各客户端报告/截图/日志。实际验证注册登录、初始免费枪、管理员发币、入房、存活伪造购买/选用拒绝、实际射击死亡、过早复活拒绝、死亡读背包/购买/幂等/默认配置、持新枪复活、离房重入保留；取石子玉石主题与真实回合；重复登录拒绝、封禁断开与解封。五个测试客户端全部退出。仍是同一台电脑的真实多进程，不是跨设备联机。
 
-独立包网络测试明确采用“源码测试客户端 → 导出宿主和房间”；两个 Client.exe 只验证真实程序的登录界面初始化与正常退出。最终源码两处背包/提示布局修正未再完成逐项视觉操作。独立包清理结果 cleanup_failed=false，同包原生进程0，UDP可重新绑定；源码测试与源码启动器也均已关闭。默认 data/framework 只初始化了空账号库，尚未创建用户管理员。
+独立包自动网络专项采用“源码测试客户端 → 导出宿主和房间”；该专项中的 Client.exe 初始化检查不充当完整试玩。下文另列原生 Client.exe 的真实鼠标/键盘与浏览器操作。默认 data/framework 只初始化了空账号库，尚未创建用户管理员；可视化验收账号在包内独立 ui-test 目录，不作为用户正式账号交付。
 
-最终干净 ZIP：artifacts/RoomKit-0.5.0-framework-windows-d9096683953f43f29e878ff44bbddf4c.zip，228944891字节，SHA256 `7cf1e5152057a08156361b864c072d31cd2d3d4e5e6db9b775bdcc659cbe776e`。ZIP包含36项、35项不可变文件校验，私有数据/测试夹具0；最新路径记录在 artifacts/framework-release.json。旁边已解压目录经过测试，含测试私有数据，不能整体转发代替干净 ZIP。
+最终干净 ZIP：artifacts/RoomKit-0.5.0-framework-windows-f4f40384083d45e28ffa38bcb5dea472.zip，228951845字节，SHA256 `49b8f13f92917b1305b9d2529bed9c371dce4c8397015501152e81ca542e173e`。ZIP包含36项、35项不可变文件校验，私有数据/测试夹具0；最新路径记录在 artifacts/framework-release.json。旁边已解压目录经过测试，含测试私有数据，不能整体转发代替干净 ZIP。之前d909/e102/e288/9d16候选保留用于证据追踪，不是当前推荐包。
 
 ## 已发现并修复后复验
 
@@ -56,18 +67,37 @@
 - 管理服务本身重启后旧玩家会话曾阻止再次登录；现只在旧进程安全确认之后执行内部会话清理，保留管理员，删除与审计同事务，专用30/0。该操作未加入公开Schema或远程RPC白名单。
 - 启动器遇到死进程遗留描述文件时，只有确认PID已不存在才删除固定标记并重启；PID仍存在或描述畸形则拒绝。包启动器专项3/0，见 logs/descriptor-test-b5485314269842fe8101488ed120106f/result.json。
 - 奖励测试首次夹具误带额外 duration_ms；已更正并完整74/0。契约初次重复键断言用了不负责HTTP重复键的通用解析器，改为实际AdminHTTP检查后241/0。失败日志保留。
+- 停服期间关闭维护可能重开准入；异步资产加载和房间重建也存在等待后的状态变化。现停止状态不能被维护开关解除，重复停止只能缩短截止时间，票据消费/资产加载后/重建等待后均复查；真实55/0验证，未延长测试超时掩盖问题。
+- CPU采集失败曾残留旧值，资产/账号审计查询失败曾显示部分成功。现指标带采样时间、15秒过期显式不可用；两路审计任一路失败则明确失败。纯投影9/0，不能写成真实存储故障注入。
+- 等级原为固定除100，现由可信资产目录的等级阈值表派生；表必须从0严格递增，共享空间使用同一表，旧目录缺省保持1级。unit293/0、assets83/0及真实UI的250经验→3级验证。
+- 容量测试前两次为测试驱动读错SDK返回错误码、报告文件原子替换期间读空；修复驱动/短暂文件读取重试后174/0。人数、ROOM_FULL与真实网络停滞门槛均未放宽，失败证据保留。
+- 实际原生UI发现死亡复活后仍显示等待提示，已修复dead→alive消息；定向Godot状态测试由6/1变为7/0。还发现备份列表缺少大小、导出启动器日志路径与API不一致、停止态运行时间标签误导及重新登录遗留旧错误提示，均在后续新包修复。日志独占锁/空文件/缺失区分已有真实14/0验证；Godot会消耗--log-file参数，因此采用受信启动器同步传入--operator-log-path，不新增任意路径HTTP入口。
+- 前一个可视化夹具0f978611214d40b0a6c42a71dcd19576途中进程消失且无最终清理报告，原因未能确认；不能记为通过。随后由根持有进程句柄的f6f9a767f89b47e1ab229fac2dd02d1f完整操作并正常收尾，exit0、cleanup_failed=false、forced_cleanup=false、live_owned_processes=0。
+- 管理员身份校验曾把存储不可用或线程容量不足改写成认证失败，浏览器因此清除登录且提示留在隐藏页面。现保留可重试的原错误码，真实失效在登录页显示原因，并防止旧请求撤销新登录。实际生产函数定向回归由Operator 3/3、页面7/5修复为6/0、12/0；替身边界如上表，不当作真实数据库故障注入。
 
-## 仍未验收
+## 本次可视化验收与剩余边界
 
-浏览器工具成功启动Chrome，但首次读取窗口时自动安全检查无法可靠确认当前URL，明确停止本轮Computer Use；没有导航、登录、点击业务按钮或截图。证据 logs/browser-qa-20260922/report-final.json，旧失败报告保留。HTTP/业务接口测试已通过，不能替代浏览器七页真实操作。未绕过工具停止继续自动操作。
+前一轮浏览器因工具安全检查停止的证据 logs/browser-qa-20260922/report-final.json 保留。本次续跑重新获得可用的内置浏览器，并实际访问隔离管理服务；没有绕过安全警告。已实际操作首次管理员设置、宿主启动、射击/取石子房间创建、邀请码、玩家资产发放、在线备份、审计、配置只读、维护公告、封禁/解封。浏览器发起真实60秒停服后显示宿主已停止、活动房间0、后台在线，原宿主及两个房间PID均不存在。还实际恢复手动备份、生成恢复前备份、撤销管理员旧会话并重新登录。
 
-最新导出客户端完整交互与视觉验收、跨电脑实体设备、Linux完整宿主、本分支16人新账号压力尚未运行。未部署公网、未花费云资源。S1/S5的浏览器与客户端验收门槛仍保留；以下历史通过记录不覆盖这些缺项。
+这次UI会话中管理进程实际启动于01:45:04，未缩时自动备份于02:15:17生成并在浏览器列为“自动备份”；这补充了52/0受控时间测试之外的一次真实30分钟墙钟观察，仍不代表24小时保留周期长测。UI夹具及两个源码对手均正常exit0且无需强制清理；完整观察记录为 logs/framework-ui-f6f9a767f89b47e1ab229fac2dd02d1f/ui-observations.json，收尾为 fixture-result.json。
+
+原生 e10231265ab7478ea7daaf228757b5d1 包已用可见 Client.exe 操作完成：邀请码注册/登录；射击进房、服务器真实击杀、死亡背包读300金币/250经验/等级3、100金币解锁SMG且另行选择、复活快照hp100/weapon=smg；真实300秒对局后返回大厅220金币/默认SMG；注销后同一账号登录取石子，独立空间0金币/经典主题，发放100金币后解锁并选择jade，真实六步取石子进入第二局且UI玩家1分。对手使用源码SDK测试驱动发送合法动作，服务端与被操作的两个客户端均为实际导出程序；不是两台实体设备。证据 logs/framework-ui-f6f9a767f89b47e1ab229fac2dd02d1f 中的截图/快照及隔离对手目录的动作证据。
+
+后续9d16d01539bb4f5bb235b1b0aadf9c6f包复验：实际注册/登录新玩家、创建并加入原生射击房间，源码SDK对手合法击杀一次后停火，点击手动复活得到生命100及“已复活，可以继续战斗”提示；浏览器创建备份成功并显示103 KB，空operator日志明确显示“当前日志为空”，重新登录没有遗留旧全局提示。证据 logs/framework-ui-6da6c5f70d2048c2b5e3e7d2510324de/ui-observations.json、shooter-respawn-fixed.png、shooter-respawn-report.json。对手首次150秒等待未入房是失败等待记录，后续成功另存；不删除此前记录。UI夹具、对手均exit0，无强制终止、清理错误或遗留自有进程。该轮也观察到一次管理员意外退登录，日志无实际根因；代码检查发现临时存储/限流失败被误映射为AUTH_FAILED，按独立缺陷修复，不把推断写成事故根因已查明。
+
+最后f4f40384083d45e28ffa38bcb5dea472包实际浏览器复验：首次管理员设置成功，停服态显示“未运行”；创建真实SQLite手动备份，列表显示103 KB；执行恢复后旧管理员会话失效，登录页明确显示“用户名、密码或登录凭据无效。”；重新登录成功，无旧全局错误提示，刷新列表可见手动备份与恢复前备份。已检查实际页面截图，未向浏览器注入模拟响应。证据 logs/framework-ui-deb891a63a1e4749b0865bfb6a3f2c2d/ui-observations.json 与 fixture-result.json；夹具退出0，cleanup_failed=false、forced_cleanup=false、live_owned_processes=0。此次没有重复完整射击局，也没有通过浏览器注入真实存储繁忙；相应范围分别由先前可视化与定向替身测试记录。
+
+本机容量174/0仅覆盖17.528秒短时满房与准入，不代表长期压测。第二台电脑局域网、Linux完整宿主和公网仍未运行；没有部署公网或花费云资源。已向用户询问第二台Windows设备，未收到答复，不推定已验收。
+
+新增响应丢失专项25/0实际在数据库完成500→400金币及解锁SMG后，由测试Lobby的发送边界不发送成功应答并中断真实WSS TCP；原版AccountClient收到CONTROL_UNAVAILABLE，重新登录后用同一operation_id得到DUPLICATE，金币、所有权和版本不再变化，真实SQLite购买流水只有1条。测试不是“已经收到成功后再重复点击”，也不涉及玩法房间或独立导出客户端。故意断TLS的mbedtls -0x6c00保留在console，无脚本异常；cleanup-recheck.json确认测试退出0、宿主退出、标记移除、大厅及控制TCP能重新绑定。
 
 ## 修改文件和本机入口
 
 本轮实际新增/修改文件完整清单见 docs/23_branch_files.md。主要入口为 host/operator.gd、host/managed_host.gd、host/managed_lobby.gd、host/admin_http.gd/admin.html、host/core/account_service.gd、通用资产/结果服务和SDK资产回调；示例位于 examples/framework、examples/shooter、examples/turn_based；契约统一位于 schemas。启动、备份、构建与测试脚本分别在 tools 和 tests。
 
 本机从仓库双击 StartManagement.cmd，首次设置管理员后点击“启动服务器”，创建邀请码；打开两个 StartShooterClient.cmd 用两个玩家账号注册登录、加入同一房间。五分钟真实规则、背包与死亡操作、取石子及关闭方法见 docs/22_framework_operations.md。开发路线见 docs/17_framework_shooter_plan.md，SDK兼容决策见 docs/07_versions_decisions.md 与 docs/21_managed_protocol.md。
+
+本次收尾修改47个源码/测试/文档文件，完整本轮差异清单相对711a657共120个文件。2026-09-22最新提供的AGENTS.md要求不推送远端，本次收尾只做本地提交；日志、私有数据及独立包继续留在Git忽略目录。新托管模板和第二台实体设备的门槛未关闭，用户现要求暂停验收，不能把整个分支目标标为全部完成。
 
 ---
 

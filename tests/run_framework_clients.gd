@@ -164,6 +164,13 @@ func _run_command(command: Dictionary, path: String) -> void:
 			selected_room = command.room_id
 			await join_selected()
 			result = {"ok": client.state == "IN_ROOM", "code": client.last_error}
+		"join_sdk":
+			# The SDK returns reservation failures directly; last_error only tracks
+			# the subsequent ENet handshake. Preserve the actual public API reply.
+			if client.state == "LOBBY":
+				world.latest.clear()
+			response = await client.join_room(str(command.room_id))
+			result = _safe_result(response)
 		"leave":
 			await leave_room()
 			result = {"ok": client.state == "LOBBY", "code": client.last_error}
