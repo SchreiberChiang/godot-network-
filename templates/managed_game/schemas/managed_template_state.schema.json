@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Managed starter game state v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["revision", "players"],
+  "properties": {
+    "revision": {"type": "integer", "minimum": 0},
+    "players": {
+      "type": "array", "maxItems": 16,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["user_id", "display_name", "badge", "asset_revision"],
+        "properties": {
+          "user_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "display_name": {"type": "string", "minLength": 1, "maxLength": 64},
+          "badge": {"enum": ["standard", "cobalt"]},
+          "asset_revision": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}

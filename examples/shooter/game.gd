@@ -32,6 +32,15 @@ var previous_step := -1
 var spawn_counter := 0
 var shot_serial := 0
 var last_results: Array = []
+var last_duration_ms := 0
+# Presentation only: authoritative state and hit detection stay untouched.
+var render_tracks: Dictionary = {}
+var visual_shots: Array = []
+var last_visual_shot := 0
+var snapshot_age := 0.0
+const BLEND_SECONDS := 0.05
+const TRACER_SPEED := 7000.0
+const TRACER_LENGTH := 18.0
 
 func _init() -> void:
 	var path: String = get_script().resource_path.get_base_dir().path_join("game_config.json")
@@ -39,11 +48,11 @@ func _init() -> void:
 	if data is Dictionary and Validator.validate_file(data, "res://schemas/shooter_config.schema.json") == "":
 		config = data
 
-# Called only by a trusted server/test composition root, never an RPC or room option.
+# Called by the adapter with host-validated room options; never a gameplay RPC.
 func configure(overrides: Dictionary = {}) -> bool:
 	var candidate := config.duplicate(true)
 	for key in overrides:
-		if key not in ["duration_ms", "minimum_participation_ms", "respawn_ms"]:
+		if key not in ["duration_ms", "minimum_participation_ms", "respawn_ms", "kill_limit"]:
 			return false
 		candidate[key] = overrides[key]
 	if phase != "waiting" or Validator.validate_file(candidate, "res://schemas/shooter_config.schema.json") != "":
@@ -160,6 +169,8 @@ func advance(now: int) -> void:
 		var fresh := now - int(player.last_input) <= 250
 		if phase == "active" and fresh and player.fire and now - int(player.last_shot) >= int(config.weapons[player.weapon].cooldown_ms):
 			_fire(player, now)
+			if int(config.get("kill_limit", 0)) > 0 and int(player.kills) >= int(config.kill_limit):
+				_finish_round()
 	for index in range(shots.size() - 1, -1, -1):
 		if now - int(shots[index].at) > 160:
 			shots.remove_at(index)
@@ -182,6 +193,7 @@ func _join_ledger(user: String) -> void:
 	players[user].deaths = int(ledger[user].deaths)
 
 func _finish_round() -> void:
+	last_duration_ms = maxi(1, mini(clock_ms - match_started, int(config.duration_ms)))
 	var rows: Array = []
 	for record in ledger.values():
 		var credits := 0
@@ -343,15 +355,16 @@ func state_snapshot() -> Dictionary:
 		var player: Dictionary = players[user]
 		rows.append({"user_id": user, "display_name": player.display_name, "x": player.position.x, "y": player.position.y, "aim_x": player.aim.x, "aim_y": player.aim.y, "hp": player.hp, "life_state": player.life_state, "weapon": player.weapon, "kills": player.kills, "deaths": player.deaths, "respawn_wait_ms": maxi(0, int(config.respawn_ms) - (clock_ms - int(player.dead_at))) if player.life_state == "dead" else 0, "asset_busy": player.asset_busy, "notice": player.notice})
 	var remaining := maxi(0, int(config.get("duration_ms", 300000)) - (clock_ms - match_started)) if phase == "active" else int(config.get("duration_ms", 300000))
-	return {"tick": tick, "phase": phase, "round": round_number, "remaining_ms": remaining, "players": rows, "shots": shots.duplicate(true), "last_results": last_results.duplicate(true)}
+	return {"tick": tick, "phase": phase, "round": round_number, "remaining_ms": remaining, "kill_limit": int(config.get("kill_limit", 0)), "players": rows, "shots": shots.duplicate(true), "last_results": last_results.duplicate(true)}
 
 func _process(delta: float) -> void:
 	if not server:
+		advance_visual(delta)
 		return
 	accumulator = minf(accumulator + delta, 0.1)
 	while accumulator >= STEP:
 		accumulator -= STEP
-		advance(Time.get_ticks_msec())
+		advance(Time.get_ticks_msec() - roundi(accumulator * 1000.0))
 		if tick % 3 == 0:
 			_publish()
 
@@ -374,7 +387,57 @@ func respawn_command(value: int) -> void:
 @rpc("authority", "call_remote", "unreliable_ordered", 1)
 func world_state(value: Dictionary) -> void:
 	if not server and Validator.validate_file(value, "res://schemas/shooter_state.schema.json") == "" and int(value.tick) >= int(latest.get("tick", -1)):
+		if latest.is_empty():
+			render_tracks.clear()
+			visual_shots.clear()
+			last_visual_shot = 0
+		_update_visual_targets(value)
 		latest = value
+		snapshot_age = 0.0
+
+func _update_visual_targets(value: Dictionary) -> void:
+	var present: Dictionary = {}
+	for player in value.players:
+		var user: String = player.user_id
+		present[user] = true
+		var target := Vector2(player.x, player.y)
+		var from := render_position(player)
+		var old: Dictionary = render_tracks.get(user, {})
+		# Death, respawn and teleports must never glide through the map.
+		if old.get("life", "") != player.life_state or from.distance_to(target) > 100.0:
+			from = target
+		if old.get("to", Vector2.INF) != target or old.get("life", "") != player.life_state:
+			render_tracks[user] = {"from": from, "to": target, "age": 0.0, "life": player.life_state}
+	for user in render_tracks.keys():
+		if not present.has(user):
+			render_tracks.erase(user)
+	for shot in value.shots:
+		if int(shot.id) <= last_visual_shot:
+			continue
+		last_visual_shot = int(shot.id)
+		visual_shots.append({"from": Vector2(shot.x, shot.y), "to": Vector2(shot.end_x, shot.end_y), "age": 0.0})
+
+func advance_visual(delta: float) -> void:
+	snapshot_age += delta
+	for track in render_tracks.values():
+		track.age = minf(float(track.age) + delta, BLEND_SECONDS)
+	for index in range(visual_shots.size() - 1, -1, -1):
+		var shot: Dictionary = visual_shots[index]
+		shot.age += delta
+		if float(shot.age) > shot.from.distance_to(shot.to) / TRACER_SPEED + 0.04:
+			visual_shots.remove_at(index)
+
+func render_position(player: Dictionary) -> Vector2:
+	var track: Dictionary = render_tracks.get(player.user_id, {})
+	if track.is_empty():
+		return Vector2(player.x, player.y)
+	return track.from.lerp(track.to, clampf(float(track.age) / BLEND_SECONDS, 0.0, 1.0))
+
+static func tracer_segment(origin: Vector2, end: Vector2, age: float) -> PackedVector2Array:
+	var distance := origin.distance_to(end)
+	var head := minf(distance, 29.0 + maxf(age, 0.0) * TRACER_SPEED)
+	var direction := origin.direction_to(end)
+	return PackedVector2Array([origin + direction * maxf(0.0, head - TRACER_LENGTH), origin + direction * head])
 
 func _publish() -> void:
 	latest = state_snapshot()
@@ -422,7 +485,8 @@ func status_text(user: String) -> String:
 	if latest.get("phase", "waiting") == "waiting":
 		return "等待第二名玩家 · 可以自由移动熟悉地图"
 	var seconds := int(latest.get("remaining_ms", 0)) / 1000
-	return "第 %d 局 · %02d:%02d · 生命 %d · 击杀 %d / 死亡 %d" % [int(latest.get("round", 1)), seconds / 60, seconds % 60, int(player.get("hp", 100)), int(player.get("kills", 0)), int(player.get("deaths", 0))]
+	var goal := int(latest.get("kill_limit", 0))
+	return "第 %d 局 · %02d:%02d · 生命 %d · 击杀 %d / 死亡 %d%s" % [int(latest.get("round", 1)), seconds / 60, seconds % 60, int(player.get("hp", 100)), int(player.get("kills", 0)), int(player.get("deaths", 0)), " · %d 杀获胜" % goal if goal > 0 else ""]
 
 func draw_on(canvas: CanvasItem, user: String, font: Font) -> void:
 	canvas.draw_rect(Rect2(Vector2.ZERO, SIZE), Color("101b2b"))
@@ -440,11 +504,16 @@ func draw_on(canvas: CanvasItem, user: String, font: Font) -> void:
 		canvas.draw_line(solid.position, Vector2(solid.end.x, solid.position.y), Color("7fa1aa"), 3)
 		for x in range(int(solid.position.x) + 10, int(solid.end.x) - 5, 28):
 			canvas.draw_line(Vector2(x, solid.position.y + 5), Vector2(x + 8, minf(solid.end.y - 3, solid.position.y + 13)), Color("405b6b"), 2)
-	for shot in latest.get("shots", []):
-		var color := Color("ffce72") if shot.weapon == "rifle" else (Color("84e5d3") if shot.weapon == "smg" else Color("ff9d7c"))
-		canvas.draw_line(Vector2(shot.x, shot.y), Vector2(shot.end_x, shot.end_y), color, 2, true)
+	for shot in visual_shots:
+		var travel: float = shot.from.distance_to(shot.to) / TRACER_SPEED
+		if float(shot.age) < travel:
+			var segment := tracer_segment(shot.from, shot.to, shot.age)
+			canvas.draw_line(segment[0], segment[1], Color("ffe2a0"), 2, true)
+		else:
+			var fade := 1.0 - clampf((float(shot.age) - travel) / 0.04, 0, 1)
+			canvas.draw_circle(shot.to, 2.5 * fade, Color(1.0, 0.75, 0.35, fade))
 	for player in latest.get("players", []):
-		var position := Vector2(player.x, player.y)
+		var position := render_position(player)
 		var own: bool = player.user_id == user
 		var color := Color("ffcd79") if own else Color("81d4df")
 		if player.life_state == "dead":

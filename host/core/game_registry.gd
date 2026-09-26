@@ -13,6 +13,9 @@ func register_game(manifest: Dictionary, artifacts: Dictionary) -> Dictionary:
 		return _failure("INVALID_MANIFEST")
 	if _has_placeholder(manifest):
 		return _failure("INVALID_MANIFEST")
+	for rule: Dictionary in manifest.get("room_rules", {}).values():
+		if rule.minimum > rule.maximum or rule.default < rule.minimum or rule.default > rule.maximum:
+			return _failure("INVALID_MANIFEST")
 	for mode: Dictionary in manifest.modes.values():
 		if int(mode.min_players) > int(mode.max_players):
 			return _failure("INVALID_MANIFEST")
@@ -52,8 +55,25 @@ func validate_options(game_id: String, options: Dictionary) -> Dictionary:
 	var entry: Dictionary = resolve(game_id)
 	if not entry.ok:
 		return entry
-	if options.size() != 3 or not options.has_all(["mode", "map", "capacity"]):
+	if not options.has_all(["mode", "map", "capacity"]):
 		return _failure("INVALID_OPTIONS")
+	for key in options:
+		if key not in ["mode", "map", "capacity", "rules"]:
+			return _failure("INVALID_OPTIONS")
+	var rules: Variant = options.get("rules", {})
+	if SchemaValidator.validate_file(rules, "res://schemas/room_rules.schema.json") != "":
+		return _failure("INVALID_OPTIONS")
+	var definitions: Dictionary = entry.manifest.get("room_rules", {})
+	for key in rules:
+		if not definitions.has(key):
+			return _failure("INVALID_OPTIONS")
+	var normalized_rules: Dictionary = {}
+	for key in definitions:
+		var rule: Dictionary = definitions[key]
+		var value: int = int(rules.get(key, rule.default))
+		if value < int(rule.minimum) or value > int(rule.maximum):
+			return _failure("INVALID_OPTIONS")
+		normalized_rules[key] = value
 	if not options.mode is String or not options.map is String:
 		return _failure("INVALID_OPTIONS")
 	var capacity: Variant = options.capacity
@@ -69,10 +89,13 @@ func validate_options(game_id: String, options: Dictionary) -> Dictionary:
 		return _failure("INVALID_OPTIONS")
 	if capacity < mode.min_players or capacity > mode.max_players:
 		return _failure("INVALID_OPTIONS")
+	var normalized := {"mode": options.mode, "map": options.map, "capacity": int(capacity)}
+	if not definitions.is_empty():
+		normalized.rules = normalized_rules
 	return {
 		"ok": true,
 		"code": "",
-		"options": {"mode": options.mode, "map": options.map, "capacity": int(capacity)},
+		"options": normalized,
 	}
 
 

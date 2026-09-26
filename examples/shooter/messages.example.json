@@ -1,5 +1,5 @@
 [
   {"schema":"shooter_input.schema.json","value":{"sequence":1,"move":1,"jump":false,"aim_x":1,"aim_y":0,"fire":true}},
   {"schema":"shooter_result.schema.json","value":{"round":1,"duration_ms":300000,"players":[{"user_id":"u_example","kills":2,"deaths":1,"participation_ms":300000,"credits":30}]}},
-  {"schema":"shooter_state.schema.json","value":{"tick":1,"phase":"waiting","round":1,"remaining_ms":300000,"players":[],"shots":[],"last_results":[]}}
+  {"schema":"shooter_state.schema.json","value":{"tick":1,"phase":"waiting","round":1,"remaining_ms":300000,"players":[],"shots":[],"last_results":[],"kill_limit":20}}
 ]

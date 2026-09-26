@@ -248,9 +248,17 @@ func clear_passwords() -> void:
 	old_password.text = ""
 	new_password.text = ""
 
-func _process(_delta: float) -> void:
+var ui_elapsed := 0.1
+
+func _process(delta: float) -> void:
 	if app == null or login_panel == null:
 		return
+	# Arena redraw follows the display; text, lists and forms need only 10 Hz.
+	queue_redraw()
+	ui_elapsed += delta
+	if ui_elapsed < 0.1:
+		return
+	ui_elapsed = 0.0
 	var authenticated: bool = app.authenticated
 	var in_room: bool = app.client != null and app.client.state == "IN_ROOM"
 	active_game.text = "ROOMKIT  /  " + ("零号仓库" if app.game_id == "shooter" else "十二颗石子")
@@ -287,6 +295,7 @@ func _process(_delta: float) -> void:
 	if in_room and app.world != null:
 		game_status.text = app.world.status_text(app.client.identity.get("user_id", ""))
 		help_text.text = app.world.instructions()
+		help_text.text += "  ·  %d FPS" % Engine.get_frames_per_second()
 		var own: Dictionary = app.world.player_view(app.client.identity.get("user_id", "")) if app.world.has_method("player_view") else {}
 		own_notice.text = str(own.get("notice", ""))
 		gameplay_buttons[0].visible = app.game_id == "shooter"

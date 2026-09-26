@@ -1,572 +1,95 @@
-# 当前进展：通用管理服务、账号、资产与射击集成
+# 当前状态：通用管理服务、账号、资产与射击示例
 
-2026-09-22用户要求暂停以便验收：当前交付为下述已验证的f4 Windows独立候选包及对应源码。新托管游戏模板尚未完成，进行中的18个文件已校验保存至 artifacts/managed-template-wip-20260922-299f0c53cca342e2bbc685e103879878/，并从验收源码中撤下；没有丢弃其工作。该模板仅生成过工程，未运行Godot编译/联机；客户端registration报告与测试尚需对齐。继续时先读该目录snapshot.json，不能把WIP当作可用模板。用户验收前不再新增功能。
+更新：2026-09-27。分支 `codex/shooter-framework`，本轮提交前的基线为 `f0b4c8b`（2026-09-22）。本文件只记录**当前**状态、最新有效验证范围、未运行项与已知问题；逐轮过程、失败修复细节与原始证据链接见 [STATUS 历史归档](docs/archive/status_history.md)。启动方法见 [README](README.md)。
 
-2026-09-22，分支 codex/shooter-framework。开发规格继续以 docs/17_framework_shooter_plan.md 为准。已按“通用框架 → 可选能力 → 游戏模式”实施；宿主/SDK 不包含枪械、死亡或取石子规则。本段覆盖下方 S0 历史状态。已补充真实浏览器、导出客户端双玩法操作及本机16人容量验收；复活提示、备份大小和空日志显示已用导出包实际复验。第二台实体设备仍未验收，不把本机多进程结果当作跨电脑联机。
+## 工作区与交接
 
-## 已实现并分别验证
+- 2026-09-26 的三轮源码工作（托管新游戏模板、客户端双击无窗口修复、射击平滑/短弹迹/房间规则）及 2026-09-27 文档整理和项目插画由本轮本地提交收录。本轮整理开始前，相对 `f0b4c8b` 有 32 个已修改文件（另有 AGENTS.md 的 09-27 规则修改）和 23 个未跟踪文件，其中 `templates/managed_game/` 占 9 个。未推送远端、未部署。
+- 环境：Windows 10.0.26200；Godot `4.7.2.stable.steam.ed1daf0bf`（`D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`），导出使用同安装目录的 4.7.2 official 模板；Git `2.55.0.windows.3`；系统 `winsqlite3.dll` 3.51.1。
 
-- 独立管理进程拥有 SQLite 与回环 HTTP 中文后台，使用认证回环 TCP 管理实际宿主子进程；宿主可启动、停止、重启、维护，后台独立存活。
-- 邀请码注册、用户名密码登录、稳定身份、单玩家会话、改昵称/密码、管理员重置/封禁/解封/踢出、真实持久审计。密码 PBKDF2-SHA256，不进入公开包或日志。
-- 永久金币/经验/所有权/游戏配置；独立或 shared 空间；管理员调整/授权/撤销/配置。资产与流水同事务，结果和全部奖励同事务，幂等重试不重复支付。
-- 真实房间许可、资产异步刷新、60 秒有界等待、成员代次隔离；SDK 回调只接收游戏定义的 operation，不解释复活。射击适配器决定死亡限制与出生。
-- 横版射击自由混战、三枪、即时命中、死亡背包/选枪/手动复活、五分钟结算。取石子通过同一资产服务购买/配置玉石主题，实际入房快照采用选定主题。
-- SQLite 在线备份、恢复前备份、恢复后撤销全部会话、损坏与路径边界检查、自动备份保留。新源码入口 StartManagement.cmd / StartShooterClient.cmd / StartManagedTurns.cmd / StopManagement.cmd 已写入；使用见 docs/22_framework_operations.md。
+## 当前已实现
 
-## 本轮当前真实结果
+- **独立管理服务（Operator）**：回环 HTTP 中文后台，持有 SQLite 账号与资产库；通过认证的回环 TCP 启动、停止、重启、维护游戏宿主；宿主停止后后台继续运行。停服默认公告 60 秒；崩溃后确认旧进程退出、端口可重绑才重启，10 分钟最多 3 次。
+- **账号**：邀请码注册、用户名密码登录（PBKDF2-SHA256）、单玩家会话、改昵称/密码；管理员重置、封禁/解封、踢出，并有持久审计。
+- **永久资产**：金币、经验与等级阈值表、非堆叠所有权、按游戏分开的默认配置；独立或 shared 资产空间；购买、选择与流水同事务，幂等重试不重复扣款；成绩与奖励同事务结算。比赛临时经济与永久钱包分开。
+- **运维**：在线备份（每 30 分钟，保留 48 份）、恢复前备份、恢复后撤销会话；进程身份核验，只回收本次创建且已核验的进程。
+- **房间**：每房一个 Godot 进程；WSS 大厅 + DTLS/ENet；房间实际绑定 UDP 后才 READY；资产许可与异步刷新按成员代次隔离。可信清单可以声明通用整数 `room_rules`，宿主只校验范围，具体含义交给游戏适配器。
+- **横版射击示例**（`shooter-dev-002` / `shooter-v2` / `game_protocol=2`）：自由混战，三把枪，服务器权威即时命中，死亡后可开背包选枪并手动复活，整局结算发奖。房间可设每局时长 30–3600 秒、获胜击杀数 0–1000（0 为不限）、复活等待 0–60 秒；已有房间用“规则 / 重建”修改。客户端对人物做 50 ms 显示平滑，并绘制最长 18 像素的短弹迹。
+- **取石子示例**：共用同一账号和资产服务，可购买并选用玉石主题。
+- **新游戏接入**：`tools/new_game.ps1 -Managed -GameId <id>` 生成自带 SDK 0.5.0、账号客户端、独立房间、资产目录/策略和结果 Schema 的工程；Operator 按受信注册表（`schemas/managed_game_registry.schema.json`）组装服务，宿主核心和 SDK 里没有射击或取石子的分支。
+- **源码启动器**：`StartShooterClient.cmd` / `StartManagedTurns.cmd` 以可见窗口启动；要等到窗口稳定出现才报告成功，并为每次启动单独保存日志。
 
-环境：本仓库 Windows；开发 Godot 4.7.2.stable.steam.ed1daf0bf；SQLite 为 Windows winsqlite3.dll。未读取其它游戏或服务器工程。下列均有真实执行及退出 0 证据，但各自范围不同。
+## 当前交付物
 
-| 命令或专项 | 已核实结果 | 范围/证据 |
-|---|---:|---|
-| tools/run.ps1 -Mode unit | 293/0 | Godot 规则/契约，增加等级表边界，保留恶意指数预期警告；最终logs/final-regression-20260922-accounts/unit-console.log |
-| tests/run_accounts.gd | 81/0 | 真实 SQLite/PBKDF2/会话/邀请码；logs/accounts-console.log |
-| tests/run_account_recovery.gd | 30/0 | 真实SQLite重开、清理玩家会话/保留管理员、恢复审计失败回滚；logs/account-recovery-console.log |
-| tests/run_admin_http.gd | 138/0 | 真实 TCP/HTTP 与严格 action Schema，业务处理为夹具；logs/admin-http-strict-final-console.log |
-| tools/run.ps1 -Mode assets | 83/0 | 等级表逻辑、真实资产仓储与并发/CAS/回滚；logs/assets-level-regression.txt |
-| tests/run_result_rewards.gd | 74/0 | 成绩＋奖励＋流水同事务、并发重试/失败回滚/容量；logs/result-rewards-console.log |
-| tests/test_operator_maintenance.ps1 | 35/0 | 实际 SQLite 在线备份/WAL/恢复/文件占用/junction/48份保留，补备份大小与路径不泄露检查；原33项证据仍保留 |
-| tests/test_asset_audit.ps1 | 14/0 | 真实最近100条固定SQL审计，只读与前后值；logs/asset-audit-console.log |
-| examples/shooter/test_runner.gd | 68/0 | Godot 玩法逻辑与配置验证；logs/shooter-console.log |
-| tests/run_asset_callbacks.gd | 32/0 | 通用回调、超时与成员代次的可控测试；logs/asset-callbacks-console.log |
-| tools/run.ps1 -Mode managed_contracts | 241/0 | 64个协议正例及权限/畸形负例，纯契约；最终logs/final-regression-20260922-accounts/managed_contracts-console.log |
-| tools/run.ps1 -Mode players | 33/0 | 原真实 WS/ENet 双客户端回归；logs/framework-regression-players.txt |
-| tools/run.ps1 -Mode integration | 133/0、22子进程 | 生命周期、失败路径与回收；logs/framework-regression-integration.txt |
-| tools/run.ps1 -Mode recovery | 24/0 | 真实旧进程退出、未知身份隔离与新房间；logs/recovery-fix-console.log |
-| tests/test_framework_clients.ps1 -Visual | 47/0 | 真实 WSS＋DTLS/ENet、两个玩法、未缩短的300秒射击局及准确到账 |
-| tests/test_operator.ps1 -Lifecycle | 29/0 | 真实60秒优雅重启、已核验宿主崩溃、房间退出/UDP回收、共享空间、备份恢复与后台持续存活；logs/operator-lifecycle-final2.txt |
-| tools/run.ps1 -Mode operator_projection | 9/0 | 指标失败不沿用旧值、审计查询失败不返回半份成功，纯响应投影；logs/operator-projection-check.txt |
-| tests/test_managed_shutdown.ps1 | 55/0 | 真实宿主/双房间/WSS/DTLS客户端，维护与停服竞争门禁、59→57秒公告；账号/资产RPC使用夹具；logs/managed-shutdown-2cf23012230d4a928f6f17878062952b |
-| tests/test_operator_schedules.ps1 | 52/0 | 7个真实宿主，三次崩溃自动重启/第四次拒绝，4次真实SQLite自动备份；到期和历史时间受控，不是30分钟墙钟测试；data/test-operator-schedules-691ba27c01ae4828b4a50cc1b46796e2/schedule-result.json |
-| tests/test_framework_capacity.ps1 | 174/0 | 16真实账号/客户端满房，第17人ROOM_FULL；17.528秒同步/心跳/移动，空位复用与全部进程/端口回收；logs/capacity-0f1e2cdae67c42a79129524c40530eef/result.json |
-| tests/run_framework_feedback.gd | 7/0 | 复活确认后的提示更新，Godot纯界面状态回归；logs/framework-feedback-console.log |
-| tests/test_operator_logs.ps1 | 14/0 | 实际Godot启动日志、合法空日志、缺失及真实Windows独占锁不可读；详见docs/19_admin_ui.md |
-| tests/run_operator_auth_errors.gd | 6/0 | 实际Operator线程准入/管理请求/HTTP映射，账号响应与HTTP输出使用替身；临时存储失败不误撤销会话；logs/operator-auth-errors-after-console.log |
-| node tests/test_admin_auth_errors.cjs | 12/0 | 执行真实HTML api函数，fetch/DOM为可控替身；重试、失效提示和晚到旧请求隔离，不是浏览器故障注入；logs/admin-auth-errors-after.log |
-| tests/test_asset_response_loss.ps1 | 25/0 | 真实源码Operator/宿主/WSS/SQLite：提交购买后测试发送边界丢弃成功回复并断开TCP，重连同operation_id得DUPLICATE、只扣一次；data/test-asset-response-loss-201117a964ef48558280a20d3569e42d/response-loss-result.json |
-| tools/build_framework_release.ps1 | 6个EXE/PCK，退出0 | Godot官方模板真实导出；logs/framework-export-f4f40384083d45e28ffa38bcb5dea472-* |
-| tests/test_framework_release.ps1 -Bundle <新包绝对目录> | 44/0 | 35项哈希、原生管理/宿主/双房间、实际WSS/ENet及回收，补日志路径与备份大小；logs/framework-release-0316ee0928e647b8b324ddd6a43e37b9/result.json |
-| tools/run_framework.ps1 -Mode panel -NoBrowser / -Mode stop | 分别退出0 | 实际源码启动和关闭，stderr空；logs/framework-source-launcher.txt、framework-source-stop.txt；没有浏览器操作 |
-
-完整客户端证据：logs/operator-68c27ae5f8bb40de977cdebca3ac19c6/clients-a982c3c81bb5453e9e802048a58c0068/result.json，以及该目录各客户端报告/截图/日志。实际验证注册登录、初始免费枪、管理员发币、入房、存活伪造购买/选用拒绝、实际射击死亡、过早复活拒绝、死亡读背包/购买/幂等/默认配置、持新枪复活、离房重入保留；取石子玉石主题与真实回合；重复登录拒绝、封禁断开与解封。五个测试客户端全部退出。仍是同一台电脑的真实多进程，不是跨设备联机。
-
-独立包自动网络专项采用“源码测试客户端 → 导出宿主和房间”；该专项中的 Client.exe 初始化检查不充当完整试玩。下文另列原生 Client.exe 的真实鼠标/键盘与浏览器操作。默认 data/framework 只初始化了空账号库，尚未创建用户管理员；可视化验收账号在包内独立 ui-test 目录，不作为用户正式账号交付。
-
-最终干净 ZIP：artifacts/RoomKit-0.5.0-framework-windows-f4f40384083d45e28ffa38bcb5dea472.zip，228951845字节，SHA256 `49b8f13f92917b1305b9d2529bed9c371dce4c8397015501152e81ca542e173e`。ZIP包含36项、35项不可变文件校验，私有数据/测试夹具0；最新路径记录在 artifacts/framework-release.json。旁边已解压目录经过测试，含测试私有数据，不能整体转发代替干净 ZIP。之前d909/e102/e288/9d16候选保留用于证据追踪，不是当前推荐包。
-
-## 已发现并修复后复验
-
-- 最初 PowerShell HTTP 健康探针自动发 Expect:100-continue，服务端按有界协议拒绝；测试明确关闭该测试进程的 Expect 行为。服务端拒绝规则保留。
-- 新管理员 Schema 的 Unicode 转义正则不兼容 PCRE2；改为受支持的十六进制范围后 HTTP 专项138/0。第一次跑到房间READY后遇到该失败，未计作整套管理流程通过。
-- 邀请码实际字段为 invite_code，原测试误读空的成功状态 code；修正后真实客户端47/0。管理员UI同步修正该字段。
-- 更改密码/登出先关闭连接会丢失成功响应；现先返回成功并立即拒绝后续业务，再结束连接。
-- 重新加载 JSON 后端口被格式化成28300.0，导致公开客户端配置无效；现显式整数格式，最终独立包42/0已包含公开WSS整数端口验证。
-- 旧管理测试停止请求漏填 reason、配置切换请求漏字段；最初退出1，finally 均停止本次进程。测试补齐实际契约后继续完整重跑。
-- 旧恢复测试两次读取正在改写的报告可能取到空快照，误把UDP端口记为0；现在使用同一份已验证快照、动态空闲端口并显式断言范围，真实恢复24/0。原19/2失败记录保留在 logs/framework-regression-recovery.txt。
-- 生命周期崩溃注入首次因Windows路径斜杠比较不一致拒绝执行；现按绝对路径比较，身份要求未放宽。随后28/1发现新宿主已RUNNING时旧journal尚未清空；现在确认旧进程退出且UDP能绑定后原子清空，再启动新宿主，最终29/0。失败日志 logs/operator-lifecycle-final.txt 保留。
-- 管理服务本身重启后旧玩家会话曾阻止再次登录；现只在旧进程安全确认之后执行内部会话清理，保留管理员，删除与审计同事务，专用30/0。该操作未加入公开Schema或远程RPC白名单。
-- 启动器遇到死进程遗留描述文件时，只有确认PID已不存在才删除固定标记并重启；PID仍存在或描述畸形则拒绝。包启动器专项3/0，见 logs/descriptor-test-b5485314269842fe8101488ed120106f/result.json。
-- 奖励测试首次夹具误带额外 duration_ms；已更正并完整74/0。契约初次重复键断言用了不负责HTTP重复键的通用解析器，改为实际AdminHTTP检查后241/0。失败日志保留。
-- 停服期间关闭维护可能重开准入；异步资产加载和房间重建也存在等待后的状态变化。现停止状态不能被维护开关解除，重复停止只能缩短截止时间，票据消费/资产加载后/重建等待后均复查；真实55/0验证，未延长测试超时掩盖问题。
-- CPU采集失败曾残留旧值，资产/账号审计查询失败曾显示部分成功。现指标带采样时间、15秒过期显式不可用；两路审计任一路失败则明确失败。纯投影9/0，不能写成真实存储故障注入。
-- 等级原为固定除100，现由可信资产目录的等级阈值表派生；表必须从0严格递增，共享空间使用同一表，旧目录缺省保持1级。unit293/0、assets83/0及真实UI的250经验→3级验证。
-- 容量测试前两次为测试驱动读错SDK返回错误码、报告文件原子替换期间读空；修复驱动/短暂文件读取重试后174/0。人数、ROOM_FULL与真实网络停滞门槛均未放宽，失败证据保留。
-- 实际原生UI发现死亡复活后仍显示等待提示，已修复dead→alive消息；定向Godot状态测试由6/1变为7/0。还发现备份列表缺少大小、导出启动器日志路径与API不一致、停止态运行时间标签误导及重新登录遗留旧错误提示，均在后续新包修复。日志独占锁/空文件/缺失区分已有真实14/0验证；Godot会消耗--log-file参数，因此采用受信启动器同步传入--operator-log-path，不新增任意路径HTTP入口。
-- 前一个可视化夹具0f978611214d40b0a6c42a71dcd19576途中进程消失且无最终清理报告，原因未能确认；不能记为通过。随后由根持有进程句柄的f6f9a767f89b47e1ab229fac2dd02d1f完整操作并正常收尾，exit0、cleanup_failed=false、forced_cleanup=false、live_owned_processes=0。
-- 管理员身份校验曾把存储不可用或线程容量不足改写成认证失败，浏览器因此清除登录且提示留在隐藏页面。现保留可重试的原错误码，真实失效在登录页显示原因，并防止旧请求撤销新登录。实际生产函数定向回归由Operator 3/3、页面7/5修复为6/0、12/0；替身边界如上表，不当作真实数据库故障注入。
-
-## 本次可视化验收与剩余边界
-
-前一轮浏览器因工具安全检查停止的证据 logs/browser-qa-20260922/report-final.json 保留。本次续跑重新获得可用的内置浏览器，并实际访问隔离管理服务；没有绕过安全警告。已实际操作首次管理员设置、宿主启动、射击/取石子房间创建、邀请码、玩家资产发放、在线备份、审计、配置只读、维护公告、封禁/解封。浏览器发起真实60秒停服后显示宿主已停止、活动房间0、后台在线，原宿主及两个房间PID均不存在。还实际恢复手动备份、生成恢复前备份、撤销管理员旧会话并重新登录。
-
-这次UI会话中管理进程实际启动于01:45:04，未缩时自动备份于02:15:17生成并在浏览器列为“自动备份”；这补充了52/0受控时间测试之外的一次真实30分钟墙钟观察，仍不代表24小时保留周期长测。UI夹具及两个源码对手均正常exit0且无需强制清理；完整观察记录为 logs/framework-ui-f6f9a767f89b47e1ab229fac2dd02d1f/ui-observations.json，收尾为 fixture-result.json。
-
-原生 e10231265ab7478ea7daaf228757b5d1 包已用可见 Client.exe 操作完成：邀请码注册/登录；射击进房、服务器真实击杀、死亡背包读300金币/250经验/等级3、100金币解锁SMG且另行选择、复活快照hp100/weapon=smg；真实300秒对局后返回大厅220金币/默认SMG；注销后同一账号登录取石子，独立空间0金币/经典主题，发放100金币后解锁并选择jade，真实六步取石子进入第二局且UI玩家1分。对手使用源码SDK测试驱动发送合法动作，服务端与被操作的两个客户端均为实际导出程序；不是两台实体设备。证据 logs/framework-ui-f6f9a767f89b47e1ab229fac2dd02d1f 中的截图/快照及隔离对手目录的动作证据。
-
-后续9d16d01539bb4f5bb235b1b0aadf9c6f包复验：实际注册/登录新玩家、创建并加入原生射击房间，源码SDK对手合法击杀一次后停火，点击手动复活得到生命100及“已复活，可以继续战斗”提示；浏览器创建备份成功并显示103 KB，空operator日志明确显示“当前日志为空”，重新登录没有遗留旧全局提示。证据 logs/framework-ui-6da6c5f70d2048c2b5e3e7d2510324de/ui-observations.json、shooter-respawn-fixed.png、shooter-respawn-report.json。对手首次150秒等待未入房是失败等待记录，后续成功另存；不删除此前记录。UI夹具、对手均exit0，无强制终止、清理错误或遗留自有进程。该轮也观察到一次管理员意外退登录，日志无实际根因；代码检查发现临时存储/限流失败被误映射为AUTH_FAILED，按独立缺陷修复，不把推断写成事故根因已查明。
-
-最后f4f40384083d45e28ffa38bcb5dea472包实际浏览器复验：首次管理员设置成功，停服态显示“未运行”；创建真实SQLite手动备份，列表显示103 KB；执行恢复后旧管理员会话失效，登录页明确显示“用户名、密码或登录凭据无效。”；重新登录成功，无旧全局错误提示，刷新列表可见手动备份与恢复前备份。已检查实际页面截图，未向浏览器注入模拟响应。证据 logs/framework-ui-deb891a63a1e4749b0865bfb6a3f2c2d/ui-observations.json 与 fixture-result.json；夹具退出0，cleanup_failed=false、forced_cleanup=false、live_owned_processes=0。此次没有重复完整射击局，也没有通过浏览器注入真实存储繁忙；相应范围分别由先前可视化与定向替身测试记录。
-
-本机容量174/0仅覆盖17.528秒短时满房与准入，不代表长期压测。第二台电脑局域网、Linux完整宿主和公网仍未运行；没有部署公网或花费云资源。已向用户询问第二台Windows设备，未收到答复，不推定已验收。
-
-新增响应丢失专项25/0实际在数据库完成500→400金币及解锁SMG后，由测试Lobby的发送边界不发送成功应答并中断真实WSS TCP；原版AccountClient收到CONTROL_UNAVAILABLE，重新登录后用同一operation_id得到DUPLICATE，金币、所有权和版本不再变化，真实SQLite购买流水只有1条。测试不是“已经收到成功后再重复点击”，也不涉及玩法房间或独立导出客户端。故意断TLS的mbedtls -0x6c00保留在console，无脚本异常；cleanup-recheck.json确认测试退出0、宿主退出、标记移除、大厅及控制TCP能重新绑定。
-
-## 修改文件和本机入口
-
-本轮实际新增/修改文件完整清单见 docs/23_branch_files.md。主要入口为 host/operator.gd、host/managed_host.gd、host/managed_lobby.gd、host/admin_http.gd/admin.html、host/core/account_service.gd、通用资产/结果服务和SDK资产回调；示例位于 examples/framework、examples/shooter、examples/turn_based；契约统一位于 schemas。启动、备份、构建与测试脚本分别在 tools 和 tests。
-
-本机从仓库双击 StartManagement.cmd，首次设置管理员后点击“启动服务器”，创建邀请码；打开两个 StartShooterClient.cmd 用两个玩家账号注册登录、加入同一房间。五分钟真实规则、背包与死亡操作、取石子及关闭方法见 docs/22_framework_operations.md。开发路线见 docs/17_framework_shooter_plan.md，SDK兼容决策见 docs/07_versions_decisions.md 与 docs/21_managed_protocol.md。
-
-本次收尾修改47个源码/测试/文档文件，完整本轮差异清单相对711a657共120个文件。2026-09-22最新提供的AGENTS.md要求不推送远端，本次收尾只做本地提交；日志、私有数据及独立包继续留在Git忽略目录。新托管模板和第二台实体设备的门槛未关闭，用户现要求暂停验收，不能把整个分支目标标为全部完成。
-
----
-
-# 以下为前一轮 S0 与更早历史
-# 本轮：通用框架分支与资产基础
-
-2026-09-21：已从 `codex/m4-results` 的 `1a8bec5` 创建并切换到 `codex/shooter-framework`。用户确认采用“通用框架＋可选玩法模块＋具体游戏模式”，永久账号资产与比赛临时经济分开；当前示例为横版自由混战，战术回合玩法仅保留扩展边界。完整范围已写入 docs/17_framework_shooter_plan.md，原 CODEX_START/docs/00 的 M0/M1 标为历史启动任务。
-
-## 已完成
-
-- S0 分支、架构边界、阶段和契约；完成 S3 的第一批内部资产基础，尚未接公共网络/UI。
-- 可信资产目录与配置槽、独立/共享空间选择；同一个钱包可以共享，默认配置按游戏分别保存。
-- Godot 内部资产服务、SQLite 永久金币/经验/非堆叠所有权/默认配置、购买与选用分开、管理员调整、版本冲突检查、幂等回执与前后状态审计。
-- SQLite 助手 v1→v2 保留式初始化升级、真实事务回滚、在线备份；不迁移旧项目账号。
-- 独立的可选比赛内存钱包，不连接永久数据库，随实例结束清空。
-- 射击策略（大厅/死亡允许）与取石子策略（只允许大厅）分别实现，框架不包含死亡/枪械分支。已验证内部接口复用，不等同于两个完整客户端已接入。
-
-## 本轮真实测试
-
-环境：当前项目 `F:\文档\GodotGame\Net\RoomKit`，Windows、Godot `4.7.2.stable.steam.ed1daf0bf`、SQLite `3.51.1`。所有命令均从本目录运行。
-
-| 实际命令 | 退出码 | 结果与范围 |
-|---|---:|---|
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit | 0 | 最终 284/0；原 250 项＋34 项资产目录、契约、策略和比赛内存钱包检查 |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode assets | 0 | 70/0；其中 30 项纯逻辑＋40 项真实 SQLite/内部服务检查；随后补充的 4 个文档例子在上方 unit 中验收，不虚增此轮 assets 实测数 |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode persistence | 0 | 42/0；原真实 Godot 子进程结果保存、丢 ACK 重试、宿主退出/恢复、签名校验与资源回收回归 |
-
-资产测试真实验证：v1 数据库旧结果保留；购买/选择跨服务重开保留；重复请求只扣一次；不同用户/空间隔离；共用钱包但不同游戏配置不覆盖；两个独立 SQLite 写者同版本竞争仅一方成功；中文审计；备份可读；在写状态后通过测试库触发器让回执写入失败，状态和回执均回滚。
-
-证据：logs/unit-console.log、assets-console.log、persistence-console.log 及各自 stderr。最终资产测试库为 data/test-assets-13d7d40cf0d4c6ceacdc5c7c1888b6ff；失败触发器仅在该独立测试库内，未改用户演示库。运行数据不进入 Git。
-
-## 失败和修复
-
-新增旧库测试夹具首次为 30 通过/1 失败、退出 1。原因是直接调用 PowerShell 脚本后检查没有设置的 LASTEXITCODE，将已成功创建的私有目录误判失败；改为同时依赖脚本异常和 PRIVATE_DATA_READY 成功标记，未降低目录边界检查。保留 logs/assets-legacy-attempt-failed.log 和对应 stderr；修复后的完整资产测试 70/0。单元原有恶意 JSON 指数过大警告仍保留，拒绝断言通过。
-
-## 未完成 / 未运行
-
-尚未实现 S1 常驻可操作后台、S2 用户名密码/邀请码账号、真实房间资产许可及复活串行控制、射击客户端/地图/伤害/背包 UI、整场奖励和自动运维。当前 StartPanel.cmd 仍打开原只读双示例面板。内部 identity/context 只接受宿主可信调用，不是可直接暴露的网络权限接口。
-
-这轮未运行射击联机、跨电脑局域网、Linux、浏览器视觉或新独立包导出。SQLite 竞争测试是真实数据库写入，不是网络并发玩家；死亡策略使用测试上下文，不是真实角色状态；重复请求测试不等于网络丢包注入。没有把新分支的全部开发计划标为完成。
-
-## 文件与启动
-
-- 范围/架构/路线：AGENTS.md、CODEX_START.md、README.md、docs/00_greenfield_start.md、docs/01_scope_architecture.md、docs/02_contracts.md、docs/03_sdk_integration.md、docs/06_roadmap_acceptance.md、docs/17_framework_shooter_plan.md、docs/18_asset_foundation.md、STATUS.md。
-- 内部实现：host/core/asset_catalog.gd、asset_rules.gd、asset_service.gd；sdk/roomkit/server/asset_policy.gd、match_wallet.gd；tools/sqlite_store.ps1。
-- 示例/契约：examples/asset_catalog.example.json、asset_messages.example.json、shooter/asset_policy.gd、turn_based/asset_policy.gd；schemas/asset_catalog.schema.json、asset_command.schema.json、asset_state.schema.json。
-- 验证：tests/test_assets.gd、run_assets.gd、run_unit.gd、fixtures/asset_database.ps1；tools/run.ps1。
-
-复现新增基础功能使用上表 `-Mode assets`；接口、错误码与数据版本边界见 docs/18_asset_foundation.md。当前还没有可以启动的射击游戏入口。后续按 docs/17 继续常驻后台和账号接入，无需重新确定架构方向。
-
----
-
-# 历史：中文本机状态面板
-
-2026-09-21：用户要求类似宝塔的服务器/房间/玩家数据查看，已新增可实际打开的中文只读网页面板。原房间生命周期、加密连接、SQLite和独立包继续保留；未引入额外后端、未访问旧工程、未部署公网。
-
-打开仓库StartPanel.cmd（需本机Godot）或新版独立包StartPanel.cmd（无需编辑器）。面板与两个示例游戏窗口一起启动；查看宿主运行时间、PID/端口、房间状态/人数/心跳/实际工作集、在线玩家身份及最近100条SQLite对局成绩。支持房间搜索、状态筛选、按房间看成员、点击玩家看近期成绩。只读，不包含账号资产/背包/商城、网页开关房或远程系统管理。具体入口与数据来源见docs/16_dashboard.md。
-
-默认面板仅监听127.0.0.1:28291，使用每次宿主随机生成的Bearer凭据；只从私有run描述文件交付给本机页面，不在应用日志打印访问链接。页面2秒刷新、数据库5秒异步读取；明确区分离线旧数据和存储错误。响应使用显式白名单，不返回控制token、票据/摘要、私钥、数据库授权或私有路径。真实响应Schema和例子已同步。测试随机端口使用独立描述文件，不覆盖用户正常面板的授权文件。
-
-## 本轮实际测试（均在Windows本机）
-
-| 命令/验证 | 最终结果 |
+| 交付物 | 状态 |
 |---|---|
-| tools/run.ps1 -Mode panel | 退出0，62/0；包含原双玩法47项及面板启动、真实HTTP/Schema、四个真实玩家、真实SQLite结果、401/403/404/405/400拒绝、敏感字段投影、关闭描述文件清理 |
-| tools/run.ps1 -Mode unit | 退出0，250/0；未重复运行所有无关的100轮/20人测试，上轮对应结果保留历史范围 |
-| tools/build_release.ps1 | 退出0；HTML随固定入口PCK导出，包内新增StartPanel.cmd |
-| tools/package_release.ps1 | 退出0；37个不可变文件校验一致，程序ZIP共38项，data/run/logs/私钥/SQLite条目0 |
-| tools/test_release.ps1 -Bundle 新解压目录 | 退出0；official EXE -Test -Panel -NoBrowser为48/0，授权HTTP核对真实宿主PID；另开两个窗口经Stop入口退出18/0，结果查看、备份及监听/日志清理通过 |
-| 浏览器实际操作 | 源码面板显示真实2房/2玩家及旧库1条结果；搜索空结果、房间过滤、玩家详情、宿主退出后的离线提示通过。最终official包页面2房/2玩家，导航到玩家后刷新仍在线；中文布局和内存缺项说明已经截图/DOM核实 |
-| 脚本检查 | PowerShell AST解析、CMD UTF8无BOM/CRLF、git diff --check通过；静态检查不代替上方运行测试 |
+| 源码入口 `StartManagement.cmd` / `StartShooterClient.cmd` / `StartManagedTurns.cmd` / `StopManagement.cmd` | 当前推荐，包含全部 2026-09-26 修改 |
+| 最新独立包 `artifacts/RoomKit-0.5.0-framework-windows-f4f40384083d45e28ffa38bcb5dea472.zip`（索引 `artifacts/framework-release.json`，SHA256 `49b8f13f92917b1305b9d2529bed9c371dce4c8397015501152e81ca542e173e`） | 2026-09-22 构建并验收；**不含** 09-26 的模板注册、启动器修复和房间规则，其射击客户端（shooter-v1）与当前源码的 shooter-v2 不兼容。需要重新构建并验收 |
+| 早期无账号演示入口（仓库根 `StartPanel.cmd`、`StartPlay.cmd`、`StartTurns.cmd`、`StartDemo.cmd`、`ShowResults.cmd`）及 0.1.0 包 | 保留但不推荐，见 [早期入口](docs/archive/early_entrypoints.md) |
 
-主要证据：logs/panel-final-test.txt、panel-unit.txt、panel-final-export.txt、panel-package-final.txt、panel-release-final.txt、panel-visual-session.txt、panel-user-session.txt及对应stderr。测试进程已回收；本轮结束时特意保留最终独立包的1个宿主、2个房间和2个玩家窗口供用户查看，浏览器标签页也保留。这些是交付中的运行会话，不宣称此时进程为零；关闭两个游戏窗口或包内StopRoomKit.cmd可停止，30分钟上限仍有效。
+## 最新有效验证范围
 
-## 失败、修复和边界
+每项的计数都是断言数，不是玩家数。“代码版本”指该结果对应的源码：**09-26** 表示当前工作区代码；**09-22** 表示提交 `f0b4c8b` 前后的代码，之后没有在 09-26 代码上重跑。所有结果都只在同一台 Windows 电脑上取得。
 
-- 一次重新解压测试32通过/16失败：首个客户端CONTROL_UNAVAILABLE，其它客户端等待双玩法后续阶段超时。连续同步启动/身份捕获会阻止宿主处理早到客户端的WSS连接；已将演示客户端启动改到独立工作线程，在主线程继续轮询连接，完成后移交精确进程身份记录。未延长超时或删测试；最终源码62/0、新解压official48/0通过。失败保留logs/panel-release-startup-failed.txt及对应旧解压目录的客户端日志。
-- official Godot返回静态内存0（未提供该指标）；现明确显示“当前引擎未提供此指标”，不把0画成有效数据。每房工作集仍由真实Windows进程采样得到。未提供整机CPU/磁盘统计。
-- 页面锚点最初可能在刷新时误当授权；改成仅64位十六进制片段作为凭据，其它锚点沿用当前标签页会话，最终浏览器导航/刷新通过。一次浏览器空字符串填充未清空搜索，改键盘选中删除后确认恢复；未把工具动作尝试计作成功。
-- 新库没有对局时显示空状态；只有完成并保存的真实结果才出现。账号总资产、第三方身份服务、远程面板、公网、Linux完整宿主仍未实现或未验收。网页写操作未提供。
+### 2026-09-26（当前工作区代码）
 
-## 当前交付位置
-- 程序ZIP：`F:\文档\GodotGame\Net\RoomKit\artifacts\RoomKit-0.1.0-windows-ba558c42d15d46f78efa2dff32b501ce.zip`
-- 已解压启动器：`F:\文档\GodotGame\Net\RoomKit\artifacts\unpacked-ba558c42d15d46f78efa2dff32b501ce\StartPanel.cmd`
-- 程序ZIP SHA256：`A1F1C6AEBE1D4D477B29F4B8214FB16F1EE4874B09A38E365AE6CA026990B1D9`
-
-## 本轮文件清单（21个）
-
-- `docs/02_contracts.md`
-- `docs/06_roadmap_acceptance.md`
-- `docs/16_dashboard.md`
-- `examples/dashboard_status.example.json`
-- `examples/showcase/host.gd`
-- `host/dashboard.html`
-- `host/dashboard_server.gd`
-- `README.md`
-- `release/README.md`
-- `release/Run.ps1`
-- `release/StartPanel.cmd`
-- `schemas/dashboard_status.schema.json`
-- `StartPanel.cmd`
-- `STATUS.md`
-- `tests/run_panel.gd`
-- `tools/build_release.ps1`
-- `tools/open_panel.ps1`
-- `tools/panel.ps1`
-- `tools/play.ps1`
-- `tools/run.ps1`
-- `tools/test_release.ps1`
-
----
-
-以下保留之前的里程碑历史；最新结论以上方为准。
-
-# 实际开发状态
-
-更新：2026-09-21。本轮继续用户“一口气全做完”的后续授权，完成 Windows 本机 M4 安全/恢复闭环和 M5 发布候选交付；**不把 M4/M5 全部正式门禁标为通过**。Linux完整宿主、跨电脑与公网、最坏玩法容量边界、另一台干净机器仍未验收。只修改当前独立仓库，没有读取、复制或修改旧游戏/旧服务器，没有云部署或账号商城。
-
-## 现在可以直接用什么
-
-- Windows独立程序ZIP：`artifacts/RoomKit-0.1.0-windows-3b92cb9c4c7f471ab9162e6490f837b8.zip`，181.73 MiB。无需Godot编辑器；需要Windows PowerShell与系统winsqlite3.dll。
-- 已重新解压并测试的启动器：`artifacts/unpacked-3b92cb9c4c7f471ab9162e6490f837b8/StartRoomKit.cmd`。打开两个取石子窗口；传入`-Game blocks`玩方块。StopRoomKit.cmd正常停止，CheckRoomKit.cmd校验。
-- SDK 0.4.0与独立新工程模板：`artifacts/RoomKit-SDK-0.4.0-template-3b92cb9c4c7f471ab9162e6490f837b8.zip`。也可运行`tools/new_game.ps1 -GameId my_game`重新生成。
-- 源码原入口StartPlay.cmd、StartTurns.cmd、ShowResults.cmd保留。完整操作/备份/故障/升级见docs/15_release_operations.md，路线见docs/06_roadmap_acceptance.md。
-- ZIP与日志不上传Git，源码与可重建脚本沿用用户授权上传指定GitHub的codex/m4-results分支；精确提交及远端核对见本轮最终回执。未修改全局Git配置。
-
-## 本轮实现
-
-身份提供方预配高熵凭据，持久文件只存摘要和稳定user_id/角色/期限；管理员停房授权，同用户第二会话拒绝，过期会话关闭。演示与独立包默认WSS + ENet DTLS，固定证书和主机名验证，凭据禁止走明文WS；保留基础M1/M2的无账号回环开发夹具。未实现第三方账号服务。
-
-启动/终止/资源采样、结果写库改为工作线程/有界队列。助手超时只终止它自己创建并持有的原句柄；历史房间/并发启动/结果队列有限额，实测内存超限关闭房间。托管宿主在启动前记保留端口，重启隔离遗留实例，精确只读身份确认退出后才能释放；未知身份不猜测、不接管、不杀旧PID。
-
-建立真正的Windows宿主、两个服务器、两个客户端EXE/PCK，固定入口适应官方模板；只读PCK与可写外部路径分开。新增启动/停止/校验/结果查看/备份脚本，按构建文件白名单打包，禁止夹带data/run/logs或私钥。SDK和新工程模板只通过GameAdapter与注册配置接入。源码SDK为0.4.0，开发及正式构建分别有独立兼容标识，详见docs/07。
-
-## 实际命令与结果
-
-下表均为实际执行，退出码0；通过数是断言数，不是玩家或测试机数量。模拟与真进程分开描述。
-
-| 命令/阶段 | 结果与边界 |
-|---|---|
-| `powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run.ps1 -Mode all` | 整体退出0；依次结果如下，共1144断言，另含demo |
-| unit | 250/0；契约/分帧/Schema及模拟生命周期，不是250次真实联机 |
-| launcher | 64/0；十轮真实身份核验/终止/句柄回收，句柄320→320 |
-| integration | 133/0；22个真实子进程，包含端口/启动/超时/故障隔离 |
-| demo / players | demo四次心跳、leases=0；players 33/0，真实回环接入 |
-| games / persistence | 47/0双玩法四客户端及真实SQLite；42/0结果幂等/故障补存/在线备份 |
-| secure | 37/0；实际WSS/DTLS，错误CA、错误DTLS主机名和无效身份拒绝、权限；另含过期和明文配置拒绝检查 |
-| stress | 404/0；真实100次创建—READY—至少两次心跳—停止—确认退出/端口回收 |
-| load | 95/0；实际20个加密输入客户端，两房16+4人；第17人ROOM_FULL，各客户端移动并收到状态 |
-| recovery | 21/0；真实终止宿主后立即重新开房，旧端口隔离/旧房自退/确认回收，未知身份继续隔离 |
-| limits / template | 8/0真实工作集超限退出与历史上限；10/0生成独立新游戏、真实模板服务器和客户端入房离房 |
-| `./tools/test_helpers.ps1` | 3/0；真实慢助手超时、持有句柄的原助手退出、助手路径白名单拒绝。慢助手是隔离测试夹具，不是制造SQLite磁盘故障 |
-| `./tools/build_release.ps1` | 正式模板导出成功，检查出口和脚本错误；最终构建索引artifacts/release.json |
-| 正式模板 `LauncherCheck.exe --headless` | 64/0；official模板十轮句柄测试，325→326，不随轮数增长 |
-| WSL Ubuntu `PortableCheck.x86_64 --headless` | 215/0；实际Linux official引擎协议/准入/玩法与本地端口检查，未运行Linux完整宿主/存储/玩家联机 |
-| `./tools/package_release.ps1` | 两个ZIP成功，重新解压后的34个不可变文件摘要一致；程序ZIP35项、模板ZIP38项，私有运行文件0 |
-| `./tools/test_release.ps1 -Bundle <delivery.unpacked>` | 退出0；重新解压包用正式EXE跑双玩法47/0；再真实打开两个窗口，通过Stop脚本正常关闭18/0；结果查看、备份成功，监听False、启动日志0项。不是另一台机器或人工试玩 |
-
-100轮耗时142922ms，Godot静态分配25,887,396→27,020,300字节（保留100条历史记录，约增加1.13MB）；宿主poll间隔P95 7ms、最大27ms，不能解释为网络RTT。20玩家全加入后继续15秒，报告包含之前逐个入场阶段：每人输入298—665次，快照165—375个，快照间隔P95 104—110ms；两个房间工作集97,923,072/96,854,016字节。应用层收发字节见load-result.json，不是包含DTLS/IP开销的链路带宽，也未测到全局安全容量上限。测试期间本机也执行构建任务，不是专门隔离的性能实验。
-
-主要证据：logs/completion-final-all.txt、completion-helpers.txt、completion-final-export.txt、completion-package.txt、completion-unpacked-release.txt、native-launcher-console.log、completion-linux-portable.txt、release-stop-console.log及对应stderr；机器报告stress-result.json、load-result.json、各*-lifecycle-result.json、completion-audit.json。最终审计当前项目Godot残留0、run顶层私有启动JSON 0、最终脚本/编译/退出泄漏错误日志0；常见凭据模式扫描命中0。此扫描不等于独立安全审计。
-
-## 本轮失败、修复及未运行
-
-- 导出初次使用--main-pack/--path被official模板拒绝；只去掉路径但保留--script仍不能选择所需入口。改固定MainLoop后又发现必须有主场景，最终固定类+空场景通过。没有把这些失败计为导出通过；早期失败日志仍在logs/及对应旧artifacts目录。
-- 本轮扩充文档消息例子后，unit首次249通过/1失败，因为例子数量断言仍为17。同步为18并保留逐项Schema校验，最终250/0；失败证据completion-example-count-failed.txt。
-- 一次WSL路径转换丢失Windows反斜杠，程序未启动（127）；改为明确/mnt/f路径后实际Linux退出0。首次进程残留审计遇到空ExecutablePath，修正为空字符串处理后重新执行，最终审计无错误。
-- 单元恶意指数产生预期Exponent too high警告；负向证书用例产生预期TLS握手失败。未隐藏这些输出。完整回归最终无GDScript编译错误或退出资源泄漏。
-- Windows正式程序已验证，Linux只有可移植测试：ProcessLauncher、RoomManager保护目录和SQLite适配仍为Windows实现，Linux宿主缺失；未将它伪装为环境测试通过。
-- 没有跨电脑/LAN/公网部署、外部身份服务、长期满载、最坏玩法/实体规模、容量边界、真实网络丢包、证书轮换、硬CPU/内存配额、磁盘满或断电测试。尚未成功写入outbox的结果不能承诺恢复。凭据仅本地预配，不是完整账号系统。
-- 资源上限是应用层采样/队列上限，初始化和离线管理仍有同步调用。数据授权/结果容量有限且无自动归档，不宣称生产长驻已完成。任意跨路径/跨机器数据迁移未验证。
-
-## 本轮实际修改文件
-
-- `docs/02_contracts.md`
-- `docs/03_sdk_integration.md`
-- `docs/06_roadmap_acceptance.md`
-- `docs/07_versions_decisions.md`
-- `docs/10_environment.md`
-- `docs/13_m4_results.md`
-- `docs/14_completion_work.md`
-- `docs/15_release_operations.md`
-- `examples/blocks/game_manifest.json`
-- `examples/m2_messages.example.json`
-- `examples/minimal/multiplayer_manifest.json`
-- `examples/result_messages.example.json`
-- `examples/showcase/client.gd`
-- `examples/showcase/host.gd`
-- `examples/turn_based/game_manifest.json`
-- `host/core/identity_provider.gd`
-- `host/core/recovery_guard.gd`
-- `host/core/result_service.gd`
-- `host/core/room_manager.gd`
-- `host/development.gd`
-- `host/lobby_server.gd`
-- `host/platform/bounded_helper.gd`
-- `host/platform/process_launcher.gd`
-- `host/storage/sqlite_repository.gd`
-- `README.md`
-- `release/CheckRoomKit.cmd`
-- `release/host.gd`
-- `release/Manage.ps1`
-- `release/README.md`
-- `release/Run.ps1`
-- `release/StartRoomKit.cmd`
-- `release/StopRoomKit.cmd`
-- `schemas/identities.schema.json`
-- `schemas/lobby_request.schema.json`
-- `schemas/process_journal.schema.json`
-- `sdk/roomkit/client/room_client.gd`
-- `sdk/roomkit/README.md`
-- `sdk/roomkit/server/room_runtime.gd`
-- `sdk/roomkit/shared/paths.gd`
-- `sdk/roomkit/shared/secure_transport.gd`
-- `STATUS.md`
-- `templates/game/adapter.gd`
-- `templates/game/client.gd`
-- `templates/game/README.md`
-- `templates/game/room.gd`
-- `tests/fixtures/load_client.gd`
-- `tests/fixtures/recovery_host.gd`
-- `tests/fixtures/secure_client.gd`
-- `tests/run_limits.gd`
-- `tests/run_load.gd`
-- `tests/run_portable.gd`
-- `tests/run_recovery.gd`
-- `tests/run_secure.gd`
-- `tests/run_stress.gd`
-- `tests/run_template.gd`
-- `tests/test_admission.gd`
-- `tests/test_launcher_real.gd`
-- `tests/test_results.gd`
-- `tools/bounded_helper.ps1`
-- `tools/build_release.ps1`
-- `tools/new_game.ps1`
-- `tools/package_release.ps1`
-- `tools/process_identity.ps1`
-- `tools/results.gd`
-- `tools/run.ps1`
-- `tools/test_helpers.ps1`
-- `tools/test_release.ps1`
-
----
-
-# 以下是先前阶段历史记录，当前结论以上方为准
-
-# 实际开发状态
-
-更新：2026-09-21。M0—M3已有本机验证；本轮继续实现M4第一部分：SQLite结果保存、幂等确认、持久outbox、宿主退出后的结果补存和在线备份。M4整体未完成。仅在当前独立仓库开发，未读取、复制或修改旧项目。
-
-## 本轮M4第一部分：结果可保存、重发、恢复与备份
-
-本轮从干净main建立codex/m4-results开发分支，沿用用户对指定GitHub仓库的上传授权。无公网部署、账号/商城开发或云资源消耗。当前工作目录仍为F:\文档\GodotGame\Net\RoomKit；引擎4.7.2.stable.steam.ed1daf0bf、Git 2.55.0.windows.3，系统SQLite实测3.51.1。
-
-完成：宿主集中写SQLite，结果ID及同局最终结果双重唯一约束；每房独立签名授权；房间先写持久outbox再发送，只有提交成功且确认摘要匹配才删除；丢ACK重试不重复写库；真实终止宿主后房间自行退出、UDP可重新绑定，新宿主补存遗留结果；在线备份及从备份打开验证。回合玩法已经实际接入，方块玩法不生成成绩。SDK更新为0.3.0，示例构建及兼容标识同步更新，协议/例子/错误码见docs/02、07、13。
-
-本机验证：双击StartTurns.cmd，两个窗口轮流取完一局石子，关闭窗口后双击ShowResults.cmd，可用中文查看已保存的局数和玩家分数。数据位于data/showcase-results/results.sqlite，不进入Git。成绩记录不等于账号累计积分；新房不会自动恢复旧局。
-
-### 本轮实际测试
-
-以下均在本项目运行，退出码0；计数是断言数，不是玩家数。
-
-| 实际命令 | 结果 |
-|---|---|
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode all | unit 248/248；launcher 63/63（句柄321→321）；integration 133/133（22子进程）；demo 4心跳、leases=0；players 33/33；games 47/47；persistence 42/42 |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit | 补充控制封装深度边界后最终249/249；包含非有限数拒绝、签名小数精度及协议例子 |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode persistence | 最终代码复验42/42；真实SQLite、真实Godot子进程及宿主终止恢复，中文/引号往返一致，备份integrity_check=ok |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode games | 最终代码重新打包复验47/47；SDK与两个独立工程一致，实际回合结果落库 |
-| cmd /c "StartTurns.cmd -Smoke < NUL" | 18/18；实际启动两个图形窗口并自动调用关闭处理，房间/客户端回收；非人工试玩 |
-| cmd /c "ShowResults.cmd -Store <games报告中的result_store> < NUL" | 显示真实双玩法测试保存的1局回合结果，两玩家分别0/1分，退出0 |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\results.ps1 -Store <persistence报告中的data_root> -Operation inspect / backup / recover | 三种操作分别运行、分别退出0；已保存结果可查看，备份产生新文件，无待恢复记录时不重复写入 |
-
-主要日志：logs/m4-all-run.txt、m4-unit-final.txt、m4-persistence-final.txt、m4-games-final.txt、m4-play-turns.txt、m4-show-results.txt及m4-results-*.txt。机器报告为logs/m4-games-result.json、m4-persistence-result.json、m4-final-audit.json。最终核查退出0：当前项目Godot残留0、私有启动配置0、最终运行时错误0、独立工程SDK差异0。41个改动文件中常见凭据模式命中0；最终测试使用的6个真实签名密钥在日志/产物文本中命中0。初始全套回归后补充了封装深度拒绝，不再重复无关的进程启动器测试。
-
-### 失败修复与未运行
-
-- 初次unit为242通过/1失败：嵌套NaN绕过通用结果校验；增加递归JSON有限数及深度校验。初次persistence因GDScript动态变量类型推断编译失败，总watchdog终止原宿主句柄，未算作运行通过。证据保留m4-unit-attempt-failed.txt、m4-persistence-parse-failed.log。
-- 首次能运行的持久化测试出现RefCounted循环引用退出泄漏；结果服务改用WeakRef引用管理器，后续最终stderr无泄漏/资源未释放错误。
-- 增加中文与引号断言后一次全套回归persistence为41通过/1失败：数据库内容正确，Windows管道返回Godot时乱码；助手改用ASCII JSON Unicode转义，最终往返断言通过。失败保留m4-all-attempt-failed.txt、m4-unicode-attempt-failed.log。另补文件和控制帧完整小数精度，避免签名摘要漂移。
-- 单元恶意1e999仍产生预期Exponent too high警告，拒绝断言通过；没有隐藏警告。
-- ACK丢失是在真实控制链路的测试宿主中故意跳过首个ACK；宿主终止前的未提交状态由测试故障钩子保持。不是网络设备丢包或真实磁盘故障。SQLite损坏文件拒绝是真实执行；存储不可用ACK保留文件由单元验证。
-- 未验证断电、磁盘满、写临时文件中途崩溃、正式奖励业务、16人/100轮、Linux、专用导出或公网。同步PowerShell存储存在阻塞延迟；每库256授权/10000结果、每房128待发送的当前上限没有自动清理策略。M4的正式身份、安全传输、完整资源治理和立即重开房的遗留实例隔离仍未完成，详见docs/13。
-
-### 本轮实际修改文件（41个）
-
-- 根入口/说明：ShowResults.cmd、README.md、STATUS.md。
-- 宿主：host/core/result_service.gd、host/core/room_manager.gd、host/storage/sqlite_repository.gd。
-- SDK：sdk/roomkit/server/game_adapter.gd、room_runtime.gd、result_outbox.gd；sdk/roomkit/shared/result_format.gd、control_transport.gd。
-- 工具：tools/protect_data.ps1、sqlite_store.ps1、results.gd、results.ps1、run.ps1。
-- Schema：schemas/result_record.schema.json、result_submission.schema.json、result_ack.schema.json、summary_result.schema.json、control.schema.json。
-- 示例：examples/showcase/host.gd；examples/turn_based/adapter.gd、game.gd、game_manifest.json；examples/blocks/game_manifest.json；examples/minimal/multiplayer_manifest.json；examples/result_messages.example.json、m2_messages.example.json。
-- 测试：tests/test_results.gd、run_persistence.gd、run_unit.gd；tests/fakes/lost_result_ack.gd；tests/fixtures/result_host.gd、result_room.gd。
-- 文档：docs/02_contracts.md、03_sdk_integration.md、06_roadmap_acceptance.md、07_versions_decisions.md、10_environment.md、13_m4_results.md。
-
-## 以下为M3历史：可以打开窗口试玩的两个游戏
-
-Git 交付完成（2026-09-21）：用户已明确授权上传 GitHub，覆盖初始任务中“不推送远端”的限制。首次本地提交为65bd328，源码与文档纳入版本管理；run/、logs/、artifacts/、私有配置与密钥文件继续排除。上传前扫描102个待提交文件，未命中常见GitHub令牌/私钥格式。用户指定远端 https://github.com/SchreiberChiang/godot-network-.git，已配置为origin，并合并保留远端main的初始MIT许可证提交88137fb。首次推送因GitHub未认证失败；用户完成Git Credential Manager设备登录后，git push -u origin HEAD:main 退出0，远端main已从88137fb推进至02a9a37，包含完整源码和文档。本地分支同步命名为main；本状态更新作为后续提交推送。全程未强制推送，未改动全局Git配置。本次只处理Git交付，没有重跑或改变上方运行时验收结果。
-
-用户继续授权后，按 docs/06 从零实现方块移动与无 CharacterBody/武器的回合取石子游戏，范围决定和协议见 docs/12_m3_games.md。宿主与 SDK 核心未改：本轮开始记录的13个 GDScript 文件 SHA-256 全部一致，两个独立产物携带的 SDK 也与源码一致。新增游戏通过自己的 GameAdapter、房间子类和本机注册配置接入。
-
-**试玩方式：** 双击 `StartPlay.cmd`，点击玩家窗口后用 WASD/方向键移动；双击 `StartTurns.cmd`，轮到自己时取1或2颗石子。每个入口打开两个玩家窗口；可退出房间并重新入房，关闭两个窗口后自动结束。建议依次运行两个入口。原 `StartDemo.cmd` 保留 M2 文字自动测试。
-
-### 本轮真实执行
-
-全部命令在 `F:\文档\GodotGame\Net\RoomKit` 执行，使用 `4.7.2.stable.steam.ed1daf0bf` 和 Git 2.55.0.windows.3。当前执行环境无沙箱限制，未修改用户全局配置。下表均以真实退出码及成功标记核实。
-
-| 实际命令 | 退出码 | 结果 |
-|---|---:|---|
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode all | 0 | unit 229/229；launcher 63/63（句柄320→320）；integration 133/133（22子进程）；demo 4次心跳、leases=0；players 33/33；games 44/44 |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode games -Visual | 0 | 48/48；4个真实图形客户端、2个房间；移动/回合、跨游戏拒绝、退房重入、全部回收；4张实际GPU截图 |
-| cmd /c "StartPlay.cmd -Smoke < NUL" | 0 | 17/17；完整批处理入口打开两个方块窗口，自动调用关闭处理程序后回收 |
-| cmd /c "StartTurns.cmd -Smoke < NUL" | 0 | 17/17；完整批处理入口打开两个石子窗口，自动调用关闭处理程序后回收 |
-| 核心哈希、独立产物及残留核查 | 0 | 核心改动0，产物SDK差异0；无另一游戏代码/Schema或host；当前项目Godot残留0、私有配置0、最终扫描脚本错误0、凭据模式匹配0 |
-
-最新综合日志：`logs/m3-all-run.txt`。机器证据：`logs/games-result.json`（最终44/44）、`logs/m3-visual-result.json`（48/48及截图目录）、`logs/m3-play-blocks-result.json`、`logs/m3-play-turns-result.json`（各17/17）、`logs/m3-final-audit.json`。独立工程索引在 `artifacts/games.json`，各游戏自己的服务器日志在其工程目录 `server.log`。生成产物和日志均忽略入Git。
-
-实际图形验证使用 NVIDIA GeForce RTX 3080 / OpenGL 3.3.0 NVIDIA 591.86。已读取并目视检查两种游戏的最新视口PNG：中文、玩家方块、石子、分数和按钮均正常。截图位置由 m3-visual-result.json 的 evidence_dir 给出；本次为 logs/games-c16df5152b62ed533487e34cf111e533/。图形测试是实际GPU渲染，自动操作仍由代码产生；未用桌面自动化手动点击鼠标/键盘，不能把 -Smoke 描述为人工试玩通过。
-
-### 本轮修复与限制
-
-- 新增玩法单元首次221通过/3失败：数值 enum 经JSON解析为float，旧校验器的数组成员比较不接受原生int；将“只能取1或2”改为语义等价的 integer/minimum=1/maximum=2，保留原失败断言并补充拒绝1.5。没有放宽合法值，也未改SDK。失败证据保留 logs/m3-unit-attempt-failed.log 及对应stderr；最终229/0。
-- 原单元恶意 `1e999` 仍触发预期 Exponent too high 警告，拒绝断言通过；没有隐藏该警告。
-- 每房真实验证2名玩家，配置最大16；未运行16人、100轮、跨电脑、Linux、浏览器或公网。没有专用服务器可执行文件导出验证：两个产物是独立Godot开发工程。
-- 方块没有碰撞、预测或插值；石子分数只在当前房间成员上保留，离房会清除。没有账号、商城、持久化、断线续局或完整游戏。
-- 本轮房间子类通过锁定SDK的 members 字典将已准入 user_id 映射到传输peer，未来SDK内部表示变化需要复验。输入/状态协议各归自己游戏，不统一为核心战斗API。
-- 私有凭据、路径控制和安全终止沿用M1/M2；同步Windows进程助手的限制仍存在。尚未进行公网安全/容量验收。
-
-### 本轮实际文件清单
-
-新增：
-
-- StartPlay.cmd、StartTurns.cmd；tools/build_games.ps1、play.ps1。
-- examples/blocks/README.md、game_manifest.json、room.gd、adapter.gd、game.gd。
-- examples/turn_based/game_manifest.json、room.gd、adapter.gd、game.gd。
-- examples/showcase/host.gd、client.gd、view.gd；examples/gameplay_messages.example.json。
-- schemas/blocks_input.schema.json、blocks_state.schema.json、turns_input.schema.json、turns_state.schema.json。
-- tests/test_games.gd、run_games.gd；docs/12_m3_games.md。
-
-修改：host/development.gd（仅注册组合入口）、tests/run_unit.gd、tools/run.ps1、examples/turn_based/README.md、README.md、docs/07_versions_decisions.md、STATUS.md。host/core/ 与 sdk/roomkit/ 源码未修改。未提交、未推送、未部署或花费云资源。
-
-后续为 M4 持久化与故障/安全闭环；当前本机玩法演示不能视为公网或正式发行已完成。
-
-## 以下为 M2 与 M0/M1 历史记录
-
-以下旧结果保留历史含义；共用日志已被本轮回归更新，当前结论以本轮 M3 记录为准。
-
-## 2026-09-20 本轮结果：两名真实测试客户端
-
-用户在 M0/M1 完成后授权继续，范围决定见 docs/11_m2_implementation.md。新增标准 WebSocket JSON 大厅、开发会话身份、创建幂等、版本检查、席位预留和一次性票据、ENet 认证、加载/快照确认、双端 SDK 与 GameAdapter；适配器示例只记录玩家身份，不含角色/地图。
-
-最简单的验证方式：双击 `StartDemo.cmd`，它会自动跑完流程并停在结果页面。正常应看到 `PLAYERS_RESULT passed=33 failed=0` 和 `ROOMKIT_EXIT mode=players code=0`。这次也实际通过 cmd 执行了该批处理入口；没有用桌面自动化模拟鼠标双击。
-
-| 本轮实际命令（均在当前项目目录） | 退出码 | 结果 |
-|---|---:|---|
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode players | 0 | 33/33；真实 WS + ENet，两个正常客户端及一个非法票据客户端，两个房间进程均退出 |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode all | 0 | 顺序完成 unit 182/182、launcher 63/63、integration 133/133、demo、players 33/33 |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit（补充到期竞态和17条协议样例后） | 0 | 最终 201/201；已覆盖加载期限到达但清理尚未执行的边界 |
-| cmd /c "StartDemo.cmd < NUL"（最终版本） | 0 | 33/33，中文输出正常，房间/客户端退出，席位和端口归零 |
-| 最后只读核查 | 0 | 当前项目 Godot 残留 0；私有配置 0；最终日志脚本错误 0；64位凭据模式匹配 0 |
-
-最终日志：logs/unit-console.log、launcher-console.log、integration-console.log、demo-console.log、players-console.log；机器报告 logs/integration-result.json、players-result.json、m2-final-audit.json。players-result.json 的 evidence_dir 保存本轮各客户端的完整日志及报告。启动器专项十轮句柄为 318→318。单元 `1e999` 恶意输入仍产生预期 Exponent too high 警告；拒绝检查通过，未隐藏警告。
-
-已真实检查：双客户端看到同一房间的两名不同业务身份、场景准备前不能进入 IN_ROOM、正式席位不重复计数、第三人满员拒绝、错误票据不能正式入房、非创建者不能停房、不兼容构建拒绝、离房后沿用同一大厅会话、所有本次启动子进程退出且回收资源。
-
-边界：创建幂等测试是相同 key 重发，不是真实丢包注入；过期/重放/跨房/跨游戏票据主要由单元测试验证；慢加载使用异步计时器，快照只有成员名单。真实客户端是自动化 headless 测试程序，还没有可操作游戏画面。未运行跨电脑、浏览器、Linux、导出产物、公网、16 人或100轮压力。未做账号、商城、持久化、断线续局、第二玩法或插件发布。SDK 目前管理默认 SceneMultiplayer，每客户端进程一个实例。
-
-本轮失败与修复：最初新增单元有 1 项失败（181/1），原因是 GDScript 点号赋值生成 StringName 字典键被内部校验拒绝；允许 String/StringName 对象键后通过，线上的 JSON 仍严格校验。复核中补上加载到期确认检查。批处理入口首次实际运行暴露 UTF-8/LF 被 cmd 错误拆行，未启动测试且 shell 误报0；改成 CRLF、保留内部退出码，并加入 .gitattributes 后重新运行通过。没有将这些失败当作成功。
-
-本轮新增文件：
-
-- .gitattributes、StartDemo.cmd。
-- host/lobby_server.gd、host/core/admission_store.gd。
-- sdk/roomkit/client/room_client.gd；sdk/roomkit/server/game_adapter.gd、room_runtime.gd；sdk/roomkit/shared/json_wire.gd、net_room.gd。
-- schemas/lobby_request.schema.json、lobby_response.schema.json、admission_hello.schema.json、admission_reply.schema.json、room_snapshot.schema.json。
-- examples/m2_messages.example.json；examples/minimal/multiplayer_manifest.json、multiplayer_room.gd、empty_adapter.gd、test_player.gd。
-- tests/test_admission.gd、run_players.gd；docs/11_m2_implementation.md。
-
-本轮修改文件：host/core/room_manager.gd、host/development.gd、schemas/control.schema.json、sdk/roomkit/shared/schema_validator.gd、control_transport.gd、tests/run_unit.gd、tools/run.ps1、README.md、sdk/roomkit/README.md、docs/07_versions_decisions.md、docs/09_m1_control.md、docs/10_environment.md、STATUS.md。运行证据和诊断探针位于已忽略的 logs/。本仓库仍未提交或推送。
-
-## 以下为 M0/M1 历史验收记录
-
-以下 2026-09-19 的数字保留为历史记录；通用日志文件已由上述 2026-09-20 回归更新，当前数字和边界以上述本轮结果为准。
-
-## 已完成
-
-- 独立 Godot 工程、可重复运行的 demo／单元／真实进程入口；Git 仅初始化于当前目录，未提交、未推送。
-- GameRegistry：Schema 校验、管理员产物白名单、模式／地图／人数校验；远程式创建参数不能指定执行路径。
-- RoomManager / PortAllocator：创建、分配、启动、注册、READY、心跳、停止、核实退出、UDP 重绑定后回收。FAILED 与 cleaned 分开；未知身份或忙端口保持隔离。
-- Windows ProcessLauncher：参数数组启动；校验本次 launch_id、PID、父进程、程序路径、创建时间。强制停止使用已持有的进程句柄；缓存句柄回收仅用于精确验证过的引擎构建。
-- ControlTransport：4 字节大端长度 + UTF-8 JSON、拆包／粘包／部分写入、队列上限、严格 JSON、有限数与深度检查；协议从 schemas/ 读取。
-- 无玩法房间实际创建 ENet UDP 服务后才发送 READY；双向控制心跳；已认证控制断开立即退出 READY 并开始清理。
-- 私有配置只写当前项目 run/，ACL 限当前用户，注册后删除；命令行仅含 launch_id 与配置路径，公开快照不含凭据。
-- 具体示例注册移到 host/development.gd，host/core 与共享 SDK 不引用示例场景或玩法。
-
-## 最终真实结果
-
-所有下列命令均在 F:\文档\GodotGame\Net\RoomKit 执行，日期为 2026-09-19；通过退出码和成功标记共同确认。
-
-| 实际命令 | 退出码 | 结果 | 证据 |
-|---|---:|---|---|
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit | 0 | 150 通过、0 失败 | logs/unit-console.log；logs/unit-stderr.log |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode integration | 0 | 133 通过、0 失败；22 个真实子进程 | logs/integration-console.log；logs/integration-result.json |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode demo | 0 | DEMO_PASS；4 次心跳；leases=0 | logs/demo-console.log |
-| powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode launcher | 0 | 10 轮真实子进程、63 通过、0 失败；句柄 324→324 | logs/launcher-console.log |
-| 最终只读进程、配置和日志核对 | 0 | 当前项目 Godot 残留 0；私有启动文件 0；未清理房间 0；最终日志未检出 64 位控制凭据模式 | logs/final-audit.json |
-
-unit 是 Godot 内执行的算法／契约／模拟测试，并包含真实回环 UDP 探测；部分写入使用可控写入器模拟，不能称为内核真实部分写入测试。integration 使用真实 Windows Godot 子进程、TCP 和 ENet UDP；占用端口由另一个真实进程持有，只有分配后争用窗口由测试分配器注入。launcher 是进程专项，不混称房间联机测试。
-
-unit 对恶意 JSON `1e999` 的拒绝用例触发 Godot `Exponent too high` 警告，最终拒绝断言通过；没有隐藏警告。其余最终 launcher/integration/demo stderr 为空。
-
-## G00–G09
-
-| 编号 | 最终状态 | 证据范围 |
+| 命令 / 专项 | 结果 | 范围与证据 |
 |---|---|---|
-| G00 | 已通过 | 工作目录与 Git 根一致；实际 Godot 4.7.2.stable.steam.ed1daf0bf，Git 2.55.0.windows.3，Windows 10.0.26200.0 |
-| G01 | 已通过：真实进程 | 完整 ALLOCATING→STARTING→READY→DRAINING→STOPPING→STOPPED；注册、UDP 被房间占用、心跳、停止通知、OS 退出与回收分别检查 |
-| G02 | 已通过：单元＋真实宿主 | 未知游戏／执行路径注入拒绝；缺失程序 PROGRAM_NOT_FOUND，租约与私有配置回收 |
-| G03 | 已通过：真实进程＋竞态注入 | UDP 占用不 READY；占用者未被误杀；失败进程退出后端口仍隔离，直到占用者退出可重绑定 |
-| G04 | 已通过：真实进程 | 不注册与不 READY 均 START_TIMEOUT，并核实退出和回收 |
-| G05 | 已通过：真实双房 | 仅终止身份已核验的 A，A 为 PROCESS_EXITED 并清理；B 继续心跳 |
-| G06 | 已通过：单元／可控写入 | 拆包、粘包、UTF-8 边界、部分写、零写、错误写、长度／深度／队列上限、非法消息、非有限数 |
-| G07 | 已通过：模拟＋真实 TCP | 在 STARTING 注册前注入错误 token、正确 token 配错误 launch，均拒绝；随后真实子进程正常注册 READY；模拟另测 PID 与重复注册 |
-| G08 | 已通过：真实房间 | 连续 10 轮 READY/停止/退出/回收；所有记录子进程已退出、活动记录和端口租约为 0；独立启动器 10 轮句柄计数不增长 |
-| G09 | 已通过：运行证据＋源码核对 | 所有 listen/bind/connect 显式回环；请求不能带执行路径，快照无 token，私有配置删除；最终 ACL 仅当前用户，最终日志凭据格式扫描为 0；只在本项目修改 |
+| Godot `tests/run_unit.gd`（等价 `tools/run.ps1 -Mode unit`） | 320/0 | 规则、契约、模拟生命周期；`logs/rules-run_unit.stdout` |
+| Godot `tests/run_shooter.gd` | 83/0 | 射击规则、击杀目标提前结算、平滑/传送/弹迹去重；`logs/rules-run_shooter.stdout` |
+| Godot `tests/run_managed_contracts.gd` | 273/0 | 管理/账号/资产协议正负例；`logs/rules-run_managed_contracts.stdout` |
+| Godot `tests/run_managed_registry.gd` | 77/0 | 注册表、兼容、共享目录、失败原子性；`logs/rules-run_managed_registry.stdout` |
+| `tests/test_room_rules.ps1` | 18/0 | 真实 Operator/宿主/房间与两名注册玩家，经 WSS/DTLS/ENet 收到自定义规则，打满一局 30 秒；非法重建保留旧房，合法重建后复用端口；`logs/room-rules-9eb8231a3e8b4f04927b1ee09f4392d8/result.json` |
+| `tests/run_shooter_visual.gd`（baseline / smoothed） | 59.83 → 60 渲染 FPS；位置变化 20 → 59 次/秒 | 真实 OpenGL 渲染 + 合成的 20 Hz 状态，不是真实对局帧率或网络延迟；`logs/shooter-visual-{baseline,smoothed}.{json,png}` |
+| `node tests/test_admin_room_rules.cjs`；`node tests/test_admin_asset_spaces.cjs` | 10/0；12/0 | 实际页面函数 + DOM/API 替身，不是浏览器点击 |
+| `tests/test_managed_template.ps1` | 74/0 | 两个生成的新游戏、真实 Operator/宿主/房间、WSS+DTLS/ENet、SQLite；`logs/managed-template-89aff6560f914ceeadeef7f0b9dfa251/result.json`（房间规则修改之前运行） |
+| `tests/test_operator.ps1 -Lifecycle`（隔离源码副本） | 29/0 | 共享钱包、备份恢复、真实 60 秒重启、崩溃注入与回收；`logs/framework-final-regression-20260926.log`（房间规则修改之前运行） |
+| `tools/run.ps1 -Mode template` | 10/0 | 早期开发身份模板入房/离房；`logs/template-resume-20260926.log` |
+| `tests/test_client_launcher.ps1`；真实 `run_framework.ps1 -Mode client -Game shooter` | 14/0；窗口可见 | 缺引擎/缺文件/早退时报失败；真实登录窗口截图 `logs/client-starts/shooter-dc4024f03fa2493cb8ac91169923952d/window-full.png`，没有登录或联机 |
+| `node tests/test_admin_auth_errors.cjs` | 12/0 | 页面函数 + 替身 |
 
-附加真实测试：拒绝正常停止后按期限安全终止；控制断开但子进程仍活着时立即失败并清理；无心跳与模拟步停滞分别返回 HEARTBEAT_TIMEOUT / LOGIC_STALLED。
+### 2026-09-22（提交 `f0b4c8b` 代码，未在当前代码上重跑）
 
-## 本轮遇到并修复的失败
+| 层级 | 专项与结果 | 证据 |
+|---|---|---|
+| 真实 SQLite | accounts 81/0；account_recovery 30/0；assets 83/0；result_rewards 74/0；operator_maintenance 35/0；asset_audit 14/0 | 各自 `logs/*-console.log`，明细见归档 |
+| 真实 HTTP / 投影 / 替身 | admin_http 138/0；operator_projection 9/0；operator_auth_errors 6/0；asset_callbacks 32/0；framework_feedback 7/0；operator_logs 14/0 | 同上 |
+| 真实多进程联机 | framework_clients `-Visual` 47/0（两种玩法，完整打满 300 秒射击局）；managed_shutdown 55/0；operator_schedules 52/0（受控时间）；framework_capacity 174/0（16 人满房，第 17 人 ROOM_FULL，持续 17.5 秒）；asset_response_loss 25/0；players 33/0；integration 133/0；recovery 24/0 | `logs/operator-68c27ae5f8bb40de977cdebca3ac19c6/clients-a982c3c81bb5453e9e802048a58c0068/result.json`、`logs/capacity-0f1e2cdae67c42a79129524c40530eef/result.json` 等 |
+| 导出程序 | `tools/build_framework_release.ps1` 生成 6 个 EXE/PCK；`tests/test_framework_release.ps1` 44/0 | `logs/framework-release-0316ee0928e647b8b324ddd6a43e37b9/result.json` |
+| 人工 UI（内置浏览器 + 原生 Client.exe） | 管理员设置、开服/建房、邀请码、发币、备份/恢复、审计、维护、封禁、60 秒停服；原生射击击杀/死亡背包/解锁/复活/300 秒结算；原生取石子主题与对局 | `logs/framework-ui-f6f9a767f89b47e1ab229fac2dd02d1f/`、`logs/framework-ui-6da6c5f70d2048c2b5e3e7d2510324de/`、`logs/framework-ui-deb891a63a1e4749b0865bfb6a3f2c2d/` |
 
-- 初次集成脚本 check-only 退出 1：两处 Variant 推断缺少显式类型；修复后通过。
-- 单元初次完整运行 133 通过／5 失败：四处测试把 JSON 解码 float 与原始 int 字典作严格深比较；真实 Godot 探针证实标量相等而字典不等，改为明确线上接收类型，仍验证全文、结构、顺序与逐字节数据。第五项为 ACL 重复设置触发 SeSecurityPrivilege；改为只修改 DACL，连续执行两次通过。保留 logs/unit-attempt-failed.log 与对应 stderr。
-- 第一次真实房间集成 130 通过／3 失败，退出 1：新 delayed_register 用例提前建立 TCP 但延迟发送认证，触发正常认证期限。改成延迟建立连接，保留认证门禁；最终 133/0。首轮记录 logs/integration-attempt-failed.log/json 保留；失败运行也完成全部子进程回收。
-- 暂停前 2026-09-18 曾有沙箱 setup refresh 错误、被拒绝的权限检查，以及沙箱 WMI 权限不足导致真实启动器专项失败；这些不算通过。本次环境已无沙箱限制，未修改用户全局权限配置。
-- 上轮大补丁工具调用卡住后拆成小补丁落盘；本轮补齐当时未完成的 tests/test_transport.gd。
+### 2026-09-21（早期宿主，仍有效的基础结论）
 
-## 实际文件变更
+`tools/run.ps1 -Mode all` 共 1144 条断言，其中 stress 用真实 100 轮开关房（404/0），load 用 20 个加密输入客户端（95/0），secure 37/0，limits 8/0；WSL Ubuntu 上 `PortableCheck.x86_64` 通过 215 项可移植检查（协议/准入/玩法，**不是** Linux 宿主）。明细见归档。
 
-从初始设计包新增：
+## 未运行 / 未验收
 
-- project.godot；config/development.json。
-- host/main.gd、host/main.tscn、host/development.gd；host/core/game_registry.gd、port_allocator.gd、room_manager.gd；host/platform/process_launcher.gd。
-- sdk/roomkit/README.md；sdk/roomkit/shared/schema_validator.gd、protocol.gd、strict_json.gd、control_transport.gd。
-- schemas/control.schema.json；examples/control_messages.example.json。
-- examples/minimal/game_manifest.json、room.gd；examples/turn_based/README.md；templates/README.md。
-- tests/run_unit.gd、run_integration.gd、test_transport.gd、test_registry_ports.gd、test_manager.gd、test_launcher.gd、test_launcher_real.gd；tests/fakes/fake_launcher.gd；tests/fixtures/udp_holder.gd、racing_ports.gd。
-- tools/run.ps1、protect_runtime.ps1、process_identity.ps1；docs/09_m1_control.md、docs/10_environment.md。
+- 第二台实体设备的局域网联机（曾询问用户，未收到答复）、Linux 完整宿主、公网与公网 WSS 发布、长期满载压测、24 小时备份保留周期。
+- 当前源码的新独立导出包；新管理表单（房间规则）的真实浏览器点击；真人操作手感；托管模板的图形界面。
+- 断电、磁盘满、真实网络丢包/延迟、证书轮换、外部身份服务。
 
-修改已有文档：README.md、STATUS.md、docs/02_contracts.md、docs/07_versions_decisions.md。原始设计／Schema 外壳与清单来源保留。运行日志与调试探针在已忽略的 logs/，不作为运行时代码；run/ 当前只有 .gdignore。没有提交、推送、部署、花费云资源或变更用户全局 Git 配置。
+## 已知问题与限制
 
-## 本机启动与验证
+1. **仅限 Windows**：账号、资产、结果存储和进程身份核验都通过 PowerShell 助手与 `winsqlite3.dll` 实现，Linux 上直接返回 `UNSUPPORTED_STORAGE`。
+2. **存储调用开销**：每次数据库操作都要启动一个 PowerShell 助手进程（有界超时，放在工作线程执行），初始化与离线管理仍是同步调用（见 [docs/10](docs/10_environment.md)、[docs/15](docs/15_release_operations.md)）。并发登录/结算下的延迟尚未测量。
+3. **代码审阅发现，未验证影响**（2026-09-26，Claude）：账号请求（注册/登录时含明文密码）会先写成私有数据目录下的临时 JSON，再交给助手读取，用完删除。目录有当前用户 ACL 保护，但存在短暂落盘。
+4. **射击网络模型只按局域网设计**：服务器每秒 20 次发送完整状态；客户端只做显示平滑，没有客户端预测，也没有命中回溯（按 [docs/17](docs/17_framework_shooter_plan.md) 的首版范围）。公网延迟下的手感没有评估。
+5. **容量与耐久**：16 人满房只持续了 17.5 秒；100 轮开关房是 09-21 的早期宿主做的，托管宿主没有做长期测试。
+6. **原因未查明的现象**：09-22 有一个可视化夹具中途消失，没有清理报告（未计为通过）；另有一次管理员意外退出登录，日志里没有根因（同期修复了一个相关的错误码映射缺陷，但不能认定就是根因）。
+7. **预期诊断输出**：unit 的恶意指数用例会打印 `Exponent too high`；测试主动断开 TLS 时出现 `mbedtls -0x6c00`。两者都不是失败。
+8. `tools/run.ps1 -Mode all` 只包含早期基础回归（外加 panel、assets）；账号、管理、射击和托管专项需按 [docs/22](docs/22_framework_operations.md#测试入口) 单独运行。
+9. 早期结果库有容量上限且没有自动归档：每库 256 个授权、10000 条结果，每房 128 条待发送（[docs/15](docs/15_release_operations.md)）。
 
-```powershell
-Set-Location 'F:\文档\GodotGame\Net\RoomKit'
-# 自动创建一间房，心跳后停止并退出
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode demo
-# 依次执行单元、启动器专项、房间集成及 demo
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode all
-```
+## 本轮记录（2026-09-27）
 
-引擎：D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe；可用 -Godot 指定路径，但更换版本要重新验收。config/development.json 配置 UDP 28100–28131、系统分配控制 TCP 端口和超时。需要正常用户有权查询自己创建的 Windows 进程并设置本项目 run/ DACL，不需要下载其它后端。详细说明见 README.md、docs/10_environment.md。
+**Codex 独立复核（源码和文档）**：在本机实际执行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit`（320/0）、`-Mode shooter`（83/0）、`-Mode managed_contracts`（273/0）、`-Mode managed_registry`（77/0），均退出 0；`powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_client_launcher.ps1`（14/0，退出 0，证据 `logs/client-launcher-80b3e390cfcc4e4fa6c3d408675a71da`）；`powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_room_rules.ps1`（真实本机 Operator、宿主、房间和两玩家 WSS/DTLS/ENet，18/0，退出 0，证据 `logs/room-rules-da5027610f3947a3a3fc8b139f30fbd2/result.json`）。独立扫描 333 个 Markdown 本地相对链接，缺失 0；`git diff --check` 退出 0；立绘副本 SHA256 与生成源一致。此次未重跑托管模板 74 项、完整 `-Mode all`、浏览器人工操作、跨设备、Linux 或新导出包。用户已明确同意本轮本地提交沿用仓库上次提交的作者身份，仅通过单次 Git 命令传入；未读取或修改全局 Git 配置。
 
-每个模式必须同时输出成功标记和 ROOMKIT_EXIT mode=... code=0。-Mode all 是上述已验证各模式的顺序入口；本轮实际命令按表逐项运行。
+**项目插画**：用户选定的 Claude 二次元角色立绘已保存为 [docs/assets/claude-character.png](docs/assets/claude-character.png)，SHA256 `D530B536AF330D88FF27A58CC65D84FD847C9042123FE4966F4994DD0AF43B7B`，非游戏玩法资产。路径已记入 AGENTS.md 供双方交接，并收录于本轮本地提交；尚未推送。
 
-## 明确未运行／限制
+**协作规则（仅文档）**：AGENTS.md 已记录 Claude 负责主要实施、Codex 负责复核的分工，以及阶段试玩、交接、并行目录隔离和技能选择规则。没有切换模型，也没有改动代码或测试结论，原文见归档。
 
-- 未运行专用服务器导出产物、Linux、16 人、100 轮压力、浏览器或公网。虽然已找到 4.7.2 导出模板，当前使用的是开发工程子进程。两名本机真实测试客户端已经由 2026-09-20 的 M2 验证补齐。
-- M2 大厅、身份、票据和源码双端 SDK／GameAdapter 回调已实现；可分发插件与完整模板、M3 第二玩法、M4 持久化／安全／宿主重启恢复、M5 发布压测未完成。
-- 无崩溃续局或宿主重启认领保证。失败进程身份不明／端口仍忙时保持隔离，不通过未经核验的 PID 强行回收。
-- Windows 辅助程序目前同步执行；CIM 操作有 3 秒超时，但辅助程序整体尚无独立总超时，异常系统阻塞可能影响宿主心跳。测试入口有 240/60 秒总 watchdog；常驻生产服务仍需异步进程管理与总超时改进。
-- 原生句柄回收针对精确 Windows Godot 4.7.2 Steam 源码 hash 验证；其他引擎不执行该专用回收路径，不能沿用本轮句柄结论。
+**文档整理（Claude，仅文档）**：用户要求 README 只保留当前推荐入口，STATUS 只保留当前状态，历史过程归档并保留证据链接，同时合并重复的入门说明、修复引用；不改代码、不删证据、不提交。
 
-本历史记录之后，M3 已按上方新记录完成本机双玩法开发工程验证；后续仍不能将这些结果当作完整游戏、公网或正式导出验收通过。
+- 完成：STATUS 全部历史原文迁入 [docs/archive/status_history.md](docs/archive/status_history.md)，逐行校验除本文件标题外无遗漏。README 改为当前入口，原文与早期入口迁入 [docs/archive/early_entrypoints.md](docs/archive/early_entrypoints.md)。根目录 `START_HERE.md`、`VALIDATION.md` 合并移入 [docs/archive/design_package_v0.2.md](docs/archive/design_package_v0.2.md)。README 的测试模式表并入 docs/22，目录地图并入 docs/01；docs/22 的 09-22 专项结果移入归档。CHANGELOG 改为只记版本变化。修复 docs/15、docs/16、docs/08 对已归档或已移动文件的引用，并在 docs/23 补记本轮文件。
+- 检查：用 Node 脚本检查全部 Markdown 的相对链接和锚点，并核对仓库文件路径的纯文本引用；另对 STATUS/docs/22 被搬走的行逐行比对。结果见本轮报告。
+- 未运行：本轮没有运行 Godot、联机或任何代码测试，上面的测试结论沿用原记录。开始前已把所有 Markdown 的基线快照和 SHA256 存到本会话临时目录，用于核对差异范围；AGENTS.md 与他人未提交的源码改动均未触碰。

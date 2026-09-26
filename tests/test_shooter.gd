@@ -14,6 +14,7 @@ func run() -> Dictionary:
 	_collision_edges()
 	_shooting_and_assets()
 	_rounds_and_rewards()
+	_room_rules_and_visuals()
 	return {"passed": passed, "failed": failed}
 
 func _game():
@@ -207,6 +208,51 @@ func _rounds_and_rewards() -> void:
 	record.payload.players.pop_back()
 	record.payload.players[0].participation_ms = 70001
 	check(Rewards.calculate(record).is_empty(), "participation cannot exceed completed duration")
+	world.free()
+
+func _room_rules_and_visuals() -> void:
+	var world = _game()
+	check(world.configure({"duration_ms": 120000, "kill_limit": 1, "respawn_ms": 0}), "custom match rules accepted")
+	world.advance(0)
+	world.players.u1.position = Vector2(80, 478)
+	world.players.u2.position = Vector2(180, 478)
+	world.players.u2.hp = 1
+	world.handle_input(2, _command(1, 0, false, true), 1000)
+	world.advance(1000)
+	check(world.phase == "waiting" and world.round_number == 2, "kill target ends match before time limit")
+	check(world.last_duration_ms == 1000 and world.last_results[0].kills == 1, "kill completion records actual elapsed duration and score")
+	check(Rewards.calculate({"game_id": "shooter", "status": "completed", "payload": {"round": 1, "duration_ms": world.last_duration_ms, "players": world.last_results}}).is_empty(), "early kill target cannot bypass reward participation minimum")
+	var client = Game.new()
+	var snapshot: Dictionary = world.state_snapshot()
+	client.world_state(snapshot)
+	var start: Vector2 = client.render_position(snapshot.players[0])
+	snapshot = snapshot.duplicate(true)
+	snapshot.tick += 3
+	snapshot.players[0].x += 12
+	client.world_state(snapshot)
+	check(client.render_position(snapshot.players[0]) == start, "snapshot does not instantly snap rendered position")
+	client.advance_visual(1.0 / 60.0)
+	check(is_equal_approx(client.render_position(snapshot.players[0]).x, start.x + 4), "20 Hz positions interpolate on 60 Hz render frames")
+	client.advance_visual(0.1)
+	check(is_equal_approx(client.render_position(snapshot.players[0]).x, start.x + 12), "network stall freezes at authoritative endpoint without extrapolating")
+	snapshot = snapshot.duplicate(true)
+	snapshot.tick += 3
+	snapshot.players[0].x = 800
+	client.world_state(snapshot)
+	check(client.render_position(snapshot.players[0]).x == 800, "teleport snaps immediately")
+	var visual_count: int = client.visual_shots.size()
+	client.world_state(snapshot)
+	check(client.visual_shots.size() == visual_count, "repeated snapshot cannot replay shot effects")
+	client.advance_visual(0.3)
+	check(client.visual_shots.is_empty(), "shot visuals expire even without new network packets")
+	snapshot = snapshot.duplicate(true)
+	client.latest.clear()
+	client.world_state(snapshot)
+	check(client.visual_shots.size() > 0, "joining another room resets per-room shot serial tracking")
+	for age in [0.0, 0.025, 0.05, 0.1]:
+		var segment := Game.tracer_segment(Vector2.ZERO, Vector2(900, 0), age)
+		check(segment[0].distance_to(segment[1]) <= 18.001 and segment[1].x <= 900, "bullet stays short and stops at server hit endpoint")
+	client.free()
 	world.free()
 
 func check(value: bool, label: String) -> void:

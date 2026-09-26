@@ -1,5 +1,7 @@
 # Windows 本机发布候选：使用与维护
 
+> 早期入口：本文描述 2026-09-21 的 0.1.0 候选包（无账号示例）。当前推荐入口见 [README](../README.md)，当前账号/管理分支的独立包见 [docs/22](22_framework_operations.md)。文中 `artifacts/delivery.json`、`artifacts/release.json` 与旧 0.1.0 包已在 2026-09-23 清理时归档，重新运行下列构建命令会重新生成；归档位置见 [文档归档](archive/README.md#证据位置)。
+
 本轮交付 RoomKit 0.1.0 Windows candidate，SDK 源码版本 0.4.0。框架本机闭环可用，发布门禁仍有未通过项，不能把候选包视为公网正式版。所有代码来自当前仓库。
 
 ## 给使用者

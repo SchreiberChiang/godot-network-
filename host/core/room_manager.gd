@@ -64,7 +64,7 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 	var valid: Dictionary = registry.validate_options(game_id, options)
 	if not valid.ok:
 		return valid
-	if active_count() >= int(config.get("max_rooms", 16)):
+	if _room_count() >= int(config.get("max_rooms", 16)):
 		return {"ok": false, "code": "HOST_CAPACITY_EXCEEDED"}
 	if config.get("async_start", false) and starts.size() >= 2:
 		return {"ok": false, "code": "HOST_CAPACITY_EXCEEDED"}
@@ -87,7 +87,7 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 		_fail(row, "PRIVATE_CONFIG_FAILED")
 		_cleanup(row)
 		return {"ok": false, "code": row.code, "room_id": room_id}
-	var private_config: Dictionary = {"room_id": room_id, "launch_id": launch_id, "token": row.token, "game_id": game_id, "build_id": row.build_id, "udp_port": row.port, "control_port": control_port, "heartbeat_ms": int(config.get("heartbeat_ms", 250)), "host_timeout_ms": int(config.get("heartbeat_timeout_ms", 8000)), "startup_timeout_ms": int(config.get("start_timeout_ms", 15000)), "options": options}
+	var private_config: Dictionary = {"room_id": room_id, "launch_id": launch_id, "token": row.token, "game_id": game_id, "build_id": row.build_id, "udp_port": row.port, "control_port": control_port, "heartbeat_ms": int(config.get("heartbeat_ms", 250)), "host_timeout_ms": int(config.get("heartbeat_timeout_ms", 8000)), "startup_timeout_ms": int(config.get("start_timeout_ms", 15000)), "options": valid.options}
 	private_config.compatibility_id = row.compatibility_id
 	private_config.game_protocol = row.game_protocol
 	private_config.bind_ip = str(config.get("game_bind", "127.0.0.1"))
@@ -214,11 +214,17 @@ func stop_all() -> void:
 		stop_room(room_id, "host_shutdown")
 
 func active_count() -> int:
+	# Shutdown must also wait for work which can outlive the last room.
+	return _room_count() + (1 if result_service != null and result_service.busy() else 0) + (1 if recovery_guard != null and not recovery_guard.idle() else 0) + (1 if resource_worker != null else 0)
+
+func _room_count() -> int:
+	# Starting, stopping and failed rooms retain capacity until cleanup confirms
+	# resources are reclaimed. Background services do not allocate room slots.
 	var count := 0
 	for row in rooms.values():
 		if not row.cleaned:
 			count += 1
-	return count + (1 if result_service != null and result_service.busy() else 0) + (1 if recovery_guard != null and not recovery_guard.idle() else 0) + (1 if resource_worker != null else 0)
+	return count
 
 func snapshot(room_id: String) -> Dictionary:
 	if not rooms.has(room_id):

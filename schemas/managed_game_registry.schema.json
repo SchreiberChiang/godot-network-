@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Trusted local managed game registry v1",
+  "description": "Operator startup configuration only. No client or HTTP request can supply paths or scripts. Runtime also validates game keys, catalogs and loaded service interfaces.",
+  "type": "object",
+  "minProperties": 1,
+  "maxProperties": 32,
+  "propertyNames": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
+  "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["project", "manifest", "name", "asset_catalog", "asset_policy", "result_schema"],
+    "properties": {
+      "project": {"$ref": "#/$defs/path"},
+      "manifest": {"$ref": "game_manifest.schema.json"},
+      "name": {"type": "string", "minLength": 1, "maxLength": 64},
+      "asset_catalog": {"$ref": "#/$defs/path"},
+      "asset_policy": {"$ref": "#/$defs/path"},
+      "result_schema": {"$ref": "#/$defs/path"},
+      "reward_script": {"$ref": "#/$defs/path"},
+      "server_executable": {"$ref": "#/$defs/path"},
+      "server_pack": {"$ref": "#/$defs/path"},
+      "client_executable": {"$ref": "#/$defs/path"},
+      "client_pack": {"$ref": "#/$defs/path"}
+    }
+  },
+  "$defs": {"path": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[^\\x00-\\x1f\\x7f]+$"}}
+}

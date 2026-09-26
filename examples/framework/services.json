@@ -1,0 +1,15 @@
+{
+  "shooter": {
+    "name": "横版射击",
+    "asset_catalog": "res://examples/asset_catalog.example.json",
+    "asset_policy": "res://examples/shooter/asset_policy.gd",
+    "result_schema": "res://schemas/shooter_result.schema.json",
+    "reward_script": "res://examples/shooter/rewards.gd"
+  },
+  "turns": {
+    "name": "回合取石子",
+    "asset_catalog": "res://examples/asset_catalog.example.json",
+    "asset_policy": "res://examples/turn_based/asset_policy.gd",
+    "result_schema": "res://schemas/summary_result.schema.json"
+  }
+}

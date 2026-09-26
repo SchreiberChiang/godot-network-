@@ -19,3 +19,5 @@
 可运行示例：`examples/minimal/multiplayer_room.gd`、`empty_adapter.gd` 和 `test_player.gd`。正常玩家只调用公开 SDK；非法票据测试刻意调用内部连接方法注入错误凭据，不属于游戏接入 API。启动 `StartDemo.cmd` 可自动执行两人流程。
 
 Schema 文件必须随源码/导出包一起提供，已经分别验证Windows开发工程与正式导出模板。详见 `docs/11_m2_implementation.md` 和 `STATUS.md`。
+
+账号与资产新工程使用 `tools/new_game.ps1 -Managed -GameId my_game` 生成，完整步骤见 [新游戏接入](../../docs/24_managed_game_template.md) 和 [模板说明](../../templates/managed_game/README.md)。生成目录包含自己的 AccountClient、GameAdapter、资产目录/策略、结果 Schema 和托管注册索引，不引用具体示例游戏。其最小客户端可真实注册/登录、购买/选择、入房读取服务端默认配置并退出；具体已运行证据以 STATUS 为准。不加 `-Managed` 仍生成早期开发身份模板。

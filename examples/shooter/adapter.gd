@@ -9,7 +9,17 @@ func configure_room(context: Dictionary) -> bool:
 	world = World.new()
 	world.name = "GameWorld"
 	world.server = true
-	if not world.configure():
+	var rules: Dictionary = context.get("options", {}).get("rules", {})
+	var overrides: Dictionary = {}
+	for key in rules:
+		match key:
+			"duration_seconds": overrides.duration_ms = int(rules[key]) * 1000
+			"respawn_seconds": overrides.respawn_ms = int(rules[key]) * 1000
+			"kill_limit": overrides.kill_limit = rules[key]
+			_:
+				world.free()
+				return false
+	if not world.configure(overrides):
 		world.free()
 		return false
 	world.round_finished.connect(_round_finished)
@@ -49,4 +59,4 @@ func _respawn_requested(user_id: String) -> void:
 
 func _round_finished(key: String, rows: Array) -> void:
 	if persist_results:
-		result_requested.emit(key, "completed", {"round": world.round_number - 1, "duration_ms": int(world.config.duration_ms), "players": rows})
+		result_requested.emit(key, "completed", {"round": world.round_number - 1, "duration_ms": world.last_duration_ms, "players": rows})

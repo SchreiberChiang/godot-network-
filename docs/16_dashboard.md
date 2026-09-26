@@ -1,12 +1,14 @@
 # 中文本机状态面板
 
+> 早期入口：本文是 2026-09-21 早期无账号示例的只读面板（仓库根目录 `StartPanel.cmd`）。当前管理后台由 `StartManagement.cmd` 启动，见 [README](../README.md) 与 [docs/19](19_admin_ui.md)；0.5.0 框架独立包里同名的 `StartPanel.cmd` 打开的是新管理后台，不是本文的面板。
+
 2026-09-21 用户要求类似宝塔的房间/玩家状态查看，本轮新增只读管理页面。仍只处理当前独立仓库，不访问旧项目，不增加 Node/Go 后端或公网部署。
 
 ## 打开
 
 双击仓库根目录 **StartPanel.cmd**。它启动当前源码的示例宿主、两个取石子玩家窗口，并在默认浏览器打开面板。需要本机已配置的 Godot。`StartPanel.cmd -Game blocks` 切换为方块演示。再次运行入口会优先重开当前面板，不额外创建同一实例。
 
-新版独立包内也有 **StartPanel.cmd**，使用包内正式EXE，不需要Godot编辑器。不要使用上轮旧包期待出现新面板；最新包路径在artifacts/delivery.json。需要在Codex浏览器查看时可用`tools/panel.ps1 -NoBrowser`启动，再由本机私有描述文件提供一次性会话入口。
+当时的0.1.0独立包内也有 **StartPanel.cmd**，使用包内正式EXE，不需要Godot编辑器。不要使用上轮旧包期待出现新面板；该包路径原记录在artifacts/delivery.json（2026-09-23已归档，见[文档归档](archive/README.md#证据位置)）。需要在Codex浏览器查看时可用`tools/panel.ps1 -NoBrowser`启动，再由本机私有描述文件提供一次性会话入口。
 
 默认地址为本机127.0.0.1:28291。仅输入裸地址会显示缺少授权；入口脚本从当前用户私有run/panel-access.json读取随机访问凭据，通过URL片段传入，页面立即清除片段并仅存当前标签页sessionStorage，接口使用Authorization头。不要分享授权链接。宿主退出后移除描述文件，旧凭据失效。
 

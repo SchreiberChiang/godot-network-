@@ -18,7 +18,7 @@
 
 目前没有独立 `admin_response` 或维护 helper Schema。它们的实际形状见下文和实现；不应声称所有 RPC body、管理响应已经逐操作完整验证。例子中的 `rpc.account.execute.typed` 会在 RPC 外壳之后，额外按 `account_request` 验证 payload。其他内部 RPC 依靠已认证本机进程边界和被调用服务检查，不能直接暴露给客户端。
 
-测试 [run_managed_contracts.gd](../tests/run_managed_contracts.gd) 读取全部 64 条例子，执行对应 Schema、必要的嵌套 Schema，并拒绝客户端夹带的身份/权限/余额字段、成功却为空的资产状态等。测试也直接调用管理 HTTP 的重复键检查函数；不创建 socket，不验证真实 token，不创建账号数据库，不启动房间。一个由 64 个零组成的 token 可以通过格式检查，仍然不能通过实际认证。
+测试 [run_managed_contracts.gd](../tests/run_managed_contracts.gd) 读取例子文件中的全部用例，执行对应 Schema、必要的嵌套 Schema，并拒绝客户端夹带的身份/权限/余额字段、成功却为空的资产状态等。测试也直接调用管理 HTTP 的重复键检查函数；不创建 socket，不验证真实 token，不创建账号数据库，不启动房间。一个由 64 个零组成的 token 可以通过格式检查，仍然不能通过实际认证。
 
 ## 通道与版本
 
@@ -134,7 +134,7 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 
 永久解锁/金币/默认武器与一局内的金钱、临时装备、比分必须分开。`sdk/roomkit/server/match_wallet.gd` 是按比赛和 launch 隔离的内存钱包，不能拿来代替持久资产库，也不能因为本局重置而清空账号余额。比赛奖励由受信游戏奖励计算器转换成永久奖励，再交给通用原子提交。
 
-添加新模式主要改游戏 policy、adapter 和该游戏配置；添加新游戏还需登记 manifest、构建、目录、结果 Schema 及奖励规则。当前 Operator 的示例组合明确登记 shooter 和 turns，未实现任意目录自动发现插件。需要扩充这层游戏登记，仍不需要把赛车或战术回合规则塞进通用核心。战术射击完整规则尚不在当前实现范围。
+添加新模式主要改游戏 policy、adapter 和该游戏配置；添加新游戏还需登记 manifest、构建、目录、结果 Schema 及可选奖励规则。Operator 从受信本地游戏登记加载这些服务，示例组合包含 shooter 和 turns，也可显式登记新游戏；不会从玩家或管理 HTTP 请求载入路径或脚本。登记结构见 [managed_game_registry.schema.json](../schemas/managed_game_registry.schema.json)。仍不需要把赛车或战术回合规则塞进通用核心。战术射击完整规则尚不在当前实现范围。
 
 ## 本机管理 HTTP API
 
@@ -163,6 +163,8 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 管理员身份检查必须区分凭据无效与暂时无法检查：账号 helper 返回的 `STORAGE_UNAVAILABLE` 或工作线程入口的 `RATE_LIMITED` 原样作为业务错误返回，不转换为 `AUTH_FAILED`，也不撤销浏览器会话。真正的 `AUTH_FAILED/AUTH_REQUIRED/SESSION_EXPIRED/ADMIN_REQUIRED` 才使管理页面回到登录页并显示原因。每次浏览器请求绑定发送时的 token；旧请求晚到的认证失败不得清除后来成功登录的新 token。
 
 优雅停服设置最多 60 秒倒计时，立即停服跳过倒计时，随后仍走房间退出和资源确认流程。重复请求不会延长已经接受的停止期限，维护开关也不能取消停服。启动成功的操作回复、READY 状态、进程确认退出是不同阶段；使用 status 查看最终结果。`room.recreate` 先等待旧房间清理，再次确认尚未停服才创建，不能凭旧 pid 猜测资源可复用。`config.set` 需要服务停止；更换共享资产空间选择已有空间，不自动复制余额。
+
+`config.set.config.asset_spaces` 是 1–32 项的游戏 ID → 空间 ID 映射。Schema 只验证数量和已有 ID 字符规则；Operator 的受信登记另要求键集合恰好等于已注册游戏，值仅可为该游戏资产目录的默认空间或 `shared`，并拒绝共享目录内冲突的物品定义。游戏 ID 与默认空间可以不同，例如已注册 `racer` 的默认空间为 `garage`。`status.games[].asset_space` 返回该默认空间，管理页面只提供它和 `shared`，实际当前选择来自 `config.get.asset_spaces`。旧 status 缺少此字段时页面兼容回退到 game_id；新服务应始终提供字段。原 shooter/turns 配置继续兼容；合法 ID 并不授权新增游戏、资产目录、可执行路径或脚本。运行时不合法映射返回 `INVALID_OPTIONS`。
 
 审计把操作者、目标、动作、原因和结果归档。账号审计不会记录原始密码、密码派生值、token 或邀请码明文；资产流水包含可审阅的原状态与新状态。内部仓储只读操作 `{"op":"asset.audit_all"}` 使用固定 SQL 返回最近 100 条，每行字段为 `user_id/request_id/space_id/actor_id/command/previous_body/body/created_at`。其中 command、previous_body、body 是 JSON 字符串；无额外 SQL、筛选、排序、limit 入参。Operator 将账户、资产与操作审计合并成 `audit.list.payload.entries`，资产前后状态解码为对象。这个仓储入口自身不是鉴权边界，只能由已验证管理员的 Operator 调用。
 
@@ -231,6 +233,8 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 
 在项目目录，用实际安装的 Godot 启动 `--headless --path <项目绝对路径> --script res://tests/run_managed_contracts.gd`；Windows 图形版 exe 用 `Start-Process -PassThru -WindowStyle Hidden` 并等待该进程退出，读取真实退出码。2026-09-22 使用 Godot 4.7.2.stable 实际结果：`MANAGED_CONTRACTS_RESULT passed=241 failed=0`，退出码 0，证据 `logs/managed-contracts-console.log` 和 stderr 日志。首次测试有两项测试调用对象错误，改为管理 HTTP 实际重复键检查后全量重跑；首次日志保留为 `managed-contracts-initial-*`。
 
+2026-09-26 通用资产空间配置回归：同一 Godot 4.7.2 实际执行上述脚本，`MANAGED_CONTRACTS_RESULT passed=260 failed=0`、退出码 0，证据 `logs/admin-generic-contracts-20260926-console.log`，stderr 无脚本错误。新增覆盖第三游戏与不同默认空间、共享空间、非法键值及 32 项上限。`node tests/test_admin_asset_spaces.cjs` 为 12/0、`node tests/test_admin_auth_errors.cjs` 为 12/0，均退出 0；它们运行页面的实际 JavaScript 函数，使用 DOM/API 替身检查显示选项、配置提交和会话错误处理，不代表真实浏览器、HTTP 权限或玩家联机验收。
+
 资产全局审计短专项命令：
 
 ```powershell
@@ -238,3 +242,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File tests/te
 ```
 
 真实 SQLite 结果：`ASSET_AUDIT_RESULT passed=14 failed=0`，退出码 0，证据 `logs/asset-audit-console.log`；测试创建自己的私有 `data/test-asset-audit-*` 数据目录。241 项是纯契约/解析函数检查，14 项是本机数据库检查；两者均不是玩家真实联机、浏览器面板操作或公网通过证明。
+
+## 2026-09-26 房间自定义规则
+
+room.create / room.recreate 新增可选 rules，整数映射由 schemas/room_rules.schema.json 限定，再由可信游戏清单校验名称、上下界并补默认值。重建先验证后停旧房；room.stop 拒绝 rules。面板 status.games 暴露 room_rules 元数据，status.rooms[].options.rules 显示实际值。旧游戏和省略 rules 的请求仍受支持。结构不符 INVALID_REQUEST，游戏不支持或超界 INVALID_OPTIONS。射击状态兼容标识升级和完整验证见 [房间规则说明](25_shooter_room_rules.md)。

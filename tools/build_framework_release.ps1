@@ -98,6 +98,9 @@ foreach($game in @('shooter','turns')) {
     $clientDirectory=Join-Path $bundle ('clients\'+$game)
     New-Item -ItemType Directory -Force -Path $serverDirectory,$clientDirectory | Out-Null
     $index[$game]=@{project=('games/'+$game);server_pack=('games/'+$game+'/Server.pck');server_executable=('games/'+$game+'/Server.exe');client_pack=('clients/'+$game+'/Client.pck');client_executable=('clients/'+$game+'/Client.exe');manifest=$entry.manifest}
+    foreach($field in @('name','asset_catalog','asset_policy','result_schema','reward_script')) {
+        if($entry.PSObject.Properties[$field]) { $index[$game][$field]=$entry.$field }
+    }
     if(-not $PrepareOnly) {
         SetMainLoop $entry.project 'res://game/room.gd'
         ExportPack $entry.project (Join-Path $serverDirectory 'Server.pck') ($game+'-server')

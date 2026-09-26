@@ -621,7 +621,12 @@
           "game_id": "shooter",
           "mode": "ffa",
           "map": "depot",
-          "capacity": 8
+          "capacity": 8,
+          "rules": {
+            "kill_limit": 20,
+            "duration_seconds": 300,
+            "respawn_seconds": 3
+          }
         }
       }
     },
@@ -643,7 +648,12 @@
         "action": "room.recreate",
         "payload": {
           "room_id": "room_example",
-          "reason": "重新开始"
+          "reason": "重新开始",
+          "rules": {
+            "kill_limit": 20,
+            "duration_seconds": 300,
+            "respawn_seconds": 3
+          }
         }
       }
     },
@@ -921,6 +931,27 @@
             }
           },
           "reason": "本机测试配置"
+        }
+      }
+    },
+    {
+      "name": "admin.config.set.custom_spaces",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "config.set",
+        "payload": {
+          "config": {
+            "lobby_bind": "127.0.0.1",
+            "advertised_host": "127.0.0.1",
+            "lobby_port": 28290,
+            "max_rooms": 4,
+            "asset_spaces": {
+              "shooter": "shared",
+              "turns": "turns",
+              "racer": "garage"
+            }
+          },
+          "reason": "第三个游戏使用已登记的默认资产空间"
         }
       }
     },

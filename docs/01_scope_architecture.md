@@ -6,6 +6,24 @@
 
 分层继续是“通用框架 → 可选类型模块 → 具体游戏/模式”。玩法按相反方向依赖框架；类型模块只有真实复用需要时才提取，不能成为所有游戏的必需依赖。永久资产与比赛临时经济分离，死亡、武器、回合与赛车规则仍由游戏决定。当前 SDK 源码位于 `sdk/roomkit/`，接入接口与 SDK 0.5 边界见 [SDK README](../sdk/roomkit/README.md) 和 [21_managed_protocol.md](21_managed_protocol.md)。
 
+### 当前代码目录（2026-09-27 核对）
+
+| 目录/文件 | 用途 |
+|---|---|
+| `host/operator.gd`、`host/admin_http.gd`、`host/admin.html` | 独立管理服务、回环 HTTP 后台与页面 |
+| `host/managed_host.gd`、`host/managed_lobby.gd` | 托管游戏宿主与 WSS 账号大厅 |
+| `host/core/` | GameRegistry、托管游戏注册表、RoomManager、PortAllocator、准入、账号/资产/结果服务、恢复保护；不引用具体游戏 |
+| `host/platform/`、`host/storage/`，`tools/process_identity.ps1`、`sqlite_store.ps1`、`account_store.ps1` | Windows 进程启动与身份核验、有界 PowerShell 助手、SQLite 适配 |
+| `host/main.*`、`host/development.gd`、`host/lobby_server.gd`、`host/dashboard*` | 早期开发宿主、无账号大厅和只读状态面板 |
+| `sdk/roomkit/` | 源码 SDK：`client/`（RoomClient、AccountClient）、`server/`（RoomRuntime、GameAdapter、资产策略、MatchWallet、结果 outbox）、`shared/`（协议、严格 JSON、Schema 校验、TCP 分帧、安全传输） |
+| `schemas/` | 唯一契约来源；修改协议时同步 `examples/`、错误码与测试 |
+| `examples/framework/`、`examples/shooter/`、`examples/turn_based/` | 当前账号客户端外壳、横版射击、取石子 |
+| `examples/minimal/`、`examples/blocks/`、`examples/showcase/` | 无玩法房间、早期方块示例与演示宿主 |
+| `templates/managed_game/`、`templates/game/`，`tools/new_game.ps1` | 托管新游戏模板与早期开发身份模板及生成器 |
+| `tools/run_framework.ps1`、`build_framework*.ps1` 与根目录 `Start*/Stop*.cmd` | 当前启动与构建入口 |
+| `tests/`、`tools/run.ps1` | 单元/模拟与真实进程测试 |
+| `release/` | 早期 0.1.0 候选包的包内脚本与说明 |
+
 ## 初始设计与历史阶段记录
 
 以下保留早期设计及当时的实现说明；其中建议名称、交付目录或阶段状态不代表当前分支的完成状态。约束继续适用，实际入口和协议以以上当前指引及 `schemas/` 为准。

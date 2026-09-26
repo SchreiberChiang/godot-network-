@@ -24,12 +24,48 @@ if($Mode -eq 'client') {
     if(-not (Test-Path -LiteralPath $indexPath)) { & (Join-Path $PSScriptRoot 'build_framework.ps1') }
     $index=Get-Content -LiteralPath $indexPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $gameRoot=$index.$Game.project
+    if(-not $gameRoot -or -not (Test-Path -LiteralPath (Join-Path $gameRoot 'project.godot') -PathType Leaf) -or -not (Test-Path -LiteralPath (Join-Path $gameRoot 'client.gd') -PathType Leaf)) { throw 'Client project is missing. Start StartManagement.cmd to rebuild it.' }
     if(-not $ConnectionConfig) { $ConnectionConfig=Join-Path $project 'artifacts\client\connection.json' }
     if(-not (Test-Path -LiteralPath $ConnectionConfig)) { throw 'Start the operator first to generate the public connection configuration.' }
-    $arguments=@('--path',$gameRoot,'--script','res://client.gd','--',('--game='+$Game),('--connection-config='+[IO.Path]::GetFullPath($ConnectionConfig)))
-    $process=Start-Process -FilePath $Godot -ArgumentList (Quote-Arguments $arguments) -PassThru -WindowStyle Hidden
-    Write-Output ('FRAMEWORK_CLIENT_STARTED game='+$Game+' pid='+$process.Id)
-    exit 0
+    $clientLogs=Join-Path $project ('logs\client-starts\'+$Game+'-'+[Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $clientLogs -Force | Out-Null
+    $stderr=Join-Path $clientLogs 'stderr.log'
+    $arguments=@('--path',$gameRoot,'--log-file',(Join-Path $clientLogs 'engine.log'),'--script','res://client.gd','--',('--game='+$Game),('--connection-config='+[IO.Path]::GetFullPath($ConnectionConfig)))
+    # This is the player's interactive window. Hidden is only for background services.
+    $process=Start-Process -FilePath $Godot -ArgumentList (Quote-Arguments $arguments) -PassThru -WindowStyle Normal -RedirectStandardOutput (Join-Path $clientLogs 'console.log') -RedirectStandardError $stderr
+    $ownedHandle=$process.Handle
+    $deadline=[DateTime]::UtcNow.AddSeconds(20)
+    $visibleSince=$null
+    while(-not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+        $process.Refresh()
+        if($process.HasExited) { break }
+        if(Test-Path -LiteralPath $stderr) {
+            if(Select-String -LiteralPath $stderr -Pattern 'SCRIPT ERROR|Parse Error|Compile Error|Failed to load script' -Quiet) { break }
+        }
+        if($process.MainWindowHandle -ne [IntPtr]::Zero) {
+            if($null -eq $visibleSince) { $visibleSince=[DateTime]::UtcNow }
+            if(([DateTime]::UtcNow-$visibleSince).TotalSeconds -ge 1) {
+                if($process.HasExited) { break }
+                Write-Output ('FRAMEWORK_CLIENT_STARTED game='+$Game+' pid='+$process.Id+' window_ready=true logs='+$clientLogs)
+                $process.Dispose()
+                exit 0
+            }
+        } else { $visibleSince=$null }
+        Start-Sleep -Milliseconds 100
+    }
+    if($process.HasExited) {
+        $clientExit=$process.ExitCode
+        $process.Dispose()
+        throw ('Client exited before its window was ready (exit '+$clientExit+'). See '+$clientLogs)
+    }
+    # Only the exact client created above can be stopped by this startup watchdog.
+    try {
+        $process.Kill()
+        if(-not $process.WaitForExit(5000)) { throw ('Client startup failed and its exit was not confirmed. See '+$clientLogs) }
+    } catch {
+        if(-not $process.HasExited) { throw }
+    } finally { $process.Dispose() }
+    throw ('Client did not show a usable window. See '+$clientLogs)
 }
 if(Test-Path -LiteralPath $metadata) {
     $descriptor=Get-Content -LiteralPath $metadata -Raw -Encoding UTF8 | ConvertFrom-Json

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Per-room integer options declared by a trusted game manifest",
+  "type": "object",
+  "maxProperties": 16,
+  "propertyNames": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,47}$"},
+  "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 3600000},
+  "$defs": {
+    "definitions": {
+      "type": "object", "maxProperties": 16,
+      "propertyNames": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,47}$"},
+      "additionalProperties": {
+        "type": "object", "additionalProperties": false,
+        "required": ["title", "minimum", "maximum", "default"],
+        "properties": {
+          "title": {"type": "string", "minLength": 1, "maxLength": 80},
+          "minimum": {"type": "integer", "minimum": 0, "maximum": 3600000},
+          "maximum": {"type": "integer", "minimum": 0, "maximum": 3600000},
+          "default": {"type": "integer", "minimum": 0, "maximum": 3600000}
+        }
+      }
+    }
+  }
+}

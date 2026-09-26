@@ -11,6 +11,7 @@ func run() -> Dictionary:
 	passed = 0
 	failed = 0
 	_test_registry()
+	_test_room_rules()
 	_test_ports()
 	return {"passed": passed, "failed": failed}
 
@@ -71,6 +72,21 @@ func _test_registry() -> void:
 	_check(registry.resolve("minimal_room").manifest.modes.sandbox.max_players == 16, "resolved manifests are defensive copies")
 	_check(registry.resolve("minimal_room").descriptor.executable == OS.get_executable_path(), "resolved artifacts are defensive copies")
 
+
+func _test_room_rules() -> void:
+	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://examples/shooter/game_manifest.json"))
+	var artifacts := {manifest.server_artifact: {"executable": OS.get_executable_path(), "args": []}}
+	var registry := GameRegistry.new()
+	_check(registry.register_game(manifest, artifacts).ok, "trusted rule definitions register")
+	var options := {"mode": "ffa", "map": "depot", "capacity": 4}
+	_check(registry.validate_options("shooter", options).options.rules == {"duration_seconds": 300, "kill_limit": 0, "respawn_seconds": 3}, "omitted options normalize to manifest defaults")
+	options.rules = {"duration_seconds": 60, "kill_limit": 10, "respawn_seconds": 0}
+	_check(registry.validate_options("shooter", options).options.rules == options.rules, "custom per-room integers survive normalization")
+	for invalid in [{"kill_limit": -1}, {"kill_limit": 1001}, {"kill_limit": 1.5}, {"kill_limit": "10"}, {"kill_limit": true}, {"kill_limit": NAN}, {"weapons": 10}, {"completion_credits": 999}, {"duration_seconds": 0}, {"respawn_seconds": 61}]:
+		options.rules = invalid
+		_check(not registry.validate_options("shooter", options).ok, "invalid or undeclared room rule rejected: " + str(invalid))
+	manifest.room_rules.kill_limit.default = 1001
+	_check(not GameRegistry.new().register_game(manifest, artifacts).ok, "invalid trusted rule default rejected before registration")
 
 func _test_ports() -> void:
 	var occupied := PacketPeerUDP.new()

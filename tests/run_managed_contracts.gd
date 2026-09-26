@@ -73,6 +73,22 @@ func _run() -> void:
 	reject_set("admin.account.ban", ["payload"], "hours", -1, "negative ban duration rejected")
 	reject_set("admin.backup.restore", ["payload"], "backup_id", "../../accounts.sqlite", "restore cannot accept arbitrary file path")
 	reject_set("admin.config.set", ["payload", "config"], "process_path", "C:/untrusted.exe", "config rejects arbitrary executable setting")
+	for key in ["../racer", "racer/track", "Racer", "x", "r".repeat(65)]:
+		reject_set("admin.config.set", ["payload", "config", "asset_spaces"], key, "garage", "asset space map rejects invalid game ID: " + key)
+	for value in ["../garage", "res://garage", "Garage", "x", "g".repeat(65), 1, {}, null]:
+		reject_set("admin.config.set", ["payload", "config", "asset_spaces"], "racer", value, "asset space map rejects invalid space ID: " + str(value))
+	reject_set("admin.config.set", ["payload", "config"], "asset_spaces", {}, "asset space map cannot be empty")
+	var spaces := {}
+	for index in range(33):
+		spaces["game_" + str(index)] = "shared"
+	reject_set("admin.config.set", ["payload", "config"], "asset_spaces", spaces, "asset space map caps registered games at 32")
+	spaces.erase("game_32")
+	var bounded_config: Dictionary = examples["admin.config.set"].duplicate(true)
+	bounded_config.message.payload.config.asset_spaces = spaces
+	check(validate_case(bounded_config) == "", "32 syntactically valid game mappings accepted before runtime registry check")
+	var unknown_config: Dictionary = examples["admin.config.set"].duplicate(true)
+	unknown_config.message.payload.config.asset_spaces = {"unregistered_game": "unknown_space"}
+	check(validate_case(unknown_config) == "", "ID syntax success does not claim registry membership or allowed mapping")
 	reject_set("admin.account.list", ["payload"], "limit", 100000, "admin account list is bounded")
 
 	var reward: Array = examples["reward.batch"].message.duplicate(true)
@@ -91,6 +107,14 @@ func _run() -> void:
 	check(not AdminHTTP._unique_keys('{"role":"player","r\\u006fle":"admin"}'), "admin HTTP key check rejects escaped duplicate identity keys")
 	check(not StrictJSON.valid('{"action":"status","payload":{},}'), "strict parser rejects trailing comma")
 	print("MANAGED_CONTRACTS_NOTE=valid_dummy_hello_does_not_authenticate_and_generic_rpc_payload_requires_runtime_service_checks")
+	for name in ["admin.room.create", "admin.room.recreate"]:
+		var ruled: Dictionary = examples[name].duplicate(true)
+		ruled.message.payload.rules = {"duration_seconds": 60, "kill_limit": 10, "respawn_seconds": 0}
+		check(validate_case(ruled) == "", "bounded room rules accepted for " + name)
+		for bad in [{"kill_limit": 1.5}, {"kill_limit": true}, {"kill_limit": -1}, {"kill_limit": "5"}, {"path/invalid": 1}]:
+			ruled.message.payload.rules = bad
+			check(validate_case(ruled) != "", "invalid room rules rejected for " + name)
+	reject_set("admin.room.stop", ["payload"], "rules", {}, "stop cannot carry recreate-only rules")
 	finish()
 
 func validate_case(item: Dictionary) -> String:

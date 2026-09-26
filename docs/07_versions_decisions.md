@@ -44,6 +44,8 @@ ADR-007：v0.1不保证崩溃续局。明确中止和清理政策比未实现的
 
 ## 4. 变更规则
 
+2026-09-26 托管模板接入：新增受信本地 `managed_game_registry.schema.json`，登记项目服务和结果Schema；管理服务按注册表组合游戏，不按 shooter/turns 分支。既有源码索引通过 `examples/framework/services.json` 补全声明，新生成索引显式包含服务路径。SDK仍为0.5.0，账号/WSS/控制/ENet线上消息版本不变；管理员资产空间配置放开为受注册表约束的游戏/空间ID。旧管理后台只认识两个示例，不能用于配置新游戏；9月22日旧独立包不包含此变更。新增游戏后必须在停服时同步受信索引和私有config.asset_spaces，不自动重命名/迁移账号资产。步骤见 [新游戏接入](24_managed_game_template.md)。
+
 2026-09-22 通用管理分支：新增受管理账号/资产 SDK **0.5.0**。源码射击构建 shooter-dev-001（shooter-v1），受管理取石子构建 turns-managed-dev-001（turns-managed-v1）；取石子旧演示的0.4清单保留，构建时生成独立0.5清单。管理大厅使用独立 managed_lobby/account/admin Schema；不能把旧无密码开发身份当成账号登录。控制协议仍为1，但增加资产许可、已确认资产状态和异步刷新消息，启用这些能力必须成对升级宿主与房间。已确认资产包含服务端版本、所有权和游戏配置，客户端不能指定空间或任意装备属性。完整兼容和错误码见 docs/21_managed_protocol.md。
 
 ADR-011：管理服务独立于游戏宿主，只有管理服务持有账号与永久资产数据库。管理服务使用回环 HTTP 和认证的回环 TCP；游戏大厅使用 WSS，房间使用 DTLS/ENet。房间只通过注册的 GameAdapter 请求和接收资产；通用核心不识别枪械、死亡、复活或取石子主题。永久资产、比赛临时资产和具体玩法分层，后续战术模式不得复用永久钱包作为比赛经济。
@@ -71,3 +73,5 @@ ADR-008：Windows SQLite适配通过系统winsqlite3.dll及宿主PowerShell助�
 2026-09-20 M2 本地实施记录：新增标准 WebSocket JSON 大厅、源码双端 SDK、GameAdapter 和两人无玩法示例。新示例 build_id=dev-002、sdk_version=0.2.0、compatibility_id=roomkit-minimal-dev-002，与 M1 dev-001 分开登记。control_protocol=1 是本地尚未发布的契约增量；宿主和新 SDK 同步升级，不保证旧宿主支持 M2 事件。M1 夹具继续使用原消息子集。SDK 插件分发与导出产物尚未验证，不能将 0.2.0 源码标识视为正式发行声明。
 
 2026-09-20 M3：新增 blocks / turns 两个 game_id，分别使用 blocks-dev-001 / turns-dev-001 构建以及 blocks-v1 / turns-v1 兼容标识。每个开发工程携带同一份未修改的 SDK 0.2.0，独立目录启动。玩法输入/状态 Schema 独立放在 schemas/，无 CharacterBody/武器依赖。没有改动宿主核心或 SDK 协议；Godot ENet RPC 仅属于对应游戏。独立开发工程验证与专用可执行文件导出验证明确分开。
+
+2026-09-26：可信清单声明通用整数 room_rules，宿主规范化并传递给游戏适配器。射击状态新增获胜击杀目标，升级 shooter-dev-002 / shooter-v2 / game_protocol=2，旧客户端需重新构建。每局时长和复活等待属于游戏，永久奖励资格保持不变。详见 docs/25。

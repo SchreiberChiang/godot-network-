@@ -11,6 +11,7 @@ const LocalBus = preload("res://sdk/roomkit/shared/local_rpc.gd")
 const Http = preload("res://host/admin_http.gd")
 const Helper = preload("res://host/platform/bounded_helper.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
+const GameServices = preload("res://host/core/managed_game_registry.gd")
 var accounts = Accounts.new()
 var assets = Assets.new()
 var results = Results.new()
@@ -22,6 +23,7 @@ var operator_log_path := ""
 var settings: Dictionary = {}
 var catalog_config: Dictionary = {}
 var games: Dictionary = {}
+var game_services = GameServices.new()
 var worker_count := 0
 var ready := false
 var starting := false
@@ -65,7 +67,15 @@ func _run() -> void:
 		printerr("OPERATOR_FAILED code=", initialized.code)
 		quit(1)
 		return
-	settings = {"lobby_bind": "0.0.0.0", "advertised_host": "127.0.0.1", "lobby_port": 28300, "game_bind": "0.0.0.0", "control_port": 28301, "udp_first": 28400, "udp_last": 28431, "max_rooms": 16, "asset_spaces": {"shooter": "shooter", "turns": "turns"}}
+	var raw_games := Wire.decode(FileAccess.get_file_as_bytes(Paths.absolute(args.get("--games", "res://artifacts/framework-games.json"))), "", 262144)
+	var defaults := Wire.decode(FileAccess.get_file_as_bytes("res://examples/framework/services.json")) if FileAccess.file_exists("res://examples/framework/services.json") else {}
+	var registry_error: String = game_services.configure(raw_games, defaults)
+	if registry_error != "":
+		printerr("OPERATOR_FAILED code=", registry_error)
+		quit(1)
+		return
+	games = game_services.entries
+	settings = {"lobby_bind": "0.0.0.0", "advertised_host": "127.0.0.1", "lobby_port": 28300, "game_bind": "0.0.0.0", "control_port": 28301, "udp_first": 28400, "udp_last": 28431, "max_rooms": 16, "asset_spaces": game_services.default_spaces.duplicate()}
 	if FileAccess.file_exists(root_path.path_join("config.json")):
 		var saved := Wire.decode(FileAccess.get_file_as_bytes(root_path.path_join("config.json")))
 		if not _valid_config(saved):
@@ -75,20 +85,11 @@ func _run() -> void:
 		settings = saved
 	else:
 		_write_json(root_path.path_join("config.json"), settings)
-	games = Wire.decode(FileAccess.get_file_as_bytes(Paths.absolute(args.get("--games", "res://artifacts/framework-games.json"))), "", 65536)
-	if games.is_empty():
-		printerr("OPERATOR_FAILED code=BUILD_FRAMEWORK_REQUIRED")
-		quit(1)
-		return
-	for entry in games.values():
-		for key in ["project", "server_executable", "server_pack"]:
-			if entry.has(key) and not str(entry[key]).is_absolute_path():
-				entry[key] = Paths.absolute("res://" + str(entry[key]))
 	_load_catalog()
 	if not (await _work(assets.initialize.bind(root_path, catalog_config))).ok:
 		quit(1)
 		return
-	var result_schemas := {"shooter": "res://schemas/shooter_result.schema.json", "turns": "res://schemas/summary_result.schema.json"}
+	var result_schemas: Dictionary = game_services.result_schemas
 	if not (await _work(results.initialize.bind(root_path, result_schemas, "assets.sqlite"))).ok:
 		quit(1)
 		return
@@ -456,8 +457,7 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 		bus.respond(peer_id, request_id, result)
 
 func _policy(game_id: String):
-	var paths := {"shooter": "res://examples/shooter/asset_policy.gd", "turns": "res://examples/turn_based/asset_policy.gd"}
-	return load(paths[game_id]).new() if paths.has(game_id) else null
+	return game_services.policies.get(game_id)
 
 func _asset_read(user_id: String, game_id: String) -> Dictionary:
 	var result: Dictionary = await _work(assets.read.bind(user_id, game_id))
@@ -467,8 +467,8 @@ func _asset_read(user_id: String, game_id: String) -> Dictionary:
 
 func _rewards(record: Dictionary) -> Array:
 	var rows: Array = []
-	if record.game_id == "shooter":
-		rows = preload("res://examples/shooter/rewards.gd").calculate(record)
+	if game_services.rewards.has(record.game_id):
+		rows = game_services.rewards[record.game_id].calculate(record)
 	for row in rows:
 		row.space_id = assets.catalog.space_for(record.game_id)
 	return rows
@@ -476,17 +476,11 @@ func _rewards(record: Dictionary) -> Array:
 func _public_games() -> Array:
 	var rows: Array = []
 	for game_id in games:
-		rows.append({"game_id": game_id, "name": "横版射击" if game_id == "shooter" else "回合取石子", "modes": games[game_id].manifest.modes})
+		rows.append({"game_id": game_id, "name": games[game_id].get("name", game_id), "modes": games[game_id].manifest.modes, "room_rules": games[game_id].manifest.get("room_rules", {}), "asset_space": game_services.default_spaces.get(game_id, game_id)})
 	return rows
 
 func _load_catalog() -> void:
-	catalog_config = Wire.decode(FileAccess.get_file_as_bytes("res://examples/asset_catalog.example.json"))
-	var shared := {"items": {}}
-	for space in catalog_config.spaces.values():
-		shared.items.merge(space.items, true)
-	catalog_config.spaces.shared = shared
-	for game_id in settings.asset_spaces:
-		catalog_config.games[game_id].space = settings.asset_spaces[game_id]
+	catalog_config = game_services.catalog_for(settings.asset_spaces)
 
 func _valid_config(value: Dictionary) -> bool:
 	var required := ["lobby_bind", "advertised_host", "lobby_port", "game_bind", "control_port", "udp_first", "udp_last", "max_rooms", "asset_spaces"]
@@ -505,9 +499,7 @@ func _valid_config(value: Dictionary) -> bool:
 		return false
 	if int(value.udp_first) > int(value.udp_last) or int(value.udp_last) - int(value.udp_first) > 255 or int(value.max_rooms) < 1 or int(value.max_rooms) > 16 or int(value.lobby_port) == int(value.control_port):
 		return false
-	if not value.asset_spaces is Dictionary or value.asset_spaces.keys().size() != 2:
-		return false
-	return value.asset_spaces.get("shooter", "") in ["shooter", "shared"] and value.asset_spaces.get("turns", "") in ["turns", "shared"]
+	return value.asset_spaces is Dictionary and not game_services.catalog_for(value.asset_spaces).is_empty()
 
 func _publish_connection() -> void:
 	var directory := Paths.absolute("res://artifacts/client")

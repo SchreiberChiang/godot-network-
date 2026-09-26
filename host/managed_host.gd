@@ -106,7 +106,7 @@ func _request(peer_id: String, request_id: String, action: String, payload: Dict
 			if stopping:
 				result = Wire.failure("ROOM_DRAINING")
 			else:
-				var created: Dictionary = manager.create_room(payload.game_id, {"mode": payload.mode, "map": payload.map, "capacity": payload.capacity})
+				var created: Dictionary = manager.create_room(payload.game_id, {"mode": payload.mode, "map": payload.map, "capacity": payload.capacity, "rules": payload.get("rules", {})})
 				result = {"ok": true, "payload": {"room_id": created.room_id}} if created.ok else created
 		"room.stop":
 			result = {"ok": manager.stop_room(payload.room_id, payload.get("reason", "admin")), "payload": {}}
@@ -124,6 +124,12 @@ func _request(peer_id: String, request_id: String, action: String, payload: Dict
 				result = Wire.failure("ROOM_NOT_FOUND")
 			else:
 				var options: Dictionary = _options(row)
+				if payload.has("rules"):
+					options.rules = payload.rules
+				var valid: Dictionary = manager.registry.validate_options(row.game_id, options)
+				if not valid.ok:
+					bus.respond(peer_id, request_id, valid)
+					return
 				manager.stop_room(row.room_id, payload.get("reason", "recreate"))
 				var end := Time.get_ticks_msec() + 30000
 				while not manager.rooms[row.room_id].cleaned and Time.get_ticks_msec() < end:

@@ -128,8 +128,7 @@
       "properties": {
         "action": {
           "enum": [
-            "room.stop",
-            "room.recreate"
+            "room.stop"
           ]
         },
         "payload": {
@@ -354,6 +353,18 @@
           "$ref": "#/$defs/config_set"
         }
       }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "room.recreate"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/room_recreate"
+        }
+      }
     }
   ],
   "$defs": {
@@ -441,6 +452,9 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 16
+        },
+        "rules": {
+          "$ref": "room_rules.schema.json"
         }
       },
       "required": [
@@ -945,25 +959,15 @@
         },
         "asset_spaces": {
           "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "shooter": {
-              "enum": [
-                "shooter",
-                "shared"
-              ]
-            },
-            "turns": {
-              "enum": [
-                "turns",
-                "shared"
-              ]
-            }
+          "description": "Exactly the games registered by the trusted server configuration. Each value must be that game's catalog default space or shared; registry membership and permitted mappings are checked at runtime.",
+          "minProperties": 1,
+          "maxProperties": 32,
+          "propertyNames": {
+            "$ref": "game_manifest.schema.json#/properties/game_id"
           },
-          "required": [
-            "shooter",
-            "turns"
-          ]
+          "additionalProperties": {
+            "$ref": "asset_catalog.schema.json#/properties/spaces/propertyNames"
+          }
         }
       },
       "required": [
@@ -994,6 +998,34 @@
       },
       "required": [
         "config",
+        "reason"
+      ]
+    },
+    "room_recreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "room_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        },
+        "rules": {
+          "$ref": "room_rules.schema.json"
+        }
+      },
+      "required": [
+        "room_id",
         "reason"
       ]
     }

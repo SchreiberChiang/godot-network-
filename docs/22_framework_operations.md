@@ -10,10 +10,16 @@ Windows 需要 Godot 4.7.2；默认路径是 `D:\SteamLibrary\steamapps\common\G
 2. 首次创建管理员账号。管理员只能管理后台，不能作为游戏玩家入房。
 3. 点击“启动服务器”。管理服务负责生成私有凭据并启动独立宿主，页面会显示宿主、房间和玩家状态。
 4. 在邀请码页创建邀请码。双击 **StartShooterClient.cmd**，用邀请码注册新的玩家账号并登录。启动第二个客户端，用另一个账号登录；同一个玩家账号不能重复占用会话。
-5. 在后台或玩家大厅创建射击房间。进入后左右移动/跳跃，鼠标瞄准射击；两名玩家开始五分钟自由混战。初始基础步枪免费，后台可给测试账号发金币。
-6. 在大厅或死亡期间打开背包，先解锁，再单独选为默认配置。死亡至少三秒且此前资产请求已确认后才可手动复活。存活时服务端拒绝购买和配置变更。
+5. 在后台或玩家大厅创建射击房间。进入后左右移动/跳跃，鼠标瞄准射击；两名玩家开始自由混战。后台创建表单可设每局时长、获胜击杀数和复活等待，默认五分钟、击杀不限、等待三秒；已有房间点击“规则 / 重建”。[设置与更新说明](25_shooter_room_rules.md)。初始基础步枪免费，后台可给测试账号发金币。
+6. 在大厅或死亡期间打开背包，先解锁，再单独选为默认配置。死亡等待达到房间设置且此前资产请求已确认后才可手动复活。存活时服务端拒绝购买和配置变更。
 7. **StartManagedTurns.cmd** 打开取石子客户端。它使用同一账号/钱包/所有权/默认配置服务，项目只定义经典/玉石主题及大厅可选用的规则。
 8. 面板“停止服务器”默认公告六十秒后停止，期间拒绝新入房；“立即停止”要确认。它只停游戏宿主，不关闭管理网页。**StopManagement.cmd** 请求关闭整个管理服务及其宿主。
+
+### 双击客户端后没看到窗口
+
+2026-09-26已修复源码启动器将玩家窗口设为隐藏的问题。正常启动会显示标题含“RoomKit · 零号仓库”的登录窗口；如果在其它窗口后面，用任务栏或 `Alt+Tab` 切过去。先在后台开服并生成邀请码，再点客户端“没有账号？使用邀请码注册”，注册玩家账号后登录。管理员账号不能直接作为玩家登录。
+
+启动器现在为每次启动保存 `logs/client-starts/shooter-<编号>/`（取石子为 `turns-<编号>`）下的 `engine.log`、`console.log` 和 `stderr.log`；等待可见窗口出现后才报告成功。缺少文件、程序提前退出或窗口未出现时会报错，CMD保留错误供查看。此启动检查只证明窗口出现，不代表已登录或联机通过。
 
 命令行等价入口（在当前项目目录）：
 
@@ -24,7 +30,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_framework.ps1 -M
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_framework.ps1 -Mode stop
 ```
 
-`StartPanel.cmd`、`StartPlay.cmd`、`StartTurns.cmd` 保留原无账号演示。它们与本分支管理服务是不同入口，不能用旧演示测试代替新账号/射击验收。
+`StartPanel.cmd`、`StartPlay.cmd`、`StartTurns.cmd` 保留原无账号演示。它们与本分支管理服务是不同入口，不能用旧演示测试代替新账号/射击验收；说明见 [早期入口](archive/early_entrypoints.md)。
 
 ## 数据与维护
 
@@ -46,6 +52,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_framework.ps1 -M
 
 ## 测试入口
 
+每条命令都要检查真实退出码。`tools/run.ps1` 的模式除了成功标记，还必须输出 `ROOMKIT_EXIT mode=<模式> code=0`；脚本会检查退出码、脚本错误和成功标记，并设置整体超时。日志写入 `logs/<模式>-console.log`、`*-stderr.log`、`*-godot.log`。`-Godot '完整路径'` 可指定引擎，换版本需要重新验收。
+
+### 基础回归（`tools/run.ps1`）
+
+`-Mode all` 按顺序运行 unit、launcher、integration、demo、players、games、persistence、secure、stress（100 轮）、load（16+4 玩家）、recovery、limits、template、panel、assets。它**不包含**下文的账号、管理、射击和托管专项。
+
+| 模式 | 执行内容 | 成功标记 |
+|---|---|---|
+| `unit` | 注册与端口、协议/分帧、Schema、模拟进程生命周期、玩法规则 | `UNIT_RESULT passed=... failed=0` |
+| `launcher` | 10 轮真实进程身份核验与 Windows 句柄回收 | `REAL_LAUNCHER_RESULT passed=... failed=0` |
+| `integration` | 真实 Godot 子进程、TCP 控制、ENet 端口、故障与连续开关房 | `INTEGRATION_RESULT passed=... failed=0` |
+| `demo` | 自动创建一房，收到至少四次心跳后停止并退出 | `DEMO_PASS` |
+| `players` | 真实 WebSocket 大厅、两名 ENet 测试玩家进出、非法票据/满员拒绝 | `PLAYERS_RESULT passed=... failed=0` |
+| `games` | 两个早期示例、四名真实客户端、实际回合结果落库；`-Visual` 打开图形窗口并截图 | `GAMES_RESULT passed=... failed=0` |
+| `persistence` | 真实 SQLite、丢 ACK 重试、宿主终止/房间自退、离线补存、备份 | `PERSISTENCE_RESULT passed=... failed=0` |
+| `secure` / `stress` / `load` / `recovery` / `limits` / `template` / `panel` | 加密与权限、100 轮开关房、并发输入、重启隔离、资源上限、早期模板接入、早期状态面板 | 对应 `*_RESULT passed=... failed=0`（stress 另含 `cycles=100`） |
+
+### 账号、管理、射击与托管专项
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode accounts
@@ -60,7 +85,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_asset_audit.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_operator.ps1 -Lifecycle
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\tests\test_managed_shutdown.ps1
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\tests\test_operator_schedules.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode managed_registry
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_managed_template.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_room_rules.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_client_launcher.ps1
+node tests/test_admin_room_rules.cjs
+node tests/test_admin_asset_spaces.cjs
+node tests/test_admin_auth_errors.cjs
 ```
+
+`managed_shutdown` 与 `operator_schedules` 会各自创建私有数据目录，运行前需要存在 `artifacts/framework-games.json` 及其中引用的工程产物；`operator_schedules` 用受控时间验证 30 分钟备份和 10 分钟重启窗口，没有真实等待。最后七条依次对应托管注册、[托管模板](24_managed_game_template.md)、[房间规则](25_shooter_room_rules.md)、客户端启动器和三个管理页面函数测试；Node 测试用的是 DOM/API 替身，不算浏览器验收。射击渲染平滑对比 `tests/run_shooter_visual.gd` 需要图形窗口，命令见 [docs/25](25_shooter_room_rules.md)。各专项的最新结果与证据见 [STATUS](../STATUS.md#最新有效验证范围)。
 
 专项分别覆盖纯规则、真实 SQLite、真实 HTTP、真实子进程；不相互冒充。`tools/run.ps1 -Mode all` 仍是原基础回归集合，新增账号、管理及玩法专项需要单独执行。tests/test_operator.ps1 使用独立 data/test-operator-* 测试目录，并在退出前请求停止本次进程；`-Lifecycle` 增加空间切换、备份恢复、真实60秒优雅重启和已核验宿主崩溃测试。保留原进程句柄的 watchdog 只作用于本次子进程。
 
@@ -68,23 +102,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\tests\
 
 独立包先运行 `tools/build_framework_release.ps1`，再对生成的本仓库绝对目录运行 `tests/test_framework_release.ps1 -Bundle '完整包目录'`。它验证六个真实导出程序、客户端界面初始化、原生宿主和房间的WSS/ENet联调及退出/端口回收；网络客户端使用源码测试驱动，不能替代导出客户端的人工完整试玩。证据写入 logs/framework-release-*，发布 ZIP 不含测试后生成的私有目录。
 
-## 停服与调度新增专项
-
-2026-09-22，在 Windows / Godot 4.7.2.stable.steam 上运行上面的两个独立 PowerShell 命令，结果如下。脚本均创建自己的私有数据目录，`managed_shutdown` 还复制当前仓库生成的射击工程，避免改写其他测试房间的日志；运行前需要存在 `artifacts/framework-games.json` 及其中引用的当前工程产物。
-
-| 专项 | 实际结果 | 已验证内容与边界 |
-| --- | --- | --- |
-| `test_managed_shutdown.ps1` | `MANAGED_SHUTDOWN_RESULT passed=55 failed=0`，退出码 0 | 真实托管宿主、两个射击房间子进程、SDK WSS/DTLS 客户端。实际客户端两次读取停服公告得到 59 → 57 秒；重复停服不延长期限，维护开关不能解除停服或覆盖公告。覆盖已发票据、异步资产读取与重建房间跨越停服/禁入边界，及席位、进程、UDP 和私有进程日志回收。可信内部账号/资产/成绩 RPC 使用夹具，不是本专项的 SQLite 验收。 |
-| `test_operator_schedules.ps1` | `OPERATOR_SCHEDULE_RESULT passed=52 failed=0`，退出码 0，71.495 秒 | 使用真实 Operator 初始化、轮询、工作线程、SQLite helper 和托管宿主。连续四次真实崩溃：前三次各启动替代宿主，第四次保留 `RESTART_LIMIT_REACHED`；主动重启不消耗崩溃配额，主动停止不自动拉起。原定时分支生成四份真实自动备份及四条系统审计，验证到期前不执行、后续帧不重复、维护/退出门禁、等待真实工作线程排空。 |
-
-`operator_schedules` 在测试实例内移动 `next_backup`，并为历史重启记录设置过期/未过期时间戳。它验证真实初始化将下一次备份设为 30 分钟之后，并执行实际定时分支；**没有真实等待 30 分钟，也没有等待 10 分钟验证历史自然过期**。四次连续崩溃和前三次自动重启使用真实进程与正常两秒延迟；历史窗口淘汰部分使用受控时间。测试子类仅禁止发布共享的公开连接配置，未替换备份 helper 或宿主生命周期实现。没有创建房间来重测孤儿回收，也没有通过浏览器点击管理按钮；这些属于其他专项与 UI 验收。
-
-本轮原始证据：
-
-- `logs/managed-shutdown-2cf23012230d4a928f6f17878062952b/`：`result.json`、`console.log`、`managed-host.log`；stderr 为空。立即停服断开 WSS 时 stdout 出现一条 `mbedtls -0x6c00`，日志保留，不能描述成完全没有引擎诊断。
-- `data/test-operator-schedules-691ba27c01ae4828b4a50cc1b46796e2/`：`schedule-result.json`、`console.log`、`operator-test.log`；stderr 为空。记录七个真实宿主的启动身份，最终全部确认退出并释放记录，`host-running.json` 无遗留。
-
-两个专项均未使用其他正在运行的 UI 夹具或源码对手，不证明另一台设备已经连通。这里的结果不能替代最终独立包的交互与清理报告。
+2026-09-22 停服（55/0）与调度（52/0）专项的原始结果、受控时间边界和证据目录已移入 [STATUS 历史归档](archive/status_history.md)；当前结论见 STATUS。
 
 ## 独立 EXE 的人工 UI 夹具与源码对手
 

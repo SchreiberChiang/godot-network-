@@ -3,6 +3,7 @@ $ErrorActionPreference='Stop'
 $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $buildRoot=Join-Path $projectRoot ('artifacts\framework-'+[Guid]::NewGuid().ToString('N'))
 $entries=@{}
+$services=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $projectRoot 'examples/framework/services.json') | ConvertFrom-Json
 $utf8=New-Object Text.UTF8Encoding($false)
 if ($IndexPath -eq '') { $IndexPath=Join-Path $projectRoot 'artifacts\framework-games.json' }
 $IndexPath=[IO.Path]::GetFullPath($IndexPath)
@@ -47,6 +48,7 @@ file_logging/enable_file_logging=false
     [IO.File]::WriteAllText((Join-Path $destination 'game_manifest.json'),$manifestText,$utf8)
     [IO.File]::WriteAllText((Join-Path $destination 'game\game_manifest.json'),$manifestText,$utf8)
     $entries[$item.id]=@{project=$destination;manifest=$manifest}
+    foreach($field in $services.($item.id).PSObject.Properties) { $entries[$item.id][$field.Name]=$field.Value }
 }
 [IO.File]::WriteAllText($IndexPath,($entries | ConvertTo-Json -Depth 20),$utf8)
 Write-Output ('BUILD_FRAMEWORK_OK '+$buildRoot)
