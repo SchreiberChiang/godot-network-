@@ -8,10 +8,12 @@
 
 2026-09-27 账号请求 stdin 改造（Claude 实现、Codex 复核，本地提交）：新增 `tests/run_storage_timing.gd`、`tests/fixtures/storage_cost_breakdown.ps1`，修改 `host/core/account_service.gd`、`host/platform/bounded_helper.gd`、`tools/account_store.ps1`、`tools/bounded_helper.ps1`、`tools/test_helpers.ps1`、docs/21、22、23 和 STATUS。
 
+2026-09-27 grant 签名密钥 stdin 改造（Claude 实现、Codex 复核，基于 `07aa0d2`，本地提交）：新增 `tests/run_grant_storage.gd`、`tests/fixtures/grant_database.ps1`，修改 `host/storage/sqlite_repository.gd`、`tools/sqlite_store.ps1`、`tests/run_secure.gd`、`tests/fixtures/secure_client.gd`、docs/21、22、23 和 STATUS。secure 测试改为通过 WSS 后单独验证 DTLS 错误主机名。
+
 2026-09-27 Codex 复核：修正 Windows PowerShell 5.1 内层标准输入的 UTF-8 BOM、测试夹具的中文输出编码，以及 `tests/run_admin_http.gd` 的旧分层断言；更新 STATUS。没有增加文件。
 
 ## 完整文件清单
-共 162 个现存文件，另有 2 个已移除文件列在末尾。
+共 165 个现存文件，另有 2 个已移除文件列在末尾。
 
 - [AGENTS.md](../AGENTS.md)
 - [CHANGELOG.md](../CHANGELOG.md)
@@ -78,6 +80,7 @@
 - [host/operator.gd](../host/operator.gd)
 - [host/platform/bounded_helper.gd](../host/platform/bounded_helper.gd)
 - [host/platform/process_launcher.gd](../host/platform/process_launcher.gd)
+- [host/storage/sqlite_repository.gd](../host/storage/sqlite_repository.gd)
 - [README.md](../README.md)
 - [schemas/account_request.schema.json](../schemas/account_request.schema.json)
 - [schemas/account_response.schema.json](../schemas/account_response.schema.json)
@@ -122,6 +125,7 @@
 - [tests/fault_lost_response_lobby.gd](../tests/fault_lost_response_lobby.gd)
 - [tests/fixtures/account_database.ps1](../tests/fixtures/account_database.ps1)
 - [tests/fixtures/account_recovery_database.ps1](../tests/fixtures/account_recovery_database.ps1)
+- [tests/fixtures/grant_database.ps1](../tests/fixtures/grant_database.ps1)
 - [tests/fixtures/result_reward_database.ps1](../tests/fixtures/result_reward_database.ps1)
 - [tests/fixtures/storage_cost_breakdown.ps1](../tests/fixtures/storage_cost_breakdown.ps1)
 - [tests/run_account_recovery.gd](../tests/run_account_recovery.gd)
@@ -132,6 +136,7 @@
 - [tests/run_framework_clients.gd](../tests/run_framework_clients.gd)
 - [tests/run_framework_feedback.gd](../tests/run_framework_feedback.gd)
 - [tests/run_framework_ui_fixture.ps1](../tests/run_framework_ui_fixture.ps1)
+- [tests/run_grant_storage.gd](../tests/run_grant_storage.gd)
 - [tests/run_managed_contracts.gd](../tests/run_managed_contracts.gd)
 - [tests/run_managed_registry.gd](../tests/run_managed_registry.gd)
 - [tests/run_managed_shutdown.gd](../tests/run_managed_shutdown.gd)

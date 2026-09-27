@@ -31,6 +31,10 @@ func _run() -> void:
 	if not session.ok:
 		finish(false, session.code)
 		return
+	# Override only the room DTLS hostname after WSS has authenticated. This
+	# isolates the DTLS certificate check from the lobby's own hostname check.
+	if settings.has("dtls_server_hostname"):
+		client.config.server_hostname = settings.dtls_server_hostname
 	if settings.get("admin", false):
 		var stop: Dictionary = await client.stop_room(settings.room_id)
 		finish(stop.ok, stop.code)

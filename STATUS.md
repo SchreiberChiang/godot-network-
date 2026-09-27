@@ -1,11 +1,12 @@
 # 当前状态：通用管理服务、账号、资产与射击示例
 
-更新：2026-09-27。分支 `codex/shooter-framework`；账号请求改造和复核已整理为本地提交。本文件只记录**当前**状态、最新有效验证范围、未运行项与已知问题；逐轮过程、失败修复细节与原始证据链接见 [STATUS 历史归档](docs/archive/status_history.md)。启动方法见 [README](README.md)。
+更新：2026-09-27。分支 `codex/shooter-framework`；账号请求改造见本地提交 `07aa0d2`，grant 签名密钥去文件化、独立包重建及 secure 测试修正已完成 Codex 复核并整理为本地提交。本文件只记录**当前**状态、最新有效验证范围、未运行项与已知问题；逐轮过程、失败修复细节与原始证据链接见 [STATUS 历史归档](docs/archive/status_history.md)。启动方法见 [README](README.md)。
 
 ## 工作区与交接
 
 - 提交 `4a2e11d` 收录了 2026-09-26 的三轮源码工作（托管新游戏模板、客户端双击无窗口修复、射击平滑/短弹迹/房间规则），以及 2026-09-27 的文档整理和项目插画；已推送到 `origin/codex/shooter-framework`，未部署。
 - 2026-09-27 本轮相对 `4a2e11d` 完成账号请求去文件化（Claude 实现、Codex 复核）：修改 `host/core/account_service.gd`、`host/platform/bounded_helper.gd`、`tools/account_store.ps1`、`tools/bounded_helper.ps1`、`tools/test_helpers.ps1`、`tests/run_admin_http.gd`、`docs/21_managed_protocol.md`、`docs/22_framework_operations.md`、`docs/23_branch_files.md` 和本文件；新增 `tests/run_storage_timing.gd`、`tests/fixtures/storage_cost_breakdown.ps1`。运行证据在 Git 忽略的 `logs/`。
+- 2026-09-27 grant 轮（Claude 实现、Codex 复核，基于 `07aa0d2`）：修改 `host/storage/sqlite_repository.gd`、`tools/sqlite_store.ps1`、`tests/run_secure.gd`、`tests/fixtures/secure_client.gd`、`docs/21_managed_protocol.md`、`docs/22_framework_operations.md`（修复上一轮留下的两行路径转义错误）、`docs/23_branch_files.md` 和本文件；新增 `tests/run_grant_storage.gd`、`tests/fixtures/grant_database.ps1`。重建出的独立包和运行证据在 Git 忽略的 `artifacts/`、`logs/`。
 - 环境：Windows 10.0.26200；Godot `4.7.2.stable.steam.ed1daf0bf`（`D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`），导出使用同安装目录的 4.7.2 official 模板；Git `2.55.0.windows.3`；系统 `winsqlite3.dll` 3.51.1。
 
 ## 当前已实现
@@ -24,15 +25,36 @@
 
 | 交付物 | 状态 |
 |---|---|
-| 源码入口 `StartManagement.cmd` / `StartShooterClient.cmd` / `StartManagedTurns.cmd` / `StopManagement.cmd` | 当前推荐，包含全部 2026-09-26 修改 |
-| 最新独立包 `artifacts/RoomKit-0.5.0-framework-windows-f4f40384083d45e28ffa38bcb5dea472.zip`（索引 `artifacts/framework-release.json`，SHA256 `49b8f13f92917b1305b9d2529bed9c371dce4c8397015501152e81ca542e173e`） | 2026-09-22 构建并验收；**不含** 09-26 的模板注册、启动器修复和房间规则，其射击客户端（shooter-v1）与当前源码的 shooter-v2 不兼容。需要重新构建并验收 |
+| 源码入口 `StartManagement.cmd` / `StartShooterClient.cmd` / `StartManagedTurns.cmd` / `StopManagement.cmd` | 当前推荐，包含到本轮为止的全部修改 |
+| 最新独立包 `artifacts/RoomKit-0.5.0-framework-windows-fc3df1a4490b40189245faaadb2fbae0.zip`（索引 `artifacts/framework-release.json`，228,974,086 字节，SHA256 `c36d86c2087b03f19f9b5aab9632e1ec828c97572c7b7fcad4172c44ba542da6`） | 2026-09-27 由 `07aa0d2` 加本轮 grant 改动构建，早于 secure 测试修正（测试文件不进入包）：含 09-26 的模板注册、启动器修复和房间规则（shooter-v2）、账号请求 stdin 和 grant 签名密钥 stdin。包内 `tools/` 下三个存储助手与仓库哈希一致，Operator/ManagedHost PCK 含新代码。`tests/test_framework_release.ps1` 44/0；**没有**用新包做人工浏览器/原生客户端操作。旁边已解压目录跑过测试、含测试私有数据，分发只用 ZIP |
+| 上一版独立包 `…-f4f40384083d45e28ffa38bcb5dea472.zip`（SHA256 `49b8f13f…e173e`） | 2026-09-22 构建，保留作证据，已被上一行取代；射击客户端为 shooter-v1，与当前源码不兼容 |
 | 早期无账号演示入口（仓库根 `StartPanel.cmd`、`StartPlay.cmd`、`StartTurns.cmd`、`StartDemo.cmd`、`ShowResults.cmd`）及 0.1.0 包 | 保留但不推荐，见 [早期入口](docs/archive/early_entrypoints.md) |
 
 ## 最新有效验证范围
 
-每项的计数都是断言数，不是玩家数。“代码版本”指该结果对应的源码：**09-27** 表示当前工作区代码（账号请求 stdin 改造后）；**09-26** 表示提交 `4a2e11d` 中的同一批源码（改造前）；**09-22** 表示提交 `f0b4c8b` 前后的代码。同一专项以最新日期的结果为准。所有结果都只在同一台 Windows 电脑上取得。
+每项的计数都是断言数，不是玩家数。“代码版本”指该结果对应的源码：**09-27 grant 轮**表示 `07aa0d2` 加 grant 改造及 secure 测试修正；**09-27 账号轮**表示提交 `07aa0d2` 的代码；**09-26** 表示提交 `4a2e11d` 中的同一批源码；**09-22** 表示提交 `f0b4c8b` 前后的代码。同一专项以最新的结果为准。所有结果都只在同一台 Windows 电脑上取得。
 
-### 2026-09-27（当前工作区代码：账号请求 stdin 改造后）
+### 2026-09-27 grant 轮（本轮提交代码）
+
+| 命令 / 专项 | 结果 | 范围与证据 |
+|---|---|---|
+| Godot `tests/run_grant_storage.gd` | 24/0，退出 0 | 走真实 `ResultService.prepare_launch`：5 次 grant 调用期间数据目录没有出现任何临时文件；除 SQLite 外没有文件含密钥；重开后密钥逐字节一致，用它签名的结果被接受、伪造签名仍返回 AUTH_FAILED；重复 launch_id 仍返回 STORAGE_UNAVAILABLE 且不改原密钥；第 256 条授权可写、第 257 条仍返回 STORAGE_CAPACITY_EXCEEDED；Godot 句柄 323 → 323。单次 grant 中位数 962 ms；`logs/grant-storage-stdin.stdout` |
+| 同一专项在未改动的 `07aa0d2` 副本上 | 22/2（预期失败） | 失败的正是两条“grant 调用期间不应有临时文件”的断言（扫到 `request-*`、`helper-*`），证明检测有效；其余错误码断言在旧代码上同样通过，说明错误行为不变；中位数 1065 ms；`logs/grant-storage-baseline-07aa0d2.stdout` |
+| `tools/run.ps1 -Mode all`（首次） | unit 320/0、launcher 64/0、integration 133/0、demo 通过、players 33/0、games 47/0、persistence 42/0，**secure 36/1** 后停止 | games 与 persistence 会真实生成 grant 并提交签名结果；旧 secure 测试错误已在本轮复核时修正，完整 `-Mode all` 未重跑；`logs/grant-regression-run_all.txt` |
+| `tools/run.ps1` 补跑 `-Mode all` 中被跳过的 stress / load / recovery / limits / template / panel / assets | 404/0；95/0；24/0；8/0；10/0；62/0；83/0 | 均退出 0；`logs/grant-regression-2-<模式>.txt` |
+| `tools/run.ps1 -Mode secure`，未改动的 `07aa0d2` 副本 vs 当前代码 | 36/1 vs 36/1 | 同一条断言、同样失败，确认与本轮无关；`logs/grant-regression-2-secure_pristine_07aa0d2.txt`、`logs/grant-regression-2-secure_working.txt` |
+| Codex 复核：`tools/run.ps1 -Mode secure`；Godot `tests/run_grant_storage.gd` | 37/0；24/0，均退出 0 | 测试客户端先完成 WSS 认证，再仅给 DTLS 使用错误主机名；实际进入 DTLS 握手后返回 `AUTH_FAILED`。grant 重跑见 `logs/review-grant-storage.stdout`；secure 结果见 `logs/secure-console.log`、`data/secure-test-9ddfd8900ade81f30d01c8ede39f5cc1/bad-dtls-name.log`。 |
+| `tools/run.ps1 -Mode result_rewards` | 74/0 | 含真实 grant → 签名提交 → 成绩与奖励同事务；`logs/grant-regression-result_rewards.txt` |
+| `tests/test_room_rules.ps1` | 18/0 | 真实 Operator/宿主/房间与两名玩家打满 30 秒规则局并结算；`logs/grant-regression-room_rules.txt` |
+| `tests/test_operator.ps1 -Lifecycle` | 29/0 | 真实 60 秒重启、崩溃注入与回收；`logs/grant-regression-operator_lifecycle.txt` |
+| `tests/test_operator.ps1 -HoldForIntegration` ＋ `tests/test_framework_clients.ps1 -Visual`（第 1 次） | **14/1，退出 1**；Operator 侧 11/0 | 驱动在开火循环中抛出 `Access is denied`，之后的步骤未执行，见已知问题 3；`logs/grant-regression-framework_clients.txt`，客户端证据 `logs/operator-df44bb1a3a0d4383b120b3cb90add04c/clients-244cffaa5cb44238a6933a7f7e7143a0/` |
+| 同上，原样重跑（第 2 次） | 47/0，退出 0；Operator 侧 11/0 | 真实 WSS+DTLS/ENet 两种玩法，完整 300 秒射击局的签名结算与准确到账；`logs/grant-regression-2-framework_clients.txt` |
+| `tools/build_framework_release.ps1` | 退出 0，`FRAMEWORK_RELEASE_BUILD_OK` | 新包见“当前交付物”；`logs/grant-regression-build_release.txt` |
+| `tests/test_framework_release.ps1 -Bundle <新包>` | 44/0，退出 0 | 35 项哈希、原生 Operator/宿主/双房间、实际 WSS/ENet 联调及退出/端口回收；`logs/grant-regression-release_test.txt` |
+
+两批回归分别由 `logs/run-grant-regression-20260927.ps1` 和 `logs/run-grant-regression-2-20260927.ps1` 顺序执行，汇总见 `logs/grant-regression-summary.txt`、`logs/grant-regression-2-summary.txt`。日志中没有脚本、解析或编译错误；运行后项目相关进程残留为 0，`data/` 下没有残留请求文件。
+
+### 2026-09-27 账号轮（提交 `07aa0d2` 代码）
 
 | 命令 / 专项 | 结果 | 范围与证据 |
 |---|---|---|
@@ -99,8 +121,8 @@
 ## 未运行 / 未验收
 
 - 第二台实体设备的局域网联机（曾询问用户，未收到答复）、Linux 完整宿主、公网与公网 WSS 发布、长期满载压测、24 小时备份保留周期。
-- 当前源码的新独立导出包（本轮未重新构建，独立包内的账号请求路径未实测）；新管理表单（房间规则）的真实浏览器点击；真人操作手感；托管模板的图形界面。
-- 09-27 改造后未重跑：`tests/test_framework_clients.ps1 -Visual`（需两个终端、完整 5 分钟对局）、`test_managed_shutdown.ps1`、`test_operator_schedules.ps1`、`test_operator_maintenance.ps1`、`test_asset_audit.ps1`、`tools/run.ps1 -Mode players / integration / recovery` 及完整 `-Mode all`。这些专项的账号调用使用夹具，或者根本不经过账号助手。
+- 用新独立包做人工浏览器操作和原生客户端试玩（自动的 44 项包测试已通过）；新管理表单（房间规则）的真实浏览器点击；真人操作手感；托管模板的图形界面。
+- grant 轮未重跑：`test_managed_shutdown.ps1`、`test_operator_schedules.ps1`、`test_operator_maintenance.ps1`、`test_asset_audit.ps1`、`test_managed_template.ps1`、`test_asset_response_loss.ps1`、`test_framework_capacity.ps1`、`tools/run.ps1 -Mode accounts / admin_http / managed_contracts / managed_registry`、`tools/test_helpers.ps1`、`run_storage_timing.gd`。本轮只改了 grant 这一个操作的传递方式，以上专项此前在 `07aa0d2` 代码上的结果见下表。`-Mode all` 因 secure 失败而未能一次跑完，已逐项补跑。
 - 经 WSS 的端到端单次延迟没有单独计时；上面的数字只是存储层耗时。
 - 断电、磁盘满、真实网络丢包/延迟、证书轮换、外部身份服务。
 
@@ -108,15 +130,23 @@
 
 1. **仅限 Windows**：账号、资产、结果存储和进程身份核验都通过 PowerShell 助手与 `winsqlite3.dll` 实现，Linux 上直接返回 `UNSUPPORTED_STORAGE`。
 2. **存储调用开销（09-27 已实测，未优化）**：每个存储往返约 1.0–1.2 秒，是两次 PowerShell 冷启动加上每次重新编译 C# 所致；注册和登录另有约 1.9 秒的 PBKDF2（有意保留的安全成本）。购买需要 3 次往返，约 3.1–3.3 秒。数字见上面的实测表。助手在工作线程执行，初始化与离线管理仍是同步调用。并发下的排队延迟没有单独测量。
-3. **临时请求文件的剩余范围**：账号请求已不落盘（09-27）。资产、结果和维护请求仍用私有目录下的短期请求文件，它们不含账号口令或 session token，但结果授权 `grant` 请求带有每房结果签名密钥（该密钥本身也保存在资产库中）。另外，用户真实数据目录 `data/framework/` 下有一个 09-26 23:33 残留的 `account-request-*.json`（104 字节，未读取内容，不能确认其内容或是否过期）和两个 `helper-*.json`；没有读取、移动或删除。
-4. **射击网络模型只按局域网设计**：服务器每秒 20 次发送完整状态；客户端只做显示平滑，没有客户端预测，也没有命中回溯（按 [docs/17](docs/17_framework_shooter_plan.md) 的首版范围）。公网延迟下的手感没有评估。
-5. **容量与耐久**：16 人满房只持续了 17.5 秒；100 轮开关房是 09-21 的早期宿主做的，托管宿主没有做长期测试。
-6. **原因未查明的现象**：09-22 有一个可视化夹具中途消失，没有清理报告（未计为通过）；另有一次管理员意外退出登录，日志里没有根因（同期修复了一个相关的错误码映射缺陷，但不能认定就是根因）。
-7. **预期诊断输出**：unit 的恶意指数用例会打印 `Exponent too high`；测试主动断开 TLS 时出现 `mbedtls -0x6c00`。两者都不是失败。
-8. `tools/run.ps1 -Mode all` 只包含早期基础回归（外加 panel、assets）；账号、管理、射击和托管专项需按 [docs/22](docs/22_framework_operations.md#测试入口) 单独运行。
-9. 早期结果库有容量上限且没有自动归档：每库 256 个授权、10000 条结果，每房 128 条待发送（[docs/15](docs/15_release_operations.md)）。
+3. **完整客户端测试驱动有偶发写文件失败**：`tests/test_framework_clients.ps1` 的 `Save-Json` 写命令文件（先写 `.tmp` 再 `Move-Item`）没有重试。09-27 第一次运行时在开火循环中抛出 `Access is denied` 并中止（14/1），原样重跑为 47/0。具体是哪个进程占用了文件没有查明；本轮没有改测试驱动。
+4. **临时请求文件的剩余范围**：账号请求（09-27）和 grant 签名密钥（09-27 grant 轮）已不落盘。其余资产、结果和维护请求仍用私有目录下的短期请求文件，它们不含账号口令、session token 或签名密钥。另外，用户真实数据目录 `data/framework/` 下有一个 09-26 23:33 残留的 `account-request-*.json`（104 字节，未读取内容，不能确认其内容或是否过期）和两个 `helper-*.json`；没有读取、移动或删除。
+5. **射击网络模型只按局域网设计**：服务器每秒 20 次发送完整状态；客户端只做显示平滑，没有客户端预测，也没有命中回溯（按 [docs/17](docs/17_framework_shooter_plan.md) 的首版范围）。公网延迟下的手感没有评估。
+6. **容量与耐久**：16 人满房只持续了 17.5 秒；100 轮开关房是 09-21 的早期宿主做的，托管宿主没有做长期测试。
+7. **原因未查明的现象**：09-22 有一个可视化夹具中途消失，没有清理报告（未计为通过）；另有一次管理员意外退出登录，日志里没有根因（同期修复了一个相关的错误码映射缺陷，但不能认定就是根因）。
+8. **预期诊断输出**：unit 的恶意指数用例会打印 `Exponent too high`；测试主动断开 TLS 时出现 `mbedtls -0x6c00`；load 模式会多打印一行 `SECURE_RESULT`（复用 secure 的测试框架）。这些都不是失败。
+9. `tools/run.ps1 -Mode all` 只包含早期基础回归（外加 panel、assets），遇到第一项失败就停止；账号、管理、射击和托管专项需按 [docs/22](docs/22_framework_operations.md#测试入口) 单独运行。
+10. **结果库容量上限没有清理机制**：每库最多 256 条启动授权、10000 条结果，每房 128 条待发送（[docs/15](docs/15_release_operations.md)）。09-27 代码检查确认，托管宿主每开一间房都会新增一条授权，而代码里没有任何删除授权的路径。所以同一个资产库在整个使用期内累计开到第 257 间房时，建房会因 `STORAGE_CAPACITY_EXCEEDED` 失败；上限本身已由 `run_grant_storage.gd` 实测。这不是本轮引入的问题，本轮也没有改；需要单独设计授权的回收策略（例如确认房间退出、结果补存完成之后再删除）。
 
 ## 本轮记录（2026-09-27）
+
+**grant 签名密钥去文件化与独立包重建（Claude 实现、Codex 复核，基于 `07aa0d2`）**：用户要求只处理 grant 请求中签名密钥临时落盘的问题，保持协议和业务行为不变，运行相关真实 Godot 测试，重建并验证独立包。
+
+- 完成：`SqliteRepository` 对 `grant` 操作改用已有的 `BoundedHelper.execute_input`，请求经标准输入交给 `sqlite_store.ps1`；`sqlite_store.ps1` 的 `-Request` 改为可选，不传时从标准输入读取一行 base64 UTF-8 JSON（上限 65536 字符）。其余操作、`release/Manage.ps1` 和测试脚本直接调用时仍用文件模式。授权表结构、SQL、256 条上限、错误码、签名算法和结果协议都没有改。新增 `tests/run_grant_storage.gd` 与预填 255 条授权的夹具。用改造后的源码重建了独立包，并跑了包测试。
+- 失败与修复：旧 `secure` 测试 36/1 是阶段混淆，Codex 修正测试后 37/0。第一次完整客户端测试因驱动写文件 `Access is denied` 失败，原样重跑通过（已知问题 3）。另有两处 Claude 的过程失误已修正：用 Node 的 `String.replace` 插入 PowerShell 正则时，替换文本里的 `$'` 被当成特殊替换符，把 `sqlite_store.ps1` 写坏了，发现后从 `07aa0d2` 还原并改用精确编辑重做；复查时发现上一轮写进 docs/22 的两行命令被转义吃掉了反斜杠（已随 `07aa0d2` 提交），本轮已修正。
+- Codex 复核：修正原有 secure 测试的阶段混淆，测试客户端先完成 WSS，再仅给 DTLS 使用错误主机名；真实 Godot secure 37/0，grant 专项重跑 24/0。旧 secure 36/1 证据保留。
+- 未运行：见上文“未运行 / 未验收”。没有删除 `data/framework/` 下的旧残留文件；本地提交，未推送或部署。
 
 **存储耗时实测与账号请求去文件化（Claude 实现、Codex 复核）**：用户要求先实测注册、登录、购买、结算的耗时，再消除明文账号请求临时文件；保持协议、事务和幂等行为不变，不引入新的后端语言，跑真实 Godot 回归。
 

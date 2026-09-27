@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Database,[Parameter(Mandatory=$true)][string]$Request)
+param([Parameter(Mandatory=$true)][string]$Database,[string]$Request='')
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 # Only the host launches this helper. SQL is fixed here, values are bound parameters.
@@ -68,7 +68,15 @@ function RewardInteger($Value,[long]$Maximum) {
     return (-not [double]::IsNaN([double]$Value) -and -not [double]::IsInfinity([double]$Value) -and [double]$Value -ge 0 -and [double]$Value -le $Maximum -and [double]$Value -eq [math]::Floor([double]$Value))
 }
 try {
-    $requestObject=Get-Content -Encoding UTF8 -LiteralPath $Request -Raw | ConvertFrom-Json
+    if ($Request) {
+        $requestObject=Get-Content -Encoding UTF8 -LiteralPath $Request -Raw | ConvertFrom-Json
+    } else {
+        # Stdin mode from bounded_helper.ps1: one base64 UTF-8 JSON line. Used for
+        # requests carrying room result signing keys, so they never touch disk.
+        $line=[Console]::In.ReadLine()
+        if ([string]::IsNullOrEmpty($line) -or $line.Length -gt 65536 -or $line.Length % 4 -ne 0 -or $line -notmatch '^[A-Za-z0-9+/]*={0,2}$') { throw 'INVALID_STORAGE_REQUEST' }
+        $requestObject=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line)) | ConvertFrom-Json
+    }
     $db=New-Object RoomKitSqlite($Database)
     $result=@{ok=$true;code=''}
     if ($requestObject.op -eq 'init') {

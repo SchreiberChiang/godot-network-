@@ -92,8 +92,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_client_launcher
 node tests/test_admin_room_rules.cjs
 node tests/test_admin_asset_spaces.cjs
 node tests/test_admin_auth_errors.cjs
-powershell -NoProfile -ExecutionPolicy Bypass -File .	ools	est_helpers.ps1
-& 'D:SteamLibrarysteamappscommonGodot Enginegodot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_storage_timing.gd -- --rounds=5 --label=my-run
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test_helpers.ps1
+& 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_storage_timing.gd -- --rounds=5 --label=my-run
+& 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_grant_storage.gd
 ```
 
 `managed_shutdown` 与 `operator_schedules` 会各自创建私有数据目录，运行前需要存在 `artifacts/framework-games.json` 及其中引用的工程产物；`operator_schedules` 用受控时间验证 30 分钟备份和 10 分钟重启窗口，没有真实等待。`test_helpers.ps1` 覆盖有界助手的超时终止、路径白名单和账号请求的 stdin 模式。`run_storage_timing.gd` 在私有测试目录里实测注册、登录、会话校验、登出、发币、购买、重试和结算的存储层耗时，同时检查账号操作期间数据目录没有出现请求文件、Godot 句柄没有增长；报告写入 `logs/storage-timing-<label>.json`，输出 `STORAGE_TIMING_RESULT passed=... failed=0` 且退出 0 才算通过。耗时受机器负载影响，只能在同一台机器上前后对比。在这两条之前的七条依次对应托管注册、[托管模板](24_managed_game_template.md)、[房间规则](25_shooter_room_rules.md)、客户端启动器和三个管理页面函数测试；Node 测试用的是 DOM/API 替身，不算浏览器验收。射击渲染平滑对比 `tests/run_shooter_visual.gd` 需要图形窗口，命令见 [docs/25](25_shooter_room_rules.md)。各专项的最新结果与证据见 [STATUS](../STATUS.md#最新有效验证范围)。

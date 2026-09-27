@@ -4,6 +4,8 @@ const Helper = preload("res://host/platform/bounded_helper.gd")
 var root := ""
 var database := ""
 var version := ""
+# Requests carrying room result signing keys: sent over stdin, never as a file.
+const STDIN_OPERATIONS := ["grant"]
 
 func initialize(directory: String, database_name: String = "results.sqlite") -> Dictionary:
 	if OS.get_name() != "Windows" or database_name.get_file() != database_name:
@@ -19,6 +21,11 @@ func initialize(directory: String, database_name: String = "results.sqlite") -> 
 	return result
 
 func execute(request: Dictionary) -> Dictionary:
+	if str(request.get("op", "")) in STDIN_OPERATIONS:
+		if root.is_empty():
+			return Wire.failure("STORAGE_UNAVAILABLE")
+		var piped := Helper.execute_input("sqlite_store.ps1", ["-Database", database], JSON.stringify(request))
+		return Wire.failure("STORAGE_UNAVAILABLE") if str(piped.get("code", "")).begins_with("HELPER_") else piped
 	var path := root.path_join("request-" + Wire.uid() + ".json")
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:

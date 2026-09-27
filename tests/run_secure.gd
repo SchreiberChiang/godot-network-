@@ -70,7 +70,7 @@ func _run() -> void:
 	check(await until(func(): return read_report(bad).get("phase", "") == "DONE", 16000) and read_report(bad).get("ok", false), "WSS rejects untrusted certificate")
 	bad = launch_client("bad-credential", "0".repeat(64), {"reject_session": true})
 	check(await until(func(): return read_report(bad).get("phase", "") == "DONE", 16000) and read_report(bad).get("ok", false), "WSS rejects invalid identity credential")
-	bad = launch_client("bad-dtls-name", one, {"server_hostname": "wrong.invalid", "reject_enet": true})
+	bad = launch_client("bad-dtls-name", one, {"dtls_server_hostname": "wrong.invalid", "reject_enet": true})
 	check(await until(func(): return read_report(bad).get("phase", "") == "DONE", 24000) and read_report(bad).get("ok", false), "ENet DTLS rejects wrong certificate hostname")
 	# Wait for the rejected admission lease to expire before normal clients join.
 	check(await until(func(): return lobby.admissions.seats.is_empty(), 18000), "rejected secure admission expires")
