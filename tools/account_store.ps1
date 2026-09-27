@@ -1,4 +1,6 @@
-param([Parameter(Mandatory=$true)][string]$Database)
+param([Parameter(Mandatory=$true)][string]$Database,[string]$RequestJson='')
+# -RequestJson is for in-process calls from storage_worker.ps1 only (it carries
+# session tokens); never pass a request on a process command line.
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 # Passwords and session tokens arrive only on standard input as one base64 line
@@ -125,10 +127,14 @@ function CheckPassword($Row,[string]$Password) {
     return [RoomKitPasswords]::Verify($Password,$Row['salt'],[int]$Row['iterations'],$Row['password_hash'])
 }
 try {
-    # 10924 base64 characters encode the same 8192-byte request limit as before.
-    $line=[Console]::In.ReadLine()
-    if ([string]::IsNullOrEmpty($line) -or $line.Length -gt 10924 -or $line.Length % 4 -ne 0 -or $line -notmatch '^[A-Za-z0-9+/]*={0,2}$') { Fail 'INVALID_ACCOUNT_REQUEST' }
-    $bytes=[Convert]::FromBase64String($line)
+    if ($RequestJson) {
+        $bytes=[Text.Encoding]::UTF8.GetBytes($RequestJson)
+    } else {
+        # 10924 base64 characters encode the same 8192-byte request limit as before.
+        $line=[Console]::In.ReadLine()
+        if ([string]::IsNullOrEmpty($line) -or $line.Length -gt 10924 -or $line.Length % 4 -ne 0 -or $line -notmatch '^[A-Za-z0-9+/]*={0,2}$') { Fail 'INVALID_ACCOUNT_REQUEST' }
+        $bytes=[Convert]::FromBase64String($line)
+    }
     if ($bytes.Length -gt 8192) { Fail 'INVALID_ACCOUNT_REQUEST' }
     $r=[Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
     if ($r -isnot [PSCustomObject]) { Fail 'INVALID_ACCOUNT_REQUEST' }
@@ -172,7 +178,7 @@ try {
             'setup.admin' {
                 if ([int](Query 'SELECT count(*) AS total FROM accounts WHERE role=''admin''')[0]['total']) { Fail 'SETUP_COMPLETE' }
                 $username=Username
-                $password=TextValue 'password' 10 128
+                $password=TextValue 'password' 8 128
                 $display=TextValue 'display_name' 1 32
                 $secret=NewPassword $password
                 $userId='admin_'+[RoomKitPasswords]::RandomHex(16)
@@ -184,7 +190,7 @@ try {
             'account.register' {
                 if (-not [int](Query 'SELECT count(*) AS total FROM accounts WHERE role=''admin''')[0]['total']) { Fail 'SETUP_REQUIRED' }
                 $username=Username
-                $password=TextValue 'password' 10 128
+                $password=TextValue 'password' 8 128
                 $display=TextValue 'display_name' 1 32
                 $invite=TextValue 'invite_code' 32 32
                 $keys=RateKeys $username
@@ -203,7 +209,7 @@ try {
             }
             'account.login' {
                 $username=Username
-                $password=TextValue 'password' 10 128
+                $password=TextValue 'password' 8 128
                 $keys=RateKeys $username
                 CheckRate $keys
                 $rows=Query 'SELECT * FROM accounts WHERE username=?' @($username)
@@ -252,8 +258,8 @@ try {
             }
             'account.change_password' {
                 $actor=Authenticate
-                $password=TextValue 'password' 10 128
-                $replacement=TextValue 'new_password' 10 128
+                $password=TextValue 'password' 8 128
+                $replacement=TextValue 'new_password' 8 128
                 $keys=RateKeys $actor['username']
                 CheckRate $keys
                 if (-not (CheckPassword $actor $password)) { $result=FailRate $keys 'AUTH_FAILED' $op; break }
@@ -320,7 +326,7 @@ try {
                 if ($target['role'] -eq 'admin') { Fail 'ADMIN_SELF_PROTECTION' }
                 $before=PublicAccount $target
                 if ($op -eq 'account.reset_password') {
-                    $secret=NewPassword (TextValue 'password' 10 128)
+                    $secret=NewPassword (TextValue 'password' 8 128)
                     [void](Query 'UPDATE accounts SET salt=?,password_hash=?,iterations=? WHERE user_id=?' @($secret.salt,$secret.hash,[string]$iterations,$id))
                 } elseif ($op -eq 'account.ban') {
                     $until=NumberValue 'until' 0 0 9007199254740991

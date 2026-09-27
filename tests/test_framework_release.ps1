@@ -162,7 +162,7 @@ function StartDriver([string]$Game,[string]$RoomId,[string]$Invite,$Manifest,$Co
     New-Item -ItemType Directory -Force -Path $directory|Out-Null
     $bootstrap=Join-Path $private ('driver-'+$Game+'.json')
     $report=Join-Path $directory 'report.json'
-    SaveJson $bootstrap @{connection=$Connection;manifest=$Manifest;game_id=$Game;username=('release_'+$Game+'_'+$runId.Substring(0,8));password=('Player!'+[Guid]::NewGuid().ToString('N'));display_name=('Release '+$Game);invite_code=$Invite;register=$true;room_id=$RoomId;report_path=$report;control_directory=$directory;timeout_ms=240000}
+    SaveJson $bootstrap @{connection=$Connection;manifest=$Manifest;game_id=$Game;username=('release_'+$Game+'_'+$runId.Substring(0,8));password=('Pl'+[Guid]::NewGuid().ToString('N').Substring(0,6));display_name=('Release '+$Game);invite_code=$Invite;register=$true;room_id=$RoomId;report_path=$report;control_directory=$directory;timeout_ms=240000}
     $entry=StartOwned $Godot @('--headless','--path',$project,'--script','res://tests/run_framework_clients.gd','--',('--test-config='+$bootstrap)) ($Game+'-source-driver')
     $entry.game=$Game;$entry.directory=$directory;$entry.report=$report
     [void]$script:clients.Add($entry)
@@ -220,7 +220,7 @@ try{
     $public=Get-Content -LiteralPath (Join-Path $publicDirectory 'connection.json') -Encoding UTF8 -Raw|ConvertFrom-Json
     Check ($public.url -eq ('wss://127.0.0.1:'+$lobbyPort)) 'published WSS port is an integer after JSON configuration load'
     foreach($game in @('shooter','turns')){TestExportedUi $game (Join-Path $publicDirectory 'connection.json')}
-    $password='Admin!'+[Guid]::NewGuid().ToString('N')
+    $password='Ad'+[Guid]::NewGuid().ToString('N').Substring(0,6)
     $credentials=@{username=('release_admin_'+$runId.Substring(0,8));password=$password}
     $setup=Api 'setup.create' $credentials -Anonymous
     Check ($setup.ok -and $setup.payload.identity.role -eq 'admin') 'native administrator setup'
@@ -258,9 +258,17 @@ try{
         Check ($report.registration.ok -and $report.user_id -ne '') ($game+' source driver actually registers and logs in over native WSS')
         Check ($report.initial_join_ok -and $report.world.players.Count -ge 1) ($game+' source driver joins native ENet and receives replicated player')
     }
-    $status=Api 'status'
+    # The host publishes room status about once per second, so poll briefly instead
+    # of reading one snapshot; fast admission can otherwise beat the next publish.
     foreach($game in @('shooter','turns')){
-        $room=@($status.payload.rooms|Where-Object room_id -eq $rooms[$game].room_id)[0]
+        $room=$null
+        $statusDeadline=(Get-Date).AddSeconds(5)
+        do {
+            $status=Api 'status'
+            $room=@($status.payload.rooms|Where-Object room_id -eq $rooms[$game].room_id)[0]
+            if([int]$room.heartbeats -gt 0 -and [int]$room.connected -ge 1){break}
+            Start-Sleep -Milliseconds 250
+        } while((Get-Date) -lt $statusDeadline)
         Check ([int]$room.heartbeats -gt 0 -and [int]$room.connected -ge 1) ($game+' native heartbeat and player count')
     }
     foreach($client in $script:clients){CloseDriver $client;Check ($client.process.ExitCode -eq 0) ($client.game+' source driver graceful exit 0')}

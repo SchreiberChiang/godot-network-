@@ -12,6 +12,7 @@ const Http = preload("res://host/admin_http.gd")
 const Helper = preload("res://host/platform/bounded_helper.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const GameServices = preload("res://host/core/managed_game_registry.gd")
+const Resident = preload("res://host/storage/resident_store.gd")
 var accounts = Accounts.new()
 var assets = Assets.new()
 var results = Results.new()
@@ -94,6 +95,10 @@ func _run() -> void:
 		quit(1)
 		return
 	results.reward_calculator = _rewards
+	# Start both resident storage workers in the background so the first player or
+	# administrator request does not pay PowerShell start-up and compile time.
+	_work(assets.repository.prewarm)
+	_work(accounts.prewarm)
 	var security := {"key": root_path.path_join("server.key"), "certificate": root_path.path_join("server.crt"), "hostname": "localhost"}
 	if not FileAccess.file_exists(security.key) or not FileAccess.file_exists(security.certificate):
 		security = await _work(preload("res://sdk/roomkit/shared/secure_transport.gd").create_local_certificate.bind(root_path))
@@ -387,6 +392,9 @@ func _admin(request: Dictionary) -> Dictionary:
 				storage_maintenance = true
 				while worker_count > 0:
 					await process_frame
+				# Workers keep no connection open between requests; stopping them here
+				# still guarantees none touches the files during the restore.
+				Resident.shutdown_all()
 				result = _payload(await _maintenance({"op": "backup.restore", "backup_id": payload.get("backup_id", ""), "reason": payload.get("reason", "restore")}))
 				if result.ok:
 					settings = Wire.decode(FileAccess.get_file_as_bytes(root_path.path_join("config.json")))
@@ -590,6 +598,7 @@ func _shutdown() -> void:
 	while worker_count > 0:
 		await process_frame
 	http.close()
+	Resident.shutdown_all()
 	DirAccess.remove_absolute(root_path.path_join("operator-stop.request"))
 	DirAccess.remove_absolute(root_path.path_join("operator.json"))
 	quit(0)

@@ -41,6 +41,15 @@ func _run() -> void:
 	reject_set("managed.asset.read", [], "user_id", "forged", "envelope rejects identity injection")
 	reject_set("managed.account.login", [], "type", "account.promote", "unknown public account operation rejected")
 	reject_remove("managed.account.login", ["payload"], "password", "login requires password")
+	for name in ["managed.account.register", "managed.account.login", "managed.account.change_password"]:
+		var accepted: Dictionary = examples[name].duplicate(true)
+		accepted.message.payload.password = "Abcd1234"
+		check(validate_case(accepted) == "", name + " accepts eight-character password")
+		reject_set(name, ["payload"], "password", "Abc1234", name + " rejects seven-character password")
+	var changed_password: Dictionary = examples["managed.account.change_password"].duplicate(true)
+	changed_password.message.payload.new_password = "Newp1234"
+	check(validate_case(changed_password) == "", "password change accepts eight-character replacement")
+	reject_set("managed.account.change_password", ["payload"], "new_password", "New1234", "password change rejects seven-character replacement")
 	reject_remove("managed.error.response", [], "error", "failed lobby response requires error object")
 	reject_set("managed.login.response", [], "error", {"code": "AUTH_FAILED", "message": "failed", "retryable": false}, "successful lobby response cannot carry an error")
 	reject_set("managed.login.response", ["payload", "identity"], "role", "owner", "typed account response rejects unknown role")

@@ -39,12 +39,12 @@
     },
     "password": {
       "type": "string",
-      "minLength": 10,
+      "minLength": 8,
       "maxLength": 128
     },
     "new_password": {
       "type": "string",
-      "minLength": 10,
+      "minLength": 8,
       "maxLength": 128
     },
     "display_name": {

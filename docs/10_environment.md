@@ -48,3 +48,10 @@ ProcessLauncher 当前同步调用 PowerShell 辅助程序。CIM 查询设有 3 
 实际工作目录仍为F:\文档\GodotGame\Net\RoomKit，当前执行环境无文件沙箱限制；没有修改全局Git、Codex或系统证书配置。Git2.55.0.windows.3，Windows10.0.26200。使用原Godot4.7.2 Steam编辑器及同安装目录的4.7.2 official Windows/Linux模板，未升级或下载引擎。系统winsqlite3.dll实测3.51.1。
 
 Windows正式模板已经运行真实宿主/房间/客户端及十轮进程句柄检查；Linux模板在已安装WSL Ubuntu（内核6.6.87.2-microsoft-standard-WSL2、x86_64）通过215项协议/准入/玩法检查。Linux没有本项目进程/数据库适配，不能算Linux完整宿主通过。可重复入口见docs/15和STATUS。
+
+## 待验收的第二台设备（用户提供，2026-09-27）
+
+- 设备：一台 Linux 笔记本；局域网 SSH 目标 `zhao@192.168.10.105`。
+- 这是用户提供的连接信息，尚未连接；发行版、CPU 架构、Godot/导出环境、防火墙和实际客户端运行能力均未知。局域网地址可能变化，使用前需重新确认。
+- 预定用途：以后做第二台实体设备的局域网联机验收。当前 Windows 宿主的账号/资产存储依赖 PowerShell 与 `winsqlite3.dll`，不能据此把 Linux 笔记本当作已经可运行完整宿主。
+- 用户本轮要求暂缓验证；未执行 SSH 命令，也未在这台设备安装或修改任何东西。

@@ -9,7 +9,7 @@ var service = Service.new()
 var admin := ""
 var player := ""
 var user_id := ""
-const PASSWORD := "very-secret-test-password"
+const PASSWORD := "Abcd1234"
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -24,6 +24,7 @@ func _run() -> void:
 	check(service.execute({"op": "account.login", "username": "bad", "password": PASSWORD}).code == "INVALID_ACCOUNT_REQUEST", "network origin required for rate-limited operation")
 	check(service.execute({"op": "account.login", "username": "bad", "password": PASSWORD, "client_ip": "local", "role": "admin"}).code == "INVALID_ACCOUNT_REQUEST", "claimed role rejected by schema")
 	check(register("before_setup", "0".repeat(32)).code == "SETUP_REQUIRED", "registration cannot precede admin setup")
+	check(service.execute({"op": "setup.admin", "username": "operator", "password": "Abc1234", "display_name": "管理员"}).code == "INVALID_ACCOUNT_REQUEST", "seven-character administrator password rejected")
 	var setup_request := {"op": "setup.admin", "username": "operator", "password": PASSWORD, "display_name": "管理员"}
 	var setup_results: Array = await compete([setup_request, setup_request])
 	check(count_ok(setup_results) == 1 and count_code(setup_results, "SETUP_COMPLETE") == 1, "concurrent first admin setup creates exactly one administrator")
@@ -39,6 +40,7 @@ func _run() -> void:
 	if not check(invitation.ok, "administrator creates invitation"):
 		finish()
 		return
+	check(call_api({"op": "account.register", "username": "short_user", "password": "Abc1234", "display_name": "短密码", "invite_code": invitation.invite_code, "client_ip": "127.0.0.2"}).code == "INVALID_ACCOUNT_REQUEST", "seven-character player password rejected")
 	var first := register("Alice", invitation.invite_code, "127.0.0.2")
 	if not check(first.ok, "invite registers real player"):
 		finish()
@@ -66,22 +68,24 @@ func _run() -> void:
 	check(call_api({"op": "account.rename", "token": player, "display_name": "玩家 ' 中文"}).ok, "own nickname supports bound Unicode and quotes")
 	check(call_api({"op": "account.rename", "token": admin, "user_id": user_id, "display_name": "管理修改", "reason": "用户请求"}).ok, "admin rename with reason")
 	check(call_api({"op": "session.authenticate", "token": player}).identity.display_name == "管理修改", "existing session reads updated name")
-	check(call_api({"op": "account.change_password", "token": player, "password": PASSWORD, "new_password": "new-password-test", "client_ip": "127.0.0.2"}).ok, "player password change commits")
+	check(call_api({"op": "account.change_password", "token": player, "password": PASSWORD, "new_password": "Abc1234", "client_ip": "127.0.0.2"}).code == "INVALID_ACCOUNT_REQUEST", "seven-character replacement password rejected")
+	check(call_api({"op": "account.change_password", "token": player, "password": PASSWORD, "new_password": "Newp1234", "client_ip": "127.0.0.2"}).ok, "eight-character player password change commits")
 	check(not call_api({"op": "session.authenticate", "token": player}).ok, "password change revokes active token")
 	check(login("alice").code == "AUTH_FAILED", "old password rejected after change")
-	var changed := login("alice", "new-password-test")
+	var changed := login("alice", "Newp1234")
 	check(changed.ok, "new password authenticates")
 	player = changed.get("token", "0".repeat(64))
-	check(call_api({"op": "account.reset_password", "token": admin, "user_id": user_id, "password": "reset-password-test", "reason": "人工恢复"}).ok, "administrator resets password")
+	check(call_api({"op": "account.reset_password", "token": admin, "user_id": user_id, "password": "Abc1234", "reason": "人工恢复"}).code == "INVALID_ACCOUNT_REQUEST", "seven-character administrator reset rejected")
+	check(call_api({"op": "account.reset_password", "token": admin, "user_id": user_id, "password": "Rset1234", "reason": "人工恢复"}).ok, "administrator resets to eight-character password")
 	check(not call_api({"op": "session.authenticate", "token": player}).ok, "reset revokes active token")
-	var reset_login := login("alice", "reset-password-test")
+	var reset_login := login("alice", "Rset1234")
 	check(reset_login.ok, "reset credential authenticates")
 	player = reset_login.get("token", "0".repeat(64))
 	check(call_api({"op": "account.ban", "token": admin, "user_id": user_id, "until": int(Time.get_unix_time_from_system()) + 600, "reason": "测试临时封禁"}).ok, "temporary ban commits")
 	check(not call_api({"op": "session.authenticate", "token": player}).ok, "ban revokes existing session immediately")
-	check(login("alice", "reset-password-test").code == "ACCOUNT_BANNED", "banned credentials denied")
+	check(login("alice", "Rset1234").code == "ACCOUNT_BANNED", "banned credentials denied")
 	check(fixture("expire_bans"), "real database clock fixture expires temporary ban")
-	var unexpired := login("alice", "reset-password-test")
+	var unexpired := login("alice", "Rset1234")
 	check(unexpired.ok, "expired temporary ban permits login")
 	player = unexpired.get("token", "0".repeat(64))
 	check(call_api({"op": "account.ban", "token": admin, "user_id": user_id, "until": 0, "reason": "测试永久封禁"}).ok, "permanent ban commits")
@@ -90,7 +94,7 @@ func _run() -> void:
 	check(call_api({"op": "account.unban", "token": admin, "user_id": user_id, "reason": "解除测试"}).ok, "administrator unbans")
 	check(not call_api({"op": "session.authenticate", "token": player}).ok, "unban never resurrects revoked token")
 	check(call_api({"op": "account.ban", "token": admin, "user_id": login_admin.identity.user_id, "reason": "self"}).code == "ADMIN_SELF_PROTECTION", "only administrator cannot accidentally ban self")
-	var concurrent_login := {"op": "account.login", "username": "alice", "password": "reset-password-test", "client_ip": "127.0.0.5"}
+	var concurrent_login := {"op": "account.login", "username": "alice", "password": "Rset1234", "client_ip": "127.0.0.5"}
 	var login_race: Array = await compete([concurrent_login, concurrent_login])
 	check(count_ok(login_race) == 1 and count_code(login_race, "ALREADY_LOGGED_IN") == 1, "simultaneous real password logins produce exactly one token")
 	for result in login_race:
@@ -110,12 +114,12 @@ func _run() -> void:
 	check(fixture("expire_invites"), "real database fixture expires invitations")
 	check(register("expired_user", invitation.invite_code, "127.0.0.8").code == "INVITE_INVALID", "expired invitation refused")
 	await rate_limits()
-	var relogin := login("alice", "reset-password-test")
+	var relogin := login("alice", "Rset1234")
 	check(relogin.ok, "login before explicit session expiry")
 	player = relogin.get("token", "0".repeat(64))
 	check(fixture("expire_sessions"), "real database fixture expires player sessions")
 	check(not call_api({"op": "session.authenticate", "token": player}).ok, "expired token rejected")
-	var next_login := login("alice", "reset-password-test")
+	var next_login := login("alice", "Rset1234")
 	check(next_login.ok, "expired session no longer blocks login")
 	player = next_login.get("token", "0".repeat(64))
 	check(call_api({"op": "session.revoke_all", "token": admin, "user_id": "", "reason": "维护撤销"}).ok, "administrator can revoke all player sessions")

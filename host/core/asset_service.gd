@@ -68,18 +68,21 @@ func _transact(user_id: String, game_id: String, command: Dictionary, actor_id: 
 	if space == "":
 		return Wire.failure("UNKNOWN_GAME")
 	var fingerprint := Format.hash_record({"user_id": user_id, "actor_id": actor_id, "game_id": game_id, "space_id": space, "command": command})
-	var receipt: Dictionary = repository.execute({"op": "asset.receipt", "user_id": user_id, "request_id": command.request_id, "fingerprint": fingerprint})
-	if not receipt.ok:
-		return receipt
-	if receipt.found:
-		return _decode_receipt(receipt)
-	var current := read(user_id, game_id)
-	if not current.ok:
-		return current
-	var changed := Rules.apply(current.state, catalog, game_id, command, administrative)
+	var snapshot: Dictionary = repository.execute({"op": "asset.snapshot", "user_id": user_id, "space_id": space, "request_id": command.request_id, "fingerprint": fingerprint})
+	if not snapshot.ok:
+		return snapshot
+	if snapshot.found:
+		return _decode_receipt(snapshot)
+	var state: Dictionary = Rules.empty_state() if snapshot.body == "" else Wire.decode(str(snapshot.body).to_utf8_buffer(), "res://schemas/asset_state.schema.json", 65536)
+	if state.is_empty():
+		return Wire.failure("STORAGE_UNAVAILABLE")
+	var projected := Rules.project(state, catalog, game_id)
+	if Validator.validate_file(projected, "res://schemas/asset_state.schema.json") != "":
+		return Wire.failure("ASSET_LIMIT_EXCEEDED")
+	var changed := Rules.apply(projected, catalog, game_id, command, administrative)
 	if not changed.ok:
 		return changed
-	var result: Dictionary = repository.execute({"op": "asset.commit", "user_id": user_id, "space_id": space, "request_id": command.request_id, "fingerprint": fingerprint, "actor_id": actor_id, "command": Format.canonical(command), "expected_revision": current.state.revision, "body": Format.canonical(changed.state)})
+	var result: Dictionary = repository.execute({"op": "asset.commit", "user_id": user_id, "space_id": space, "request_id": command.request_id, "fingerprint": fingerprint, "actor_id": actor_id, "command": Format.canonical(command), "expected_revision": projected.revision, "body": Format.canonical(changed.state)})
 	return _decode_receipt(result)
 
 static func _decode_receipt(result: Dictionary) -> Dictionary:

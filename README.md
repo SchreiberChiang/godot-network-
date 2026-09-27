@@ -23,13 +23,15 @@
 
 私有数据在 `data/framework/`（账号库、资产库、配置、私钥），不会进入 Git 或玩家分发包。源码更新后按这个顺序重启：先退出旧客户端，然后 `StopManagement.cmd` → `StartManagement.cmd` → 在网页启动服务器并建房 → 重新打开客户端。账号和资产会保留。
 
+新注册、改密及管理员重置的密码长度为 8–128 字符；已有密码继续有效。源码和最新独立 ZIP 均已包含。
+
 房间规则设置、背包与复活、局域网配置、备份恢复、客户端窗口排查和命令行等价入口，见 [本机启动与验证](docs/22_framework_operations.md)。
 
 ## 独立 Windows 包（无需 Godot 编辑器）
 
 运行 `tools/build_framework_release.ps1` 构建。最新 ZIP 和解压位置记录在 `artifacts/framework-release.json`。解压后按顺序：`CheckFramework.cmd` 校验 → `StartPanel.cmd` 打开管理后台 → 玩家用 `StartShooter.cmd` / `StartTurns.cmd` → 全部关闭用 `StopFramework.cmd`；`PublishClients.cmd` 生成给玩家的公开连接配置。只分发构建时的干净 ZIP，不要分发跑过测试的解压目录。
 
-最新包已在 2026-09-27 重建，包含房间规则、模板注册和账号/结果授权的请求传递修正；自动包测试已通过，人工试玩尚未做。准确包名、哈希与验收范围见 [STATUS](STATUS.md#当前交付物)。
+最新包已在 2026-09-27 重建，包含房间规则、模板注册、账号/结果授权的请求传递修正、资产读写与会话校验的常驻存储试点，以及 8 字符最低密码长度。默认使用常驻模式；需要回退时，在启动前设置环境变量 `ROOMKIT_STORAGE_MODE=oneshot`。最新包的常驻模式自动包测试已通过，并用恰好 8 字符的管理员和玩家密码完成包内注册、登录；旧路径在上一版包上通过，新包尚未复测。新包的人工试玩尚未做。准确包名、哈希与验收范围见 [STATUS](STATUS.md#当前交付物)。
 
 ## 接入自己的游戏
 

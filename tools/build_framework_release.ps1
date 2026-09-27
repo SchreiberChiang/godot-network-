@@ -14,7 +14,7 @@ $utf8=New-Object Text.UTF8Encoding($false)
 if (-not (Test-Path -LiteralPath $Godot -PathType Leaf)) { throw 'Godot editor executable is missing.' }
 if (-not (Test-Path -LiteralPath $template -PathType Leaf)) { throw 'The tested Godot 4.7.2 Windows release export template is missing.' }
 New-Item -ItemType Directory -Force -Path $work,$source,$bundle,(Join-Path $project 'logs') | Out-Null
-$helpers=@('bounded_helper.ps1','process_identity.ps1','protect_runtime.ps1','protect_data.ps1','sqlite_store.ps1','account_store.ps1','operator_maintenance.ps1')
+$helpers=@('bounded_helper.ps1','process_identity.ps1','protect_runtime.ps1','protect_data.ps1','sqlite_store.ps1','account_store.ps1','operator_maintenance.ps1','storage_worker.ps1')
 $preset=@'
 [preset.0]
 name="Windows Desktop"

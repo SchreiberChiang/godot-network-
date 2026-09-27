@@ -149,6 +149,9 @@ try {
     $select=Command $two 'select' @{slot='primary';item_id='smg';operation_id=('choose_'+$runId)}
     Require ($select.ok -and $select.state.profiles.shooter.primary -eq 'smg') 'dead selection persists independently'
     if($Visual){[void](Command $two 'capture' @{name='inventory.png'})}
+    # The server silently ignores respawn requests during the room's respawn wait.
+    # Inventory calls used to take seconds, which hid this; wait for the wait to end.
+    [void](Wait-Report $two {param($r) [int](Player $r $two.user_id).respawn_wait_ms -eq 0} 10)
     [void](Command $two 'respawn')
     $respawn=Wait-Report $two {param($r) (Player $r $two.user_id).life_state -eq 'alive'} 15
     Require ((Player $respawn $two.user_id).weapon -eq 'smg') 'manual respawn uses newly confirmed saved weapon'

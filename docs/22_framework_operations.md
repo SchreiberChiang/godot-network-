@@ -44,6 +44,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_framework.ps1 -M
 
 宿主发生异常后先确认旧房间退出与端口回收，再尝试重启，十分钟最多三次。重新启动前清理旧玩家会话，玩家可再次登录，管理员会话保留；恢复整个备份会使管理员会话也失效。未完成的对局不续赛。主动停服不自动拉起。这里只管理本项目进程，不是全系统服务管理器。
 
+### 常驻存储与回退开关
+
+管理服务启动后，会为账号库和资产库各启动一个常驻存储进程（`powershell.exe … storage_worker.ps1`，每个约 0.1 GB 内存），用于资产读取、购买、选择和会话校验；空闲 5 分钟后自动退出，下次请求再启动。管理服务正常退出和备份恢复前都会关闭它们。如果怀疑常驻进程有问题，可以先停止管理服务，在同一个命令行窗口里设置 `set ROOMKIT_STORAGE_MODE=oneshot`，再从这个窗口启动 `StartManagement.cmd` 或包内 `StartPanel.cmd`，这样全部回到原来的一次性存储路径。数据库文件和格式不变，两种模式可以随时切换。
+
 ## 局域网与独立导出
 
 后台仍只由服务器本机访问。停服后在配置页设置服务器局域网 IPv4 地址作为 advertised_host，设置 lobby_bind=0.0.0.0，保留专用 TCP/UDP 范围，再启动宿主。公共连接配置生成在 artifacts/client/connection.json，与同目录 server.crt 一起交给玩家；不复制 server.key、数据库、run 文件或后台凭据。源码客户端支持 `-ConnectionConfig` 指向公开配置。跨电脑是否能连通还取决于两端网络和防火墙；脚本不自动修改系统防火墙。
@@ -95,9 +99,30 @@ node tests/test_admin_auth_errors.cjs
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test_helpers.ps1
 & 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_storage_timing.gd -- --rounds=5 --label=my-run
 & 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_grant_storage.gd
+& 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_asset_snapshot.gd
+& 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_resident_store.gd
 ```
 
-`managed_shutdown` 与 `operator_schedules` 会各自创建私有数据目录，运行前需要存在 `artifacts/framework-games.json` 及其中引用的工程产物；`operator_schedules` 用受控时间验证 30 分钟备份和 10 分钟重启窗口，没有真实等待。`test_helpers.ps1` 覆盖有界助手的超时终止、路径白名单和账号请求的 stdin 模式。`run_storage_timing.gd` 在私有测试目录里实测注册、登录、会话校验、登出、发币、购买、重试和结算的存储层耗时，同时检查账号操作期间数据目录没有出现请求文件、Godot 句柄没有增长；报告写入 `logs/storage-timing-<label>.json`，输出 `STORAGE_TIMING_RESULT passed=... failed=0` 且退出 0 才算通过。耗时受机器负载影响，只能在同一台机器上前后对比。在这两条之前的七条依次对应托管注册、[托管模板](24_managed_game_template.md)、[房间规则](25_shooter_room_rules.md)、客户端启动器和三个管理页面函数测试；Node 测试用的是 DOM/API 替身，不算浏览器验收。射击渲染平滑对比 `tests/run_shooter_visual.gd` 需要图形窗口，命令见 [docs/25](25_shooter_room_rules.md)。各专项的最新结果与证据见 [STATUS](../STATUS.md#最新有效验证范围)。
+`run_resident_store.gd` 检查常驻存储：新旧路径返回完全一致、每个数据库只有一个工作进程、不产生请求文件、新旧路径并发写同一个库、助手报错时进程不退出、超时和崩溃后重试只扣一次、队列上限、空闲退出、模式开关、全部关闭后自动重启，以及会话校验两条路径一致和句柄不泄漏。其余专项默认走常驻路径；在启动 Godot 或测试脚本前设置 `ROOMKIT_STORAGE_MODE=oneshot`，就可以用一次性路径重跑。
+
+`managed_shutdown` 与 `operator_schedules` 会各自创建私有数据目录，运行前需要存在 `artifacts/framework-games.json` 及其中引用的工程产物；`operator_schedules` 用受控时间验证 30 分钟备份和 10 分钟重启窗口，没有真实等待。`test_helpers.ps1` 覆盖有界助手的超时终止、路径白名单和账号请求的 stdin 模式。`run_storage_timing.gd` 在私有测试目录里实测注册、登录、会话校验、登出、发币、购买、重试和结算的存储层耗时，同时检查账号操作期间数据目录没有出现请求文件、Godot 句柄没有增长；报告写入 `logs/storage-timing-<label>.json`，输出 `STORAGE_TIMING_RESULT passed=... failed=0` 且退出 0 才算通过。耗时受机器负载影响，只能在同一台机器上前后对比。`run_grant_storage.gd` 检查房间签名密钥不落盘及授权上限。`run_asset_snapshot.gd` 走真实资产服务，检查购买、选择、重复请求、同 ID 不同内容、重开后重试、同一请求并发、超额并发购买和并发加币；每步之后用回执流水链核对余额与版本，并数出每个操作实际发生的存储调用次数（购买、选择、发币各 2 次，已提交请求的重复调用 1 次）。在这几条之前的七条依次对应托管注册、[托管模板](24_managed_game_template.md)、[房间规则](25_shooter_room_rules.md)、客户端启动器和三个管理页面函数测试；Node 测试用的是 DOM/API 替身，不算浏览器验收。射击渲染平滑对比 `tests/run_shooter_visual.gd` 需要图形窗口，命令见 [docs/25](25_shooter_room_rules.md)。各专项的最新结果与证据见 [STATUS](../STATUS.md#最新有效验证范围)。
+
+### 性能测量（评估用，不属于回归门禁）
+
+`tests/perf/` 下的脚本只用于测量，结论见 [docs/17 第六节](17_framework_shooter_plan.md#六常驻存储评估2026-09-27claude-实测仅评估未实施)：
+
+```powershell
+# 客户端视角的资产耗时：先在另一个终端运行 tests\test_operator.ps1 -HoldForIntegration，
+# 等出现 OPERATOR_INTEGRATION_READY 后再执行下一行；结束后按“完整客户端测试”的方式写入 integration-done.request
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\perf\measure_asset_e2e.ps1 -Clients 3 -Label my-run
+# 一次性调用的轻量变体对比（在私有测试目录中生成修改过的副本，不改生产脚本）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\perf\storage_oneshot_variants.ps1 -Rounds 7
+# 常驻工作进程原型与 GDScript PBKDF2 可行性
+& 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/perf/run_resident_probe.gd
+& 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/perf/run_gd_pbkdf2_probe.gd
+```
+
+结果分别写入 `logs/asset-e2e-<label>.json`、`logs/storage-oneshot-variants.json`、`logs/resident-probe.json`、`logs/gd-pbkdf2-probe.json`。`resident_store_probe.ps1` 是原型，仍通过测试目录里的短期文件把请求交给 `sqlite_store.ps1`，不能直接用于生产。
 
 专项分别覆盖纯规则、真实 SQLite、真实 HTTP、真实子进程；不相互冒充。`tools/run.ps1 -Mode all` 仍是原基础回归集合，新增账号、管理及玩法专项需要单独执行。tests/test_operator.ps1 使用独立 data/test-operator-* 测试目录，并在退出前请求停止本次进程；`-Lifecycle` 增加空间切换、备份恢复、真实60秒优雅重启和已核验宿主崩溃测试。保留原进程句柄的 watchdog 只作用于本次子进程。
 

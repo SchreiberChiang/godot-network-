@@ -1,4 +1,6 @@
-param([Parameter(Mandatory=$true)][string]$Database,[string]$Request='')
+param([Parameter(Mandatory=$true)][string]$Database,[string]$Request='',[string]$RequestJson='')
+# -RequestJson is for in-process calls from storage_worker.ps1 only; never pass a
+# request on a process command line.
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
 # Only the host launches this helper. SQL is fixed here, values are bound parameters.
@@ -68,7 +70,9 @@ function RewardInteger($Value,[long]$Maximum) {
     return (-not [double]::IsNaN([double]$Value) -and -not [double]::IsInfinity([double]$Value) -and [double]$Value -ge 0 -and [double]$Value -le $Maximum -and [double]$Value -eq [math]::Floor([double]$Value))
 }
 try {
-    if ($Request) {
+    if ($RequestJson) {
+        $requestObject=$RequestJson | ConvertFrom-Json
+    } elseif ($Request) {
         $requestObject=Get-Content -Encoding UTF8 -LiteralPath $Request -Raw | ConvertFrom-Json
     } else {
         # Stdin mode from bounded_helper.ps1: one base64 UTF-8 JSON line. Used for
@@ -95,6 +99,18 @@ try {
     elseif ($requestObject.op -eq 'asset.read') {
         $rows=Query 'SELECT body FROM asset_states WHERE user_id=? AND space_id=?' @($requestObject.user_id,$requestObject.space_id)
         $result.body=if ($rows.Count) { $rows[0]['body'] } else { '' }
+    } elseif ($requestObject.op -eq 'asset.snapshot') {
+        # Read the receipt and current state in one helper invocation. The later
+        # asset.commit still performs the authoritative CAS/idempotency checks.
+        $rows=Query 'SELECT fingerprint,body FROM asset_receipts WHERE user_id=? AND request_id=?' @($requestObject.user_id,$requestObject.request_id)
+        $result.found=$rows.Count -gt 0
+        if ($result.found) {
+            if ($rows[0]['fingerprint'] -cne $requestObject.fingerprint) { $result=@{ok=$false;code='REQUEST_CONFLICT'} }
+            else { $result.body=$rows[0]['body']; $result.code='DUPLICATE' }
+        } else {
+            $state=Query 'SELECT body FROM asset_states WHERE user_id=? AND space_id=?' @($requestObject.user_id,$requestObject.space_id)
+            $result.body=if ($state.Count) { $state[0]['body'] } else { '' }
+        }
     } elseif ($requestObject.op -eq 'asset.receipt') {
         $rows=Query 'SELECT fingerprint,body FROM asset_receipts WHERE user_id=? AND request_id=?' @($requestObject.user_id,$requestObject.request_id)
         $result.found=$rows.Count -gt 0

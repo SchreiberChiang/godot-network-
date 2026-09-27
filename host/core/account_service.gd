@@ -5,6 +5,7 @@ const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Helper = preload("res://host/platform/bounded_helper.gd")
 const Paths = preload("res://sdk/roomkit/shared/paths.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
+const Resident = preload("res://host/storage/resident_store.gd")
 var root := ""
 var database := ""
 
@@ -34,9 +35,20 @@ func reset_player_sessions() -> Dictionary:
 	# The helper records a fixed recovery reason and never clears admin sessions.
 	return _dispatch({"op": "local.reset_player_sessions"})
 
+## Starts the account database's worker early; an all-zero token only returns AUTH_FAILED.
+func prewarm() -> Dictionary:
+	return _dispatch({"op": "session.authenticate", "token": "0".repeat(64)})
+
 func _dispatch(request: Dictionary) -> Dictionary:
 	if root.is_empty():
 		return Wire.failure("STORAGE_UNAVAILABLE")
+	# Only session.authenticate uses the resident worker in this stage: it is safe to
+	# repeat (it only also removes expired sessions). Registration, login and other
+	# writes stay on the one-shot helper.
+	if request.get("op", "") == "session.authenticate" and Resident.enabled():
+		var reply: Dictionary = Resident.for_database("account_store.ps1", database, 10000).request(request)
+		if not reply.is_empty():
+			return reply
 	# Passwords and tokens go to the helper over stdin only; no request file is
 	# written, so a host crash mid-call leaves no secret in the data directory.
 	var result := Helper.execute_input("account_store.ps1", ["-Database", database], JSON.stringify(request), 30000)

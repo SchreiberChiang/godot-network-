@@ -10,12 +10,22 @@
 
 2026-09-27 grant 签名密钥 stdin 改造（Claude 实现、Codex 复核，基于 `07aa0d2`，本地提交）：新增 `tests/run_grant_storage.gd`、`tests/fixtures/grant_database.ps1`，修改 `host/storage/sqlite_repository.gd`、`tools/sqlite_store.ps1`、`tests/run_secure.gd`、`tests/fixtures/secure_client.gd`、docs/21、22、23 和 STATUS。secure 测试改为通过 WSS 后单独验证 DTLS 错误主机名。
 
+2026-09-27 常驻存储方案 B 第一阶段（Claude，已本地提交）：新增 `host/storage/resident_store.gd`、`tools/storage_worker.ps1`、`tests/run_resident_store.gd`；修改 `host/storage/sqlite_repository.gd`、`host/core/account_service.gd`、`host/operator.gd`、`tools/sqlite_store.ps1`、`tools/account_store.ps1`、`tools/build_framework_release.ps1`、`tests/run_asset_snapshot.gd`、`tests/run_storage_timing.gd`、`tests/test_framework_clients.ps1`（复活前等待倒计时）、`tests/test_framework_release.ps1`（房间状态轮询）、docs/17、21、22、23 和 STATUS。
+
+2026-09-27 常驻存储评估（Claude，已本地提交，仅测量工具和文档）：新增 `tests/perf/` 下 6 个测量脚本，更新 docs/17 第六节、docs/22、23 和 STATUS；未改生产代码。
+
+2026-09-27 资产 `asset.snapshot`（Codex 实现、Claude 复核，已本地提交）：修改 `host/core/asset_service.gd`、`tools/sqlite_store.ps1`、`tests/run_storage_timing.gd`、docs/17、STATUS；复核新增 `tests/run_asset_snapshot.gd`，并更新 docs/22、23。
+
 2026-09-27 Codex 复核：修正 Windows PowerShell 5.1 内层标准输入的 UTF-8 BOM、测试夹具的中文输出编码，以及 `tests/run_admin_http.gd` 的旧分层断言；更新 STATUS。没有增加文件。
 
 2026-09-27 后续方向梳理（仅文档）：新增根目录 `CONTEXT.md` 术语表，更新 docs/17 的多游戏定位、赛车与合作种田边界、授权回收和性能路线；同步 README、STATUS 与本清单。未修改运行代码。
 
+2026-09-27 密码长度小阶段（Codex，已本地提交）：账号最低长度从 10 调到 8；修改 `schemas/account_request.schema.json`、`schemas/managed_lobby_request.schema.json`、`tools/account_store.ps1`、`host/admin.html`、`examples/framework/view.gd`、`tests/run_accounts.gd`、`tests/run_managed_contracts.gd`、`tests/test_framework_release.ps1`，同步 README、STATUS、docs/17、21、23。沿用现有密码哈希、会话和数据库格式；独立包已重建，全新解压副本使用 8 字符管理员和玩家密码完成自动包测试 44/0。
+
+2026-09-27 第二台设备登记（Codex）：`docs/10_environment.md` 记录用户提供的 Linux 笔记本局域网 SSH 目标，STATUS 标记未连接、未验收；没有执行远程命令。
+
 ## 完整文件清单
-共 166 个现存文件，另有 2 个已移除文件列在末尾。
+共 178 个现存文件，另有 2 个已移除文件列在末尾。
 
 - [AGENTS.md](../AGENTS.md)
 - [CHANGELOG.md](../CHANGELOG.md)
@@ -83,6 +93,7 @@
 - [host/operator.gd](../host/operator.gd)
 - [host/platform/bounded_helper.gd](../host/platform/bounded_helper.gd)
 - [host/platform/process_launcher.gd](../host/platform/process_launcher.gd)
+- [host/storage/resident_store.gd](../host/storage/resident_store.gd)
 - [host/storage/sqlite_repository.gd](../host/storage/sqlite_repository.gd)
 - [README.md](../README.md)
 - [schemas/account_request.schema.json](../schemas/account_request.schema.json)
@@ -130,12 +141,20 @@
 - [tests/fixtures/account_recovery_database.ps1](../tests/fixtures/account_recovery_database.ps1)
 - [tests/fixtures/grant_database.ps1](../tests/fixtures/grant_database.ps1)
 - [tests/fixtures/result_reward_database.ps1](../tests/fixtures/result_reward_database.ps1)
+- [tests/fixtures/secure_client.gd](../tests/fixtures/secure_client.gd)
 - [tests/fixtures/storage_cost_breakdown.ps1](../tests/fixtures/storage_cost_breakdown.ps1)
 - [tests/run_account_recovery.gd](../tests/run_account_recovery.gd)
 - [tests/run_accounts.gd](../tests/run_accounts.gd)
 - [tests/run_admin_http.gd](../tests/run_admin_http.gd)
 - [tests/run_asset_callbacks.gd](../tests/run_asset_callbacks.gd)
 - [tests/run_asset_response_loss.gd](../tests/run_asset_response_loss.gd)
+- [tests/perf/measure_asset_e2e.ps1](../tests/perf/measure_asset_e2e.ps1)
+- [tests/perf/resident_store_probe.ps1](../tests/perf/resident_store_probe.ps1)
+- [tests/perf/run_asset_e2e.gd](../tests/perf/run_asset_e2e.gd)
+- [tests/perf/run_gd_pbkdf2_probe.gd](../tests/perf/run_gd_pbkdf2_probe.gd)
+- [tests/perf/run_resident_probe.gd](../tests/perf/run_resident_probe.gd)
+- [tests/perf/storage_oneshot_variants.ps1](../tests/perf/storage_oneshot_variants.ps1)
+- [tests/run_asset_snapshot.gd](../tests/run_asset_snapshot.gd)
 - [tests/run_framework_clients.gd](../tests/run_framework_clients.gd)
 - [tests/run_framework_feedback.gd](../tests/run_framework_feedback.gd)
 - [tests/run_framework_ui_fixture.ps1](../tests/run_framework_ui_fixture.ps1)
@@ -148,7 +167,9 @@
 - [tests/run_operator_projection.gd](../tests/run_operator_projection.gd)
 - [tests/run_operator_schedules.gd](../tests/run_operator_schedules.gd)
 - [tests/run_recovery.gd](../tests/run_recovery.gd)
+- [tests/run_resident_store.gd](../tests/run_resident_store.gd)
 - [tests/run_result_rewards.gd](../tests/run_result_rewards.gd)
+- [tests/run_secure.gd](../tests/run_secure.gd)
 - [tests/run_shooter.gd](../tests/run_shooter.gd)
 - [tests/run_shooter_visual.gd](../tests/run_shooter_visual.gd)
 - [tests/run_storage_timing.gd](../tests/run_storage_timing.gd)
@@ -183,5 +204,6 @@
 - [tools/run_framework.ps1](../tools/run_framework.ps1)
 - [tools/test_helpers.ps1](../tools/test_helpers.ps1)
 - [tools/sqlite_store.ps1](../tools/sqlite_store.ps1)
+- [tools/storage_worker.ps1](../tools/storage_worker.ps1)
 
 已移除（原文已移入 [docs/archive/design_package_v0.2.md](archive/design_package_v0.2.md)）：`START_HERE.md`、`VALIDATION.md`。

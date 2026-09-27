@@ -1,5 +1,5 @@
 extends SceneTree
-## Real storage latency on this machine for register, login, purchase and
+## Real storage latency on this machine for register, login, purchase, select and
 ## settlement through the production account, asset and result services. Each
 ## operation runs on a worker thread while the main thread polls the private data
 ## directory, so any temporary request file that exists during the call is seen.
@@ -10,7 +10,7 @@ const Shooter = preload("res://examples/shooter/asset_policy.gd")
 const Format = preload("res://sdk/roomkit/shared/result_format.gd")
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const PASSWORD := "storage-timing-password"
-const OPERATIONS := ["register", "login", "authenticate", "logout", "admin_grant", "purchase", "purchase_retry", "settlement"]
+const OPERATIONS := ["register", "login", "authenticate", "logout", "admin_grant", "purchase", "purchase_retry", "select", "settlement"]
 const ACCOUNT_OPERATIONS := ["register", "login", "authenticate", "logout"]
 var passed := 0
 var failed := 0
@@ -46,6 +46,10 @@ func _run() -> void:
 		finish({})
 		return
 	var space: String = assets.catalog.space_for("shooter")
+	# Resident workers hold a fixed set of handles for their lifetime; start them
+	# first so the check below still catches handles leaked per call.
+	assets.repository.prewarm()
+	accounts.prewarm()
 	handles.before = _handle_count()
 	for index in rounds:
 		var username := "timing_%02d" % index
@@ -64,6 +68,9 @@ func _run() -> void:
 		check(bought.ok and bought.state.credits == 200 and "smg" in bought.state.owned, "round %d purchase commits exactly once" % index)
 		var retried: Dictionary = timed_call("purchase_retry", assets.perform.bind(identity, "shooter", purchase, Shooter.new(), {"location": "lobby"}))
 		check(retried.get("code", "") == "DUPLICATE" and retried.state.credits == 200, "round %d same request retry returns the receipt" % index)
+		var selection := {"kind": "select", "item_id": "smg", "slot": "primary", "request_id": "select_%d" % index}
+		var selected: Dictionary = timed_call("select", assets.perform.bind(identity, "shooter", selection, Shooter.new(), {"location": "lobby"}))
+		check(selected.ok and selected.state.profiles.shooter.primary == "smg", "round %d selected weapon becomes the default" % index)
 		var settled: Dictionary = timed_call("settlement", assets.repository.execute.bind(_submission(identity.user_id, space)))
 		check(settled.ok, "round %d result and reward commit together" % index)
 		check(assets.read(identity.user_id, "shooter").state.credits == 225, "round %d reward credited once" % index)

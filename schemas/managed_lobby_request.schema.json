@@ -35,7 +35,7 @@
                 },
                 "password": {
                   "type": "string",
-                  "minLength": 10,
+                  "minLength": 8,
                   "maxLength": 128
                 },
                 "display_name": {
@@ -87,7 +87,7 @@
                 },
                 "password": {
                   "type": "string",
-                  "minLength": 10,
+                  "minLength": 8,
                   "maxLength": 128
                 }
               }
@@ -152,12 +152,12 @@
               "properties": {
                 "password": {
                   "type": "string",
-                  "minLength": 10,
+                  "minLength": 8,
                   "maxLength": 128
                 },
                 "new_password": {
                   "type": "string",
-                  "minLength": 10,
+                  "minLength": 8,
                   "maxLength": 128
                 }
               }

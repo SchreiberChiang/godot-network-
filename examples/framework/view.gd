@@ -137,7 +137,7 @@ func _build_login() -> void:
 	var form := _panel(Vector2(668, 152), Vector2(520, 565), login_panel)
 	login_title = _label(form, "欢迎回来", Vector2(44, 27), Vector2(425, 44), 28)
 	login_username = _field(form, "用户名 · 3–32 个英文字母、数字或 _ . -", Vector2(44, 93), 432)
-	login_password = _field(form, "密码 · 10–128 个字符", Vector2(44, 181), 432, true)
+	login_password = _field(form, "密码 · 8–128 个字符", Vector2(44, 181), 432, true)
 	register_fields = Control.new()
 	form.add_child(register_fields)
 	register_name = _field(register_fields, "昵称", Vector2(44, 268), 432)
@@ -238,7 +238,7 @@ func _build_account() -> void:
 	account_name = _field(account_panel, "新昵称 · 房间显示需重新入房更新", Vector2(32, 96), 345)
 	_button(account_panel, "保存昵称", Vector2(395, 125), Vector2(132, 43), func(): app.rename(account_name.text))
 	old_password = _field(account_panel, "当前密码", Vector2(32, 214), 496, true)
-	new_password = _field(account_panel, "新密码 · 10–128 个字符", Vector2(32, 310), 496, true)
+	new_password = _field(account_panel, "新密码 · 8–128 个字符", Vector2(32, 310), 496, true)
 	_button(account_panel, "更新密码并重新登录", Vector2(32, 418), Vector2(496, 46), func(): app.change_password(old_password.text, new_password.text))
 	var help := _label(account_panel, "忘记密码请联系管理员重置。\n更改密码后，当前登录会话会失效。", Vector2(32, 492), Vector2(496, 65), 16, Color("9bb4c5"))
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
