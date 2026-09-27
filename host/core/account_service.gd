@@ -35,6 +35,18 @@ func reset_player_sessions() -> Dictionary:
 	# The helper records a fixed recovery reason and never clears admin sessions.
 	return _dispatch({"op": "local.reset_player_sessions"})
 
+## Trusted local deletion hooks, also absent from execute()'s public schema. The
+## Operator reaches them only after an authenticated admin began the job, or when it
+## resumes interrupted jobs on start-up (host/core/account_deletion.gd).
+func pending_deletions() -> Dictionary:
+	return _dispatch({"op": "local.deletion_pending"})
+
+func finish_deletion(job_id: String) -> Dictionary:
+	return _dispatch({"op": "local.deletion_finish", "job_id": job_id})
+
+func close_deletion(job_id: String) -> Dictionary:
+	return _dispatch({"op": "local.deletion_close", "job_id": job_id})
+
 ## Starts the account database's worker early; an all-zero token only returns AUTH_FAILED.
 func prewarm() -> Dictionary:
 	return _dispatch({"op": "session.authenticate", "token": "0".repeat(64)})

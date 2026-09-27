@@ -13,6 +13,7 @@ const Helper = preload("res://host/platform/bounded_helper.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const GameServices = preload("res://host/core/managed_game_registry.gd")
 const Resident = preload("res://host/storage/resident_store.gd")
+const AccountDeletion = preload("res://host/core/account_deletion.gd")
 var accounts = Accounts.new()
 var assets = Assets.new()
 var results = Results.new()
@@ -37,6 +38,8 @@ var recovery_next := 0
 var requested_stop := false
 var restart_requested := false
 var storage_maintenance := false
+# One account deletion at a time; backups, restore and config changes wait for it.
+var deletion_busy := false
 var restart_times: Array = []
 var restart_after := 0
 var player_tokens: Dictionary = {}
@@ -107,6 +110,9 @@ func _run() -> void:
 		return
 	_publish_connection()
 	_load_audit()
+	# Finish account deletions an earlier run left between the two databases before
+	# any administrator or player request is served.
+	await _resume_deletions()
 	http.request_received.connect(_http_request)
 	if http.start(int(args.get("--panel-port", "28291"))) != OK:
 		printerr("OPERATOR_FAILED code=PANEL_PORT_BUSY")
@@ -338,6 +344,7 @@ func _admin(request: Dictionary) -> Dictionary:
 			result = await _host_command("server.stop", {"immediate": payload.get("immediate", false)})
 		"room.create", "room.stop", "room.recreate", "room.joinable", "player.kick", "maintenance.set":
 			result = await _host_command(action, payload)
+		"account.delete": result = await _delete_account(payload, token)
 		"account.list", "account.get", "account.rename", "account.reset_password", "account.ban", "account.unban", "invite.create", "invite.list", "invite.revoke":
 			var account_request := _account_request(action, payload, token)
 			result = _payload(await _work(accounts.execute.bind(account_request)))
@@ -359,6 +366,8 @@ func _admin(request: Dictionary) -> Dictionary:
 		"config.set":
 			if host_owned or starting or host_closing or restart_after > 0 or FileAccess.file_exists(root_path.path_join("host-running.json")):
 				result = Wire.failure("STOP_SERVER_FIRST")
+			elif deletion_busy:
+				result = Wire.failure("MAINTENANCE_BUSY")
 			else:
 				var proposed := settings.duplicate(true)
 				proposed.merge(payload.get("config", {}), true)
@@ -383,11 +392,19 @@ func _admin(request: Dictionary) -> Dictionary:
 						_load_catalog()
 						await _work(assets.initialize.bind(root_path, catalog_config))
 					storage_maintenance = false
-		"backup.list": result = _payload(await _maintenance({"op": "backup.list"}))
+		"backup.list":
+			result = _payload(await _maintenance({"op": "backup.list"}))
+			if result.ok:
+				# Backups taken before a deletion can bring that account back.
+				var marks := AccountDeletion.journal_marks(root_path)
+				for row in result.payload.get("backups", []):
+					row.deleted_accounts = marks.get(str(row.get("backup_id", "")), []).size()
 		"backup.create": result = await _backup(false, payload.get("reason", "manual"))
 		"backup.restore":
 			if host_owned or starting or host_closing:
 				result = Wire.failure("STOP_SERVER_FIRST")
+			elif deletion_busy:
+				result = Wire.failure("MAINTENANCE_BUSY")
 			else:
 				storage_maintenance = true
 				while worker_count > 0:
@@ -414,7 +431,14 @@ func _admin(request: Dictionary) -> Dictionary:
 			var asset_audit: Dictionary = await _work(assets.repository.execute.bind({"op": "asset.audit_all"}))
 			result = _merged_audit(audit, records, asset_audit)
 	if action not in ["status", "asset.read", "config.get", "backup.list", "logs.list", "logs.read", "audit.list", "account.list", "account.get", "invite.list"]:
-		_audit(auth.identity.user_id, action, payload.get("reason", ""), result.get("code", "OK" if result.ok else "FAILED"), str(payload.get("user_id", payload.get("room_id", payload.get("backup_id", "")))))
+		var target := str(payload.get("user_id", payload.get("room_id", payload.get("backup_id", ""))))
+		# Never write a deleted (or being deleted) account's user_id into this log.
+		var reason := str(payload.get("reason", ""))
+		if action == "account.delete" or result.get("code", "") in ["ACCOUNT_DELETED", "ACCOUNT_ALREADY_DELETED"]:
+			# ...nor that account's user_id or typed username inside the reason text.
+			reason = AccountDeletion.scrub(reason, AccountDeletion.needles({"user_id": target, "username": str(payload.get("confirm_username", ""))}), AccountDeletion.subject_for(target))
+			target = AccountDeletion.subject_for(target)
+		_audit(auth.identity.user_id, action, reason, result.get("code", "OK" if result.ok else "FAILED"), target)
 	return result
 
 func _account_request(action: String, payload: Dictionary, token: String) -> Dictionary:
@@ -550,9 +574,161 @@ static func _merged_audit(local_rows: Array, account_result: Dictionary, asset_r
 	rows.sort_custom(func(a, b): return int(a.get("created_at", a.get("time", 0))) < int(b.get("created_at", b.get("time", 0))))
 	return {"ok": true, "payload": {"entries": rows.slice(maxi(0, rows.size() - 100))}}
 
+## Test-stage account deletion (docs/17 section 7). Reports success only after both
+## databases are done; any earlier stop leaves a pending, blocked account that a
+## repeated request or the next Operator start completes.
+func _delete_account(payload: Dictionary, token: String) -> Dictionary:
+	if deletion_busy:
+		return Wire.failure("MAINTENANCE_BUSY")
+	deletion_busy = true
+	var result: Dictionary = await _delete_account_steps(payload, token)
+	deletion_busy = false
+	return result
+
+func _delete_account_steps(payload: Dictionary, token: String) -> Dictionary:
+	# Nothing changes until the backup list is known: the reply must name every
+	# existing backup that may still hold this account.
+	var listed: Dictionary = await _maintenance({"op": "backup.list"})
+	if not listed.get("ok", false):
+		return Wire.failure(str(listed.get("code", "STORAGE_UNAVAILABLE")))
+	var begun: Dictionary = await _work(accounts.execute.bind({"op": "account.delete_begin", "token": token, "user_id": payload.get("user_id", ""), "confirm_username": payload.get("confirm_username", ""), "reason": payload.get("reason", "")}))
+	if not begun.ok:
+		return begun
+	var job: Dictionary = begun.deletion
+	# The typed username is the one the helper matched; it is needed to scrub texts.
+	job.username = str(payload.get("confirm_username", "")).to_lower()
+	var online: Dictionary = await _disconnect_player(str(job.user_id))
+	var assets_report := {}
+	var account_report := {}
+	if job.state == "assets_pending":
+		var completed: Variant = await _work(AccountDeletion.complete.bind(accounts, assets.repository, job))
+		if not completed is Dictionary or not completed.get("ok", false):
+			var cause: String = str(completed.get("code", "STORAGE_UNAVAILABLE")) if completed is Dictionary else "STORAGE_UNAVAILABLE"
+			# A refused worker slot (RATE_LIMITED) also leaves the job open.
+			var failure: Dictionary = completed if cause == "ACCOUNT_DELETION_INCOMPLETE" else AccountDeletion.incomplete(job, "worker", cause)
+			failure.payload.backups_may_restore = AccountDeletion.backups_since(listed.get("backups", []), int(job.account_created_at))
+			failure.payload.merge(online)
+			return failure
+		job = completed.job
+		assets_report = completed.assets
+		account_report = completed.account
+	var closed: Dictionary = await _close_deletion(job)
+	if not closed.ok:
+		closed.payload.backups_may_restore = AccountDeletion.backups_since(listed.get("backups", []), int(job.account_created_at))
+		closed.payload.merge(online)
+		return closed
+	var summary := {"job_id": job.job_id, "subject": job.subject, "state": "done", "resumed": job.resumed, "sessions_revoked": job.sessions_revoked, "assets": assets_report, "account": account_report, "operator_audit_rows_deidentified": closed.rows, "backups_may_restore": closed.backups, "residual_files": closed.residual}
+	summary.merge(online)
+	return {"ok": true, "payload": summary}
+
+## Step 4 of host/core/account_deletion.gd, then step 5. The Operator's audit files are
+## rewritten on this (main) thread, so no concurrent _audit() append can interleave.
+## Any failure leaves the job open and is reported as incomplete, never as success.
+func _close_deletion(job: Dictionary) -> Dictionary:
+	AccountDeletion.scrub_rows(audit, job)
+	var files := [root_path.path_join("operator-audit.jsonl"), root_path.path_join("operator-audit.jsonl.previous"), root_path.path_join("maintenance-audit.jsonl")]
+	var scrubbed := AccountDeletion.scrub_files(files, job)
+	if not scrubbed.ok:
+		return AccountDeletion.incomplete(job, "operator", scrubbed.code)
+	# Listed again now: a backup taken while the job was open also holds the account.
+	var listed: Dictionary = await _maintenance({"op": "backup.list"})
+	if not listed.get("ok", false):
+		return AccountDeletion.incomplete(job, "operator", "BACKUP_LIST_UNAVAILABLE")
+	var backups := AccountDeletion.backups_since(listed.get("backups", []), int(job.account_created_at))
+	var residual: Dictionary = await _work(_residual_files.bind(root_path, operator_log_path, AccountDeletion.needles(job)))
+	var entry := {"event": "done", "job_id": job.job_id, "subject": job.subject, "backups": backups.map(func(row): return row.backup_id), "operator_audit_rows_deidentified": scrubbed.rows, "residual_files": residual}
+	if not AccountDeletion.append_journal(root_path, entry):
+		return AccountDeletion.incomplete(job, "operator", "JOURNAL_WRITE_FAILED")
+	var close: Variant = await _work(accounts.close_deletion.bind(str(job.job_id)))
+	if not close is Dictionary or not close.get("ok", false):
+		return AccountDeletion.incomplete(job, "close", str(close.get("code", "STORAGE_UNAVAILABLE")) if close is Dictionary else "STORAGE_UNAVAILABLE")
+	return {"ok": true, "code": "", "rows": scrubbed.rows, "backups": backups, "residual": residual}
+
+func _resume_deletions() -> void:
+	var resumed: Variant = await _work(AccountDeletion.resume.bind(accounts, assets.repository))
+	if not resumed is Dictionary or not resumed.get("ok", false):
+		printerr("OPERATOR_DELETION_RESUME_FAILED code=", resumed.get("code", "") if resumed is Dictionary else "")
+		return
+	for ready in resumed.ready:
+		var closed: Dictionary = await _close_deletion(ready.job)
+		if closed.ok:
+			print("OPERATOR_DELETION_RESUMED subject=", ready.job.subject)
+		else:
+			printerr("OPERATOR_DELETION_PENDING subject=", ready.job.subject, " stage=operator cause=", closed.payload.cause)
+	for failed in resumed.failed:
+		printerr("OPERATOR_DELETION_PENDING subject=", failed.payload.subject, " stage=", failed.payload.stage, " cause=", failed.payload.cause)
+
+## Revokes this Operator's record of the player's tokens and asks the host to close
+## the player's lobby connection and room seats (sessions were already deleted).
+func _disconnect_player(user_id: String) -> Dictionary:
+	for key in player_tokens.keys():
+		if player_tokens[key] == user_id:
+			player_tokens.erase(key)
+	var was_online := _player_online(user_id)
+	if bus != null and host_owned:
+		bus.broadcast("account.revoked", {"user_id": user_id})
+	var deadline := Time.get_ticks_msec() + 5000
+	while was_online and _player_online(user_id) and Time.get_ticks_msec() < deadline:
+		await process_frame
+	return {"was_online": was_online, "still_online": _player_online(user_id)}
+
+func _player_online(user_id: String) -> bool:
+	for row in snapshot.get("players", []):
+		if row is Dictionary and str(row.get("user_id", "")) == user_id:
+			return true
+	return false
+
+## Files this deletion does not rewrite that still mention the user_id or username:
+## queued result files (the next accept stores only the pseudonym and pays nobody
+## deleted, then removes them), rejected result files, logs and other private files.
+static func _residual_files(root: String, operator_log: String, words: Array) -> Dictionary:
+	var report := {"outbox_pending": 0, "outbox_rejected": 0, "files": []}
+	var outbox := root.path_join("outbox")
+	if DirAccess.dir_exists_absolute(outbox):
+		for launch in DirAccess.get_directories_at(outbox):
+			for name in DirAccess.get_files_at(outbox.path_join(launch)):
+				if name.ends_with(".json") and _file_mentions(outbox.path_join(launch).path_join(name), words):
+					report["outbox_rejected" if name.ends_with(".rejected.json") else "outbox_pending"] += 1
+	var candidates: Array = []
+	for name in DirAccess.get_files_at(root):
+		if (name.ends_with(".jsonl") or name.ends_with(".log") or name.ends_with(".previous")) and name != AccountDeletion.JOURNAL:
+			candidates.append(name)
+	if DirAccess.dir_exists_absolute(root.path_join("logs")):
+		for name in DirAccess.get_files_at(root.path_join("logs")):
+			candidates.append("logs/" + name)
+	for name in candidates:
+		if _file_mentions(root.path_join(name), words):
+			report.files.append(name)
+	if not operator_log.is_empty() and not operator_log.begins_with(root) and _file_mentions(operator_log, words):
+		report.files.append("operator_log")
+	return report
+
+static func _file_mentions(path: String, words: Array) -> bool:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return false
+	var longest := 0
+	for word in words:
+		longest = maxi(longest, str(word).length())
+	var tail := PackedByteArray()
+	var found := false
+	# Chunked with overlap, so large logs never load whole into memory. ASCII decoding
+	# never reports errors for split or non-ASCII bytes; IDs and usernames are ASCII.
+	while not found and file.get_position() < file.get_length():
+		var chunk := tail + file.get_buffer(1048576)
+		found = AccountDeletion.mentions(chunk.get_string_from_ascii(), words)
+		tail = chunk.slice(maxi(0, chunk.size() - longest))
+	file.close()
+	return found
+
 func _backup(automatic: bool, reason: String) -> Dictionary:
 	if storage_maintenance:
 		return Wire.failure("STORAGE_MAINTENANCE")
+	if deletion_busy:
+		# Never snapshot an account halfway between the two databases; retry shortly.
+		if automatic:
+			next_backup = Time.get_ticks_msec() + 60000
+		return Wire.failure("MAINTENANCE_BUSY")
 	storage_maintenance = true
 	while worker_count > 0:
 		await process_frame

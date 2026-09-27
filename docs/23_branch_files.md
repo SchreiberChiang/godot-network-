@@ -28,8 +28,12 @@
 
 2026-09-27 账号删除纠正（Codex，文档）：用户撤回“只停用”的理解，改为测试阶段清除指定玩家在当前账号库与资产库的数据，旧备份单独标明并处理。更新 `CONTEXT.md`、docs/17 第七节和 STATUS；删除功能尚未实现，前一轮停用入口仍为独立功能。
 
+2026-09-27 测试阶段账号删除（Claude 实现，基于 `d79b1fc`，未提交，待 Codex 复核）：新增 `host/core/account_deletion.gd`、`tests/run_account_deletion.gd`、`tests/run_deletion_client.gd`、`tests/test_account_deletion.ps1`、`tests/test_admin_account_deletion.cjs`、`tests/fixtures/deletion_database.ps1`、`tests/fixtures/deletion_offline.gd`；修改 `tools/account_store.ps1`、`tools/sqlite_store.ps1`、`host/core/account_service.gd`、`host/operator.gd`、`host/admin.html`、`schemas/admin_request.schema.json`、`schemas/account_request.schema.json`、`schemas/account_response.schema.json`、`examples/managed_messages.example.json`、`tests/run_admin_http.gd`、`tests/run_managed_contracts.gd`，以及 README、CONTEXT、STATUS、docs/17、21、22 和本清单。
+
+2026-09-27 账号删除复核修正（Claude，未提交，待 Codex 复核）：Operator 收尾可恢复、删除原因去名。修改 `tools/account_store.ps1`、`tools/sqlite_store.ps1`、`host/core/account_deletion.gd`、`host/core/account_service.gd`、`host/operator.gd`、`host/admin.html`、`schemas/account_response.schema.json`、`tests/run_account_deletion.gd`、`tests/test_account_deletion.ps1`、`tests/fixtures/deletion_offline.gd`，以及 STATUS、docs/17、21、22 和本清单；没有新增文件。
+
 ## 完整文件清单
-共 178 个现存文件，另有 2 个已移除文件列在末尾。
+共 185 个现存文件，另有 2 个已移除文件列在末尾。
 
 - [AGENTS.md](../AGENTS.md)
 - [CHANGELOG.md](../CHANGELOG.md)
@@ -81,6 +85,7 @@
 - [examples/turn_based/game.gd](../examples/turn_based/game.gd)
 - [host/admin.html](../host/admin.html)
 - [host/admin_http.gd](../host/admin_http.gd)
+- [host/core/account_deletion.gd](../host/core/account_deletion.gd)
 - [host/core/account_service.gd](../host/core/account_service.gd)
 - [host/core/admission_store.gd](../host/core/admission_store.gd)
 - [host/core/asset_catalog.gd](../host/core/asset_catalog.gd)
@@ -143,10 +148,13 @@
 - [tests/fault_lost_response_lobby.gd](../tests/fault_lost_response_lobby.gd)
 - [tests/fixtures/account_database.ps1](../tests/fixtures/account_database.ps1)
 - [tests/fixtures/account_recovery_database.ps1](../tests/fixtures/account_recovery_database.ps1)
+- [tests/fixtures/deletion_database.ps1](../tests/fixtures/deletion_database.ps1)
+- [tests/fixtures/deletion_offline.gd](../tests/fixtures/deletion_offline.gd)
 - [tests/fixtures/grant_database.ps1](../tests/fixtures/grant_database.ps1)
 - [tests/fixtures/result_reward_database.ps1](../tests/fixtures/result_reward_database.ps1)
 - [tests/fixtures/secure_client.gd](../tests/fixtures/secure_client.gd)
 - [tests/fixtures/storage_cost_breakdown.ps1](../tests/fixtures/storage_cost_breakdown.ps1)
+- [tests/run_account_deletion.gd](../tests/run_account_deletion.gd)
 - [tests/run_account_recovery.gd](../tests/run_account_recovery.gd)
 - [tests/run_accounts.gd](../tests/run_accounts.gd)
 - [tests/run_admin_http.gd](../tests/run_admin_http.gd)
@@ -159,6 +167,7 @@
 - [tests/perf/run_resident_probe.gd](../tests/perf/run_resident_probe.gd)
 - [tests/perf/storage_oneshot_variants.ps1](../tests/perf/storage_oneshot_variants.ps1)
 - [tests/run_asset_snapshot.gd](../tests/run_asset_snapshot.gd)
+- [tests/run_deletion_client.gd](../tests/run_deletion_client.gd)
 - [tests/run_framework_clients.gd](../tests/run_framework_clients.gd)
 - [tests/run_framework_feedback.gd](../tests/run_framework_feedback.gd)
 - [tests/run_framework_ui_fixture.ps1](../tests/run_framework_ui_fixture.ps1)
@@ -178,6 +187,8 @@
 - [tests/run_shooter_visual.gd](../tests/run_shooter_visual.gd)
 - [tests/run_storage_timing.gd](../tests/run_storage_timing.gd)
 - [tests/run_ui_opponent.ps1](../tests/run_ui_opponent.ps1)
+- [tests/test_account_deletion.ps1](../tests/test_account_deletion.ps1)
+- [tests/test_admin_account_deletion.cjs](../tests/test_admin_account_deletion.cjs)
 - [tests/test_admin_asset_spaces.cjs](../tests/test_admin_asset_spaces.cjs)
 - [tests/test_admin_auth_errors.cjs](../tests/test_admin_auth_errors.cjs)
 - [tests/test_admin_room_rules.cjs](../tests/test_admin_room_rules.cjs)

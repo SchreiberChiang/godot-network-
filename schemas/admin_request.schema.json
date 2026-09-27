@@ -31,6 +31,7 @@
         "room.joinable",
         "player.kick",
         "account.unban",
+        "account.delete",
         "account.list",
         "account.get",
         "account.reset_password",
@@ -206,6 +207,18 @@
         },
         "payload": {
           "$ref": "#/$defs/account_ban"
+        }
+      }
+    },
+    {
+      "properties": {
+        "action": {
+          "enum": [
+            "account.delete"
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/account_delete"
         }
       }
     },
@@ -635,6 +648,36 @@
       "required": [
         "user_id",
         "hours",
+        "reason"
+      ]
+    },
+    "account_delete": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Test-stage permanent deletion of one player account and all of its game assets in the current databases. confirm_username must equal the target username; administrators cannot be deleted.",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "confirm_username": {
+          "$ref": "account_request.schema.json#/properties/username"
+        },
+        "reason": {
+          "allOf": [
+            {
+              "$ref": "account_request.schema.json#/properties/reason"
+            },
+            {
+              "pattern": "^(?=.*\\S)[^\\x00-\\x1f\\x7f]*$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "user_id",
+        "confirm_username",
         "reason"
       ]
     },

@@ -1,6 +1,6 @@
 # 当前状态：通用管理服务、账号、资产与射击示例
 
-更新：2026-09-27。分支 `codex/shooter-framework`；账号请求与 grant 密钥去文件化、资产 `asset.snapshot` 往返合并、常驻存储方案 B 第一阶段、8 字符密码和 Linux 待验收设备登记均已整理为本地提交，尚未推送。Codex 已复核常驻存储代码与证据，并独立重跑其专项。本文件记录当前状态、最新有效验证范围、未运行项与已知问题；较早过程见 [STATUS 历史归档](docs/archive/status_history.md)。启动方法见 [README](README.md)。
+更新：2026-09-27。分支 `codex/shooter-framework`；账号请求与 grant 密钥去文件化、资产 `asset.snapshot` 往返合并、常驻存储方案 B 第一阶段、8 字符密码和 Linux 待验收设备登记均已整理为本地提交，尚未推送。Codex 已复核常驻存储代码与证据，并独立重跑其专项。之后基于 `d79b1fc` 实现了测试阶段账号删除（Claude，未提交）；Codex 已复核删除收尾修正并重建独立 ZIP，包测试见下文，人工浏览器验收尚未运行。本文件记录当前状态、最新有效验证范围、未运行项与已知问题；较早过程见 [STATUS 历史归档](docs/archive/status_history.md)。启动方法见 [README](README.md)。
 
 后续产品取舍见 [docs/17 第五节](docs/17_framework_shooter_plan.md)：2–8 人熟人试玩、可选框架服务、赛车与合作种田边界、累计房间授权回收、8 字符密码和存储性能路线已讨论确认。资产 `asset.snapshot` 往返合并后，又按 [docs/17 第六节](docs/17_framework_shooter_plan.md#六常驻存储评估2026-09-27claude-实测仅评估未实施) 实施常驻存储第一阶段：资产读写和会话校验走常驻进程，客户端实测购买约 0.1 秒（旧路径约 3.7 秒），旧路径保留为可切换的回退。8 字符最低密码长度已在源码工作区实施；授权回收仍未实施，方案 C 暂缓。
 
@@ -15,12 +15,13 @@
 - 2026-09-27 密码长度小阶段（Codex，已本地提交）：账号最低密码长度从 10 降为 8，服务、两套 Schema、管理后台和游戏客户端提示同步；真实账号与契约边界测试覆盖 7 字符拒绝及 8 字符可用。修改清单见 docs/23。已从当前工作区重新构建独立 ZIP。
 - 环境：Windows 10.0.26200；Godot `4.7.2.stable.steam.ed1daf0bf`（`D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`），导出使用同安装目录的 4.7.2 official 模板；Git `2.55.0.windows.3`；系统 `winsqlite3.dll` 3.51.1。
 - 用户提供一台待验收 Linux 笔记本的局域网 SSH 目标，记录于 `docs/10_environment.md`；2026-09-27 尚未连接或检测环境，用户要求暂缓验证。
-- 用户纠正账号删除需求：测试阶段要在后台删除指定玩家在当前账号库、资产库中的账号数据与全部游戏资产；旧备份保留并单独标记/处理。现有 `account.ban/unban` 仍只负责可恢复的停用，**尚无删除功能**。实现边界见 docs/17 第七节；本轮没有删除真实账号、修改数据库或运行新验证。前一轮“只停用”的决定已撤销。
+- 用户纠正账号删除需求：测试阶段要在后台删除指定玩家在当前账号库、资产库中的账号数据与全部游戏资产；旧备份保留并单独标记/处理。前一轮“只停用”的决定已撤销，`account.ban/unban` 仍只负责可恢复的停用。
+- 2026-09-27 测试阶段账号删除（Claude 实现，基于 `d79b1fc`，**未提交**，待 Codex 复核）：新增 `account.delete` 和后台独立的“删除测试账号”按钮，设计见 [docs/17 第七节](docs/17_framework_shooter_plan.md#七测试阶段账号删除2026-09-27已实现待复核)，协议见 [docs/21](docs/21_managed_protocol.md#测试阶段账号删除)，文件清单见 docs/23。只在隔离测试目录中用假账号验证；没有删除或读取 `data/framework/` 中的真实账号，没有连接 Linux 设备，没有重建独立 ZIP。
 
 ## 当前已实现
 
 - **独立管理服务（Operator）**：回环 HTTP 中文后台，持有 SQLite 账号与资产库；通过认证的回环 TCP 启动、停止、重启、维护游戏宿主；宿主停止后后台继续运行。停服默认公告 60 秒；崩溃后确认旧进程退出、端口可重绑才重启，10 分钟最多 3 次。
-- **账号**：邀请码注册、用户名密码登录（PBKDF2-SHA256，60 万次迭代）、单玩家会话、改昵称/密码；管理员重置、封禁/解封、踢出，并有持久审计。账号请求（含密码、session token、邀请码）经 Godot 管道写入助手的标准输入，不写请求文件（2026-09-27 起）。会话校验由账号库的常驻存储进程处理，其余账号操作仍走一次性助手。
+- **账号**：邀请码注册、用户名密码登录（PBKDF2-SHA256，60 万次迭代）、单玩家会话、改昵称/密码；管理员重置、停用/恢复、踢出，并有持久审计。测试阶段可由管理员永久删除玩家账号：两库分步执行、作业记录可恢复，比赛结果和审计保留匿名代号，后台列出可能仍含该账号的旧备份（2026-09-27，源码版，未提交）。账号请求（含密码、session token、邀请码）经 Godot 管道写入助手的标准输入，不写请求文件（2026-09-27 起）。会话校验由账号库的常驻存储进程处理，其余账号操作仍走一次性助手。
 - **永久资产**：金币、经验与等级阈值表、非堆叠所有权、按游戏分开的默认配置；独立或 shared 资产空间；购买、选择与流水同事务，幂等重试不重复扣款；成绩与奖励同事务结算。比赛临时经济与永久钱包分开。资产读取、购买和选择由资产库的常驻存储进程处理（每个数据库一个，串行排队，超时或出错时自动回退到一次性助手；`ROOMKIT_STORAGE_MODE=oneshot` 整体切回旧路径）。
 - **运维**：在线备份（每 30 分钟，保留 48 份）、恢复前备份、恢复后撤销会话；进程身份核验，只回收本次创建且已核验的进程。
 - **房间**：每房一个 Godot 进程；WSS 大厅 + DTLS/ENet；房间实际绑定 UDP 后才 READY；资产许可与异步刷新按成员代次隔离。可信清单可以声明通用整数 `room_rules`，宿主只校验范围，具体含义交给游戏适配器。
@@ -34,6 +35,7 @@
 | 交付物 | 状态 |
 |---|---|
 | 源码入口 `StartManagement.cmd` / `StartShooterClient.cmd` / `StartManagedTurns.cmd` / `StopManagement.cmd` | 当前推荐，包含到本轮为止的全部修改 |
+| 最新独立包 `artifacts/RoomKit-0.5.0-framework-windows-aa019dbc45f9461099ad5a8136b1e4a1.zip`（索引 `artifacts/framework-release.json`，SHA256 `e5d1cfb7c91975815bfda57cda85cd3e4f26d313780f7cb6ec947332ec44f48b`） | 2026-09-27 用当前未提交源码构建，包含测试账号删除及收尾修正。`tools/build_framework_release.ps1` 退出 0；从该 ZIP 全新解压后执行 `tests/test_framework_release.ps1 -Bundle <新解压目录>`，44/0、退出 0，证据 `logs/deletion2-review-final-build.txt`、`logs/deletion2-review-final-package-test.txt`、`logs/framework-release-ddc825734d194a0b8b9af6dadda7807c`。这项包测试验证原生启动、房间与联机基本流程，不包含包内删除按钮的实际点击或删除端到端测试；旁边解压目录含隔离测试数据，分发只用 ZIP |
 | 最新独立包 `artifacts/RoomKit-0.5.0-framework-windows-12253e0acce8497fb173fd91d8a4f716.zip`（索引 `artifacts/framework-release.json`，228,983,858 字节，SHA256 `0761326e5ed0338bbb94a4d93b09c35c70826c7f1ec4d81f1a6fbb5122fb2bdc`） | 2026-09-27 由 `7567497` 加本地未提交的 snapshot、常驻存储第一阶段和 8 字符密码改动构建；默认使用常驻存储。包内 `tools/account_store.ps1` 的密码下限为 8，校验清单 36 项；自动包测试常驻模式 44/0、退出 0。修改包测试夹具后又用 ZIP 全新解压副本的恰好 8 字符管理员和玩家密码完成注册、登录，44/0、退出 0，证据 `logs/framework-release-b521b70977274676a9dec3f5f96a2815`。原解压目录复跑曾两次 6/1，见已知问题。旧路径在上一版包 44/0，本包未重跑；未人工点击新后台表单或试玩本包原生客户端。旁边已解压目录含测试私有数据，分发只用 ZIP |
 | 上一版独立包 `…-bbc5f4ddb8c247b8af6bac9d9d8e800d.zip`（228,983,857 字节，SHA256 `3f4be8e9415b78598aefee36d4f76caf56ab5e92ac8ddbc46a8300a85e63100b`） | 2026-09-27 由 `7567497` 加 snapshot 与常驻存储第一阶段改动构建，不含 8 字符密码改动；常驻与旧路径包测试均为 44/0 |
 | 上一版独立包 `…-a5eb4e454ac44da4bbfb76e10c81eec7.zip`（228,974,562 字节，SHA256 `43f7f04728dae72203a7b6d17a2258128192a22327d9d0e73f865b188ba7bcb7`） | 2026-09-27 由 `7567497` 加 snapshot 改动构建，不含常驻存储，已被上一行取代；包测试 44/0 |
@@ -44,6 +46,38 @@
 ## 最新有效验证范围
 
 密码长度小阶段（2026-09-27，当前本地提交源码）：`tools/run.ps1 -Mode accounts` 85/0、退出 0，真实 SQLite 覆盖 7 字符管理员设置/玩家注册/改密/管理员重置拒绝，以及 8 字符注册、登录、改密、重置成功；`-Mode managed_contracts` 281/0、退出 0，覆盖大厅密码字段 7/8 字符边界；`-Mode admin_http` 139/0、退出 0，检查真实回环后台 HTTP 处理；Godot `tests/run_account_recovery.gd` 30/0、退出 0，见 `logs/password8-account-recovery-rerun.stdout`。账号恢复首次工具会话中断，日志只写到中途，不计入通过或失败；原样重跑通过。新独立包构建退出 0；包测试夹具改用恰好 8 字符的管理员和玩家密码后，在 ZIP 全新解压副本中 44/0、退出 0。本包旧路径、人工点击新后台表单和人工客户端试玩未运行。已有账户密码及数据库格式不变。
+
+### 2026-09-27 账号删除复核修正验收（当前工作区代码，Claude，未提交）
+
+Codex 复核指出两个问题，本轮修正：① 两库删除完成后，Operator 的审计去标识化和备份标记若因退出或写入失败遗漏，重启无法补做；② 管理员填写的删除原因可能含用户名或 user_id。现在作业多了“等待 Operator 收尾”状态，收尾（改写并读回校验 Operator 审计文件、重新取备份列表、写入并读回删除日志）全部成功后才调用 `local.deletion_close` 并报告成功，重启和重复请求都能补做；原因在写入任何审计前替换，其他审计、回执和维护审计文本中的该 user_id/用户名也会被替换。设计见 docs/17 第七节“复核修正”。
+
+编排脚本 `logs/run-deletion2-acceptance-20260927.ps1`，汇总 `logs/deletion2-acceptance-summary.txt`，全部退出 0、0 失败，没有需要重跑的项：
+
+| 测试 | 结果 | 新增覆盖 |
+|---|---|---|
+| Godot `tests/run_account_deletion.gd` | 常驻 83/0、旧路径 83/0 | 原因含大小写不同的用户名和 user_id（删除原因、错误确认的失败请求、其他账号审计、邀请审计、其他玩家回执）全部被替换；两库完成后只有作业行还持有名字，收尾后为 0；收尾未完成时重启仍交回作业、重复请求（账号行已删）仍核对用户名并继续；过早收尾返回 `DELETION_NOT_READY`；Operator 审计文件设为只读时报告 `AUDIT_WRITE_FAILED` 且文件原样、无临时文件残留；删除日志只读时写入失败被检测且作业仍未完成；恢复可写后收尾成功、重复收尾 DUPLICATE |
+| `tests/test_account_deletion.ps1`（真实 Operator、宿主、房间、两个 WSS 客户端） | 常驻 52/0、旧路径 52/0 | 删除时 `operator-audit.jsonl` 只读 → 返回 `ACCOUNT_DELETION_INCOMPLETE`（stage operator / AUDIT_WRITE_FAILED），账号已从两库删除但审计仍含名字；恢复可写后原样重新提交才报告完成（约 5.1 秒）；各处原因写入被删玩家名字后，两库逐表扫描、合并审计、Operator 审计、维护审计、删除日志均不含其 user_id/用户名；Operator 停止时制造“只做第一步”和“两库已完成、未收尾”两种中断，重启后两者都完成、审计已去名、删除日志列出旧备份。证据 `logs/account-deletion-3d1b5481…` 及本轮编排的两个目录 |
+| 回归 | resident_store 34/0、asset_snapshot 40/0、account_recovery 30/0、unit 320/0、assets 83/0、accounts 85/0（旧路径 85/0）、result_rewards 74/0（旧路径 74/0）、admin_http 143/0、managed_contracts 286/0、asset_audit 14/0、operator_maintenance 35/0、operator_lifecycle 29/0、完整客户端 47/0（持有的 Operator 11/0）、后台页面 Node 测试 12/0、12/0、10/0、9/0 | |
+
+运行结束后没有残留 Godot 或存储工作进程；`data/framework/` 没有任何文件在本轮被修改；没有碰旧备份或 Linux 设备。
+
+Codex 复核补充：审计文件改写后的读回现在同时检查文件打开错误，避免读回失败被误判为“无身份信息”（`host/core/account_deletion.gd`）。补丁后独立重跑 Godot `tests/run_account_deletion.gd` 83/0、退出 0，证据 `logs/deletion2-review-account_deletion.stdout`；未重跑删除端到端，沿用上表补丁前的 52/0。随后按上方“当前交付物”重建最终 ZIP 并从全新解压目录完成包测试。
+
+### 2026-09-27 账号删除验收（当前工作区代码，Claude，未提交）
+
+编排脚本 `logs/run-deletion-acceptance-20260927.ps1`（汇总 `logs/deletion-acceptance-summary.txt`），完整客户端测试的原样重跑 `logs/run-deletion-retest-20260927.ps1`（汇总 `logs/deletion-retest-summary.txt`）。“常驻”为默认模式，“旧路径”为 `ROOMKIT_STORAGE_MODE=oneshot`。所有删除测试只使用 `data/test-account-deletion-<id>` 隔离目录里的假账号。
+
+| 测试 | 结果 | 覆盖 |
+|---|---|---|
+| Godot `tests/run_account_deletion.gd` | 常驻 60/0、旧路径 60/0，退出 0 | 真实 SQLite：管理员保护、用户名确认（不分大小写）、玩家无权删除、旧 token、3 个资产空间、签名结果与迟到结算（只给其他玩家发奖、重试仍 DUPLICATE）、资产步骤失败与两库之间中断（替身注入）均报告未完成、启动恢复、重复删除、逐表扫描两库不再含 user_id/用户名/昵称、审计与回执保留代号、限流键删除、其他玩家不受影响、同名重新注册得到新身份、删除前的备份副本仍含该账号 |
+| `tests/test_account_deletion.ps1`（真实 Operator、托管宿主、房间、两个 WSS 客户端） | 常驻 44/0（删除耗时 5720 ms）、旧路径 44/0（7100 ms），退出 0 | 后台 HTTP 删除；被删玩家坐在房间内时被踢出、旧会话与重新登录被拒（`AUTH_FAILED`）；其他玩家保持连接、资产不变；管理员不可删、错误用户名拒绝且不改数据；资产写入 `ACCOUNT_DELETED`、重复删除 `ACCOUNT_ALREADY_DELETED`；合并审计、删除日志、操作审计文件不含 user_id/用户名；备份列表标注；Operator 停止时只做第一步、重启后启动恢复完成；恢复删除前的备份后账号和资产确实回来且标注仍在。证据 `logs/account-deletion-58fae399…`、`…ab6ebfc4…` |
+| `node tests/test_admin_account_deletion.cjs` | 9/0 | 后台删除对话框的备份提示、用户名输入与勾选、最终确认取消时不发请求、只发送三个字段、结果文案、“删除未完成”状态与错误说明（DOM/API 替身，不是浏览器验收） |
+| 回归（常驻） | resident_store 34/0、asset_snapshot 40/0、account_recovery 30/0、grant_storage 24/0、unit 320/0、assets 83/0、accounts 85/0、result_rewards 74/0、admin_http 143/0、managed_contracts 286/0、test_helpers 6/0、asset_audit 14/0、operator_maintenance 35/0、asset_response_loss 25/0、operator_lifecycle 29/0，均退出 0 | admin_http 与契约新增 `account.delete` 的有效/缺字段/非法用户名/自选数据库用例 |
+| 回归（旧路径） | accounts 85/0、result_rewards 74/0，退出 0 | |
+| 完整客户端 `test_framework_clients.ps1 -Visual` | 首次 39/1（测试驱动 `Access is denied`，已知问题 3），原样重跑 47/0，持有的 Operator 两次 11/0 | 含原有停用/恢复流程 |
+| 其余三个后台页面 Node 测试 | 12/0、12/0、10/0 | 编排脚本里这四个 Node 测试因我把函数命名为 `Node`（与 `node` 命令同名，PowerShell 不区分大小写）而自我递归、全部退出 1，未执行测试；随后直接用 `node` 运行，结果如左 |
+
+运行结束后：没有残留 Godot 或存储工作进程；`data/framework/` 中没有任何文件在本轮开始后被修改；`git diff --check` 通过；改动的 .ps1 均为纯 ASCII。
 
 ### 2026-09-27 常驻存储第一阶段验收（当前工作区代码，Claude）
 
@@ -219,6 +253,7 @@ Codex 初测（保留原记录）：资产延迟小改动（2026-09-27，本地�
 - 用最新独立包（`12253e0a…`）做人工浏览器操作和原生客户端试玩（自动的 44 项包测试已通过）；新管理表单（房间规则、8 字符密码）的真实浏览器点击；真人操作手感；托管模板的图形界面。
 - 大厅内的玩家资产请求已通过真实 WSS 客户端单独计时；房间内死亡背包及复活前刷新仍未单独计时。
 - 断电、磁盘满、真实网络丢包/延迟、证书轮换、外部身份服务。
+- 账号删除未运行：真实浏览器里点击删除对话框（只有 Node 替身测试）；把删除功能打进独立 ZIP 并跑包测试（当前 ZIP 不含删除功能）；删除时房间正在进行、之后才提交结果的完整真实对局（迟到结算只在 SQLite 层用真实签名结果验证）；outbox 中存在待处理/已拒绝结果文件时的残留报告（代码有扫描，未构造此场景）；大量账号或大审计文件下的删除耗时；Linux 设备（按要求未连接）。
 
 ## 已知问题与限制
 
@@ -235,6 +270,20 @@ Codex 初测（保留原记录）：资产延迟小改动（2026-09-27，本地�
 11. **重复运行同一解压目录的包测试不稳定**：新包初次测试 44/0；将测试夹具改用 8 字符密码后，在同一已测试过的解压目录里连续两次都在射击导出客户端 UI 初始化标记处失败（6/1），进程退出码 0，控制台只有 Godot 启动横幅，尚未进入账号测试。用同一 ZIP 全新解压后原样运行通过 44/0，包含 8 字符管理员和玩家注册/登录。两次失败证据在 `logs/framework-release-d720d222ab154c4980cba1bd2c7301e3`、`logs/framework-release-50ad9127e6a04304aa2c999e6a60815a`；原因尚未确定，验包时使用干净解压副本。
 
 ## 本轮记录（2026-09-27）
+
+**账号删除复核修正（Claude，未提交，待 Codex 复核）**：修正 Codex 复核的两个问题：Operator 收尾（审计去标识化、备份标记）可恢复、未完成不报告成功；删除原因中的用户名/user_id 不留在当前数据库或 Operator 审计中。
+
+- 完成：账号库作业新增 `username`、`closed` 两列（首版未发布表自动补列）、`operator_pending` 状态和 `local.deletion_close`；`local.deletion_finish` 替换其他审计文本中的名字，作业保留 user_id/用户名直到收尾；`account.delete_begin` 在写入前替换原因中的名字，账号行已删、只差收尾时也接受重复请求；资产库 `asset.purge_user` 可带用户名，替换其他玩家回执命令中的名字。`host/core/account_deletion.gd` 新增审计文件改写并读回校验、删除日志追加并读回、内存审计替换；Operator 收尾在主线程执行，任一步失败返回 `ACCOUNT_DELETION_INCOMPLETE`（stage operator/close），启动时先完成只差收尾的作业；Operator 自己的审计行替换原因中的名字。同步响应 Schema、后台错误说明、docs/17、21、22、23。验收见上方“账号删除复核修正验收”。
+- 失败：本轮新旧测试均一次通过，没有失败项。过程中我用内联 Node 脚本改 `tools/sqlite_store.ps1` 时转义出错，把正则里的 `\x00-\x1f\x7f` 写成了真实控制字符，随即修正并确认文件只含可打印 ASCII，之后才运行测试。
+- 限制：昵称不在替换范围（可能是常见词，会误伤其他文本）；收尾完成前作业行仍保存 user_id 和用户名；旧备份、已拒绝的结果文件和运行日志仍只报告不改写。
+- 未运行：真实浏览器点击；独立 ZIP 与包测试（按要求不打包）；Linux；磁盘满等真实系统级写入失败（用只读属性模拟）。没有提交或推送。
+
+**测试阶段账号删除（Claude 实现，基于 `d79b1fc`，未提交，待 Codex 复核）**：用户要求实现仅管理员可用的测试账号删除，删除指定玩家在当前账号库及资产库中的账号数据和所有游戏资产，保留停用/恢复为独立操作；不改写旧备份，但明确提示并记录可能恢复该账号的备份；重点处理在线会话、交易回执、审计、比赛结果、迟到结算和跨库中断恢复，做不到就拒绝。
+
+- 完成：账号库新增作业表和 `account.delete_begin` / `local.deletion_pending` / `local.deletion_finish`，待删除账号不可解封、改名、重置；资产库新增墓碑表和 `asset.purge_user`，`asset.commit` 拒绝已删除账号，结算跳过已删除玩家并只存代号；新增 `host/core/account_deletion.gd` 编排两库步骤与启动恢复；Operator 新增 `account.delete`（先取备份清单、踢出在线玩家、完成后去标识化自己的审计文件、扫描残留文件、写删除日志）、备份列表标注、删除期间的备份/恢复/配置互斥，并在启动时先完成未完成的删除再开放 HTTP；后台新增独立的“删除测试账号”区块和“删除未完成”状态、备份页标注与恢复提醒。同步三份 Schema、契约样例、错误码、README、CONTEXT、docs/17、21、22、23。验收见上方“账号删除验收”。
+- 失败：端到端首跑 42/1，是测试假设错误（对局进行中商店关闭，玩家在房内购买被游戏策略以 `ASSET_OPERATION_DENIED` 拒绝），改为先在大厅购买再入房后 44/0，产品代码未改。完整客户端测试一次 `Access is denied` 驱动中止，原样重跑通过。编排脚本的 Node 步骤写错（见验收表），直接运行通过。更新 docs/21 时一次 shell 引号错误把反引号当成命令执行、写坏了该文件的新增段落，已用 `git checkout` 还原该文件（此前本轮未改过它）并改用脚本文件重做。
+- 限制：旧备份、已拒绝的结果文件（`*.rejected.json`）和运行日志不改写，只报告；复制到项目外的备份无法处理；匿名代号由 user_id 派生，持有旧备份的人可以据此关联。审计中管理员自己填写的删除原因会保留，页面提示不要写用户名。
+- 未运行：见上文“未运行 / 未验收”。没有提交、推送、部署或连接 Linux；没有读取、修改或删除 `data/framework/` 中的真实账号或残留文件；没有重建独立包。
 
 **常驻存储方案 B 第一阶段（Claude 实现、Codex 复核，未提交）**：用户要求按 docs/17 第六节的阶段决定实施方案 B，先处理资产读写和会话校验，保留旧路径回退，用真实客户端计时验收。
 

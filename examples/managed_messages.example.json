@@ -750,6 +750,18 @@
       }
     },
     {
+      "name": "admin.account.delete",
+      "schema": "admin_request.schema.json",
+      "message": {
+        "action": "account.delete",
+        "payload": {
+          "user_id": "user_example",
+          "confirm_username": "example_player",
+          "reason": "测试阶段清理"
+        }
+      }
+    },
+    {
       "name": "admin.invite.create",
       "schema": "admin_request.schema.json",
       "message": {

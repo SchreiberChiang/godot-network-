@@ -153,7 +153,7 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 | 维护入口 | `maintenance.set {enabled,message}`；维护期间拒绝新建/加入，公告可通过 `server.notice` 读取；已接受停服后返回 `ROOM_DRAINING` |
 | 房间 | `room.create {game_id,mode,map,capacity}`；`room.stop/room.recreate {room_id,reason}`；`room.joinable {room_id,joinable,reason}` |
 | 玩家 | `player.kick {user_id,reason}`；`account.list {query?,offset?,limit?}`；`account.get {user_id}` |
-| 账号修改 | `account.rename {user_id,display_name,reason}`；`account.reset_password {user_id,password,reason}`；`account.ban {user_id,hours,reason}`；`account.unban {user_id,reason}` |
+| 账号修改 | `account.rename {user_id,display_name,reason}`；`account.reset_password {user_id,password,reason}`；`account.ban {user_id,hours,reason}`；`account.unban {user_id,reason}`；测试阶段删除 `account.delete {user_id,confirm_username,reason}`（见下节） |
 | 邀请码 | `invite.create {uses,expires_hours,reason}`；`invite.list {}`；`invite.revoke {invite_id,reason}` |
 | 资产管理 | `asset.read {user_id,game_id}`；`asset.adjust {user_id,game_id,coins_delta,xp_delta,operation_id,reason}`；`asset.grant/asset.revoke {user_id,game_id,item_id,operation_id,reason}`；`asset.select` 还含 `slot` |
 | 备份/恢复 | `backup.create {reason}`；`backup.list {}`；`backup.restore {backup_id,reason}` |
@@ -162,7 +162,7 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 
 准确的必填、默认与范围以 Schema 为准。`hours:0` 表示永久封禁；内部账号接口将其转换为 `until:0`，账号输出的 `ban_until:-1` 表示永久封禁。邀请创建把相对小时转换成服务端绝对 expires。管理员不能通过重置/封禁接口封禁或重置管理员自身；内部账号服务支持验证旧密码后的自身改密，但当前管理 HTTP action 表尚未暴露管理员改密入口。资产 `coins_delta/xp_delta` 分别转换成内部 credits/experience，选择转换成管理员 `configure` 命令。客户端不能指定资产 actor、启动可执行文件或任意日志路径。
 
-管理后台把 `account.ban/unban` 显示为“停用账号/恢复账号”；停用表单默认 `hours:0`（无限期，之后可恢复）。这是界面措辞与默认值变化，协议 action 未改。停用只撤销会话并拒绝继续登录，不删除账号、资产、回执或比赛结果；当前没有物理删除用户的 API。该界面变化 2026-09-27 尚未运行新测试或人工点击验收。
+管理后台把 `account.ban/unban` 显示为“停用账号/恢复账号”；停用表单默认 `hours:0`（无限期，之后可恢复）。这是界面措辞与默认值变化，协议 action 未改。停用只撤销会话并拒绝继续登录，不删除账号、资产、回执或比赛结果。永久删除是另一个 action `account.delete`，见下一节；两者在后台是不同按钮。停用界面的措辞变化没有单独的人工点击验收。
 
 常见响应形状是 `{ok:true,payload:{...}}` 或 `{ok:false,code,payload:{}}`；账号 helper 原生 `ok/code/identity/...` 常嵌套于外层 payload。HTTP 200 本身不代表业务成功；AUTH_FAILED/AUTH_REQUIRED 通常返回 401，其他业务失败可能仍是 200。`status.payload` 包含 host、rooms、players、metrics、games；room 行还含 pid、port、heartbeats、heartbeat_age_ms、cleaned、joinable、options。这里的玩家在线状态来自托管宿主快照，账号列表的 active 则来自有效会话。
 
@@ -173,6 +173,29 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 `config.set.config.asset_spaces` 是 1–32 项的游戏 ID → 空间 ID 映射。Schema 只验证数量和已有 ID 字符规则；Operator 的受信登记另要求键集合恰好等于已注册游戏，值仅可为该游戏资产目录的默认空间或 `shared`，并拒绝共享目录内冲突的物品定义。游戏 ID 与默认空间可以不同，例如已注册 `racer` 的默认空间为 `garage`。`status.games[].asset_space` 返回该默认空间，管理页面只提供它和 `shared`，实际当前选择来自 `config.get.asset_spaces`。旧 status 缺少此字段时页面兼容回退到 game_id；新服务应始终提供字段。原 shooter/turns 配置继续兼容；合法 ID 并不授权新增游戏、资产目录、可执行路径或脚本。运行时不合法映射返回 `INVALID_OPTIONS`。
 
 审计把操作者、目标、动作、原因和结果归档。账号审计不会记录原始密码、密码派生值、token 或邀请码明文；资产流水包含可审阅的原状态与新状态。内部仓储只读操作 `{"op":"asset.audit_all"}` 使用固定 SQL 返回最近 100 条，每行字段为 `user_id/request_id/space_id/actor_id/command/previous_body/body/created_at`。其中 command、previous_body、body 是 JSON 字符串；无额外 SQL、筛选、排序、limit 入参。Operator 将账户、资产与操作审计合并成 `audit.list.payload.entries`，资产前后状态解码为对象。这个仓储入口自身不是鉴权边界，只能由已验证管理员的 Operator 调用。
+
+## 测试阶段账号删除
+
+2026-09-27 起（设计与取舍见 [docs/17 第七节](17_framework_shooter_plan.md)）。管理 API `account.delete {user_id, confirm_username, reason}` 永久删除一名**玩家**在当前 `accounts.sqlite` 中的账号、会话和登录限流记录，以及当前 `assets.sqlite` 中所有资产空间的状态和交易回执；比赛结果正文、审计和其他玩家回执里该玩家的 `user_id` 换成匿名代号 `deleted_<32 位十六进制>`（SHA-256(user_id) 的前 32 位）。管理员账号不能删除。`confirm_username` 必须与服务端按 `user_id` 查出的用户名一致（不区分大小写）；客户端不能选择数据库、表或 SQL。
+
+成功回复只含代号，不含 user_id 或用户名，例如：
+
+```json
+{"ok":true,"payload":{"state":"done","job_id":"deletion_…","subject":"deleted_…","resumed":false,"was_online":true,"still_online":false,"sessions_revoked":1,
+ "assets":{"spaces":["shooter","turns"],"asset_states":2,"asset_receipts":3,"actor_receipts":0,"results_deidentified":0,"receipt_texts_scrubbed":1},
+ "account":{"job_id":"deletion_…","subject":"deleted_…","state":"operator_pending","audit_rows_deidentified":2,"audit_texts_scrubbed":1,"rate_limits_removed":0,"sessions_revoked":0},
+ "operator_audit_rows_deidentified":2,
+ "backups_may_restore":[{"backup_id":"backup-…","created_at":1790514643,"kind":"manual"}],
+ "residual_files":{"outbox_pending":0,"outbox_rejected":0,"files":[]}}}
+```
+
+`assets`/`account` 是本次请求实际执行的数据库步骤；如果数据库步骤在之前的请求里已经完成、本次只补做 Operator 收尾，二者为空对象，`resumed` 为 true。`backups_may_restore` 是收尾时已存在、且创建时间不早于该账号注册时间的备份（作业未完成期间做的备份也在内）；从中恢复会把账号和资产带回来。`residual_files` 列出本次没有改写、但仍提及该 user_id 的文件：待处理的结果文件（下次入库时只存代号、不给已删除玩家发奖，然后删除）、已拒绝的结果文件，以及数据目录下的日志与私有日志。
+
+内部步骤：账号库 `account.delete_begin`（管理员 token；写作业、停用账号、删会话）→ 资产库 `asset.purge_user {user_id, username?}`（一个事务；写墓碑；可重复）→ 账号库 `local.deletion_finish`（删账号行、审计去标识化；作业进入 `operator_pending`）→ Operator 收尾（重写并读回校验 `operator-audit.jsonl`、`.previous`、`maintenance-audit.jsonl`，重新取备份列表，把备份清单写入并读回删除日志）→ 账号库 `local.deletion_close`（作业完成，清掉作业里的 user_id、用户名和原因；尚未到 `operator_pending` 时返回 `DELETION_NOT_READY`）。`local.*` 不在账号请求 Schema、大厅或 RPC 白名单中；`asset.purge_user` 只由 Operator 在管理员开始删除后或启动恢复时调用。第 1 步之后任何一步失败都返回 `ACCOUNT_DELETION_INCOMPLETE`，`payload` 含 `job_id/subject/user_id/stage/cause/backups_may_restore/was_online/still_online`，`stage` 为 `assets/account/operator/close/worker`，Operator 收尾的 `cause` 可为 `AUDIT_WRITE_FAILED/AUDIT_READ_FAILED/BACKUP_LIST_UNAVAILABLE/JOURNAL_WRITE_FAILED`。再次提交同一删除（账号行已删、只差收尾时也接受，仍核对输入的用户名）或 Operator 重启都会继续完成。管理员填写的 `reason` 中出现的 user_id 或输入的用户名（不区分大小写）在写入任何审计前换成代号。账号列表和详情的每个账号新增布尔字段 `deletion_pending`。
+
+删除之后：对该 user_id 的资产写入返回 `ACCOUNT_DELETED`；新的签名结果照常入库，其余玩家照常发奖，资产库回复可能带 `rewards_skipped`（发给房间的 `result.ack` 不变）；再次删除或读取账号返回 `ACCOUNT_ALREADY_DELETED`。同一用户名可以重新注册，得到新的 user_id 和空资产。`backup.list` 的每一行新增 `deleted_accounts`（该备份可能含有的已删除账号数），依据是数据目录中不随恢复覆盖的 `account-deletions.jsonl`（只记代号、作业号、备份号和计数）。删除进行中，`backup.create/backup.restore/config.set` 返回 `MAINTENANCE_BUSY`，自动备份顺延 1 分钟。
+
+兼容：账号库新增 `account_deletions` 表、资产库新增 `deleted_subjects` 表，`user_version` 仍为 1 / 2，旧备份可以恢复，缺表时自动补建。旧版本管理页面没有删除按钮；旧 Operator 不认识 `account.delete`，按 Schema 拒绝为 `INVALID_REQUEST`。
 
 ## 成绩与永久奖励同事务
 
@@ -215,7 +238,10 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 | `LOG_NOT_FOUND/LOG_READ_FAILED` | 管理后台允许的日志尚未生成或当前不可读；合法空文件返回成功和空 text，不伪装为读取失败 |
 | `SETUP_REQUIRED/SETUP_COMPLETE` | 尚未首次设置，或已完成首次设置不能再次创建管理员 |
 | `INVITE_INVALID/INVITE_NOT_FOUND/USERNAME_UNAVAILABLE` | 邀请过期/撤销/耗尽、未知邀请或用户名已占用 |
-| `ACCOUNT_NOT_FOUND/ACCOUNT_BANNED/ADMIN_SELF_PROTECTION` | 未知账号、封禁中，或管理员自身保护规则拒绝操作 |
+| `ACCOUNT_NOT_FOUND/ACCOUNT_BANNED/ADMIN_SELF_PROTECTION` | 未知账号、封禁中，或管理员自身保护规则拒绝操作（含删除管理员） |
+| `DELETE_CONFIRMATION_MISMATCH` | 删除时输入的用户名与目标账号不一致；没有改动任何数据 |
+| `ACCOUNT_DELETION_PENDING/ACCOUNT_DELETION_INCOMPLETE` | 该账号的删除已开始但未完成：账号保持停用，不能解封、改名或重置；再次执行删除或重启 Operator 继续 |
+| `ACCOUNT_DELETED/ACCOUNT_ALREADY_DELETED` | 账号已被删除：拒绝再写入资产、再次删除或读取；不是存储故障 |
 | `ALREADY_LOGGED_IN/ALREADY_CONNECTED` | 玩家有效会话已存在，或当前连接已登录 |
 | `RATE_LIMITED` | 失败限流、单连接账号操作或单玩家资产操作正在进行；勿立即紧密重试 |
 | `ACCOUNT_CAPACITY_EXCEEDED/INVITE_CAPACITY_EXCEEDED` | 本地账号或邀请码有界表达到容量 |
@@ -229,7 +255,7 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 | `STOP_SERVER_FIRST/SERVER_RUNNING` | 管理层或 helper 检测到服务尚未确认停止 |
 | `INVALID_BACKUP_ID/BACKUP_NOT_FOUND/BACKUP_NOT_READY` | 备份标识、已列举备份或所需文件不满足恢复条件 |
 | `BACKUP_INTEGRITY_FAILED/BACKUP_VERSION_UNSUPPORTED` | 校验失败或数据库版本不支持，不覆盖当前数据 |
-| `MAINTENANCE_BUSY/DATABASE_BUSY/FILES_IN_USE` | 维护互斥、SQLite 占用或文件仍被持有 |
+| `MAINTENANCE_BUSY/DATABASE_BUSY/FILES_IN_USE` | 维护互斥（含账号删除进行中）、SQLite 占用或文件仍被持有 |
 | `INVALID_DATA_PATH/REPARSE_POINT_REFUSED/PRIVATE_DATA_FAILED` | 私有目录边界或 ACL 不满足要求 |
 | `RESTORE_RECOVERY_REQUIRED` | 先解决未完成恢复日志；不要继续启动写入 |
 

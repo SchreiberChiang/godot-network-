@@ -68,15 +68,41 @@ function Username {
     if ($value -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_.-]{2,31}$') { Fail 'INVALID_ACCOUNT_REQUEST' }
     return $value.ToLowerInvariant()
 }
+# Test-stage deletion (docs/17 section 7). The pseudonym is derived from the random
+# user_id only, so audit rows and tombstones stay linkable without keeping the ID.
+# Job states: assets_pending (account blocked) -> done with closed=0 (both databases
+# done, Operator audit/journal still pending) -> closed=1. user_id and username stay
+# in the job only until closed, because the Operator needs them to finish its files.
+function EnsureDeletions {
+    [void](Query 'CREATE TABLE IF NOT EXISTS account_deletions (job_id TEXT PRIMARY KEY, subject TEXT NOT NULL UNIQUE, user_id TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN (''assets_pending'',''done'')), actor_id TEXT NOT NULL, reason TEXT NOT NULL, account_created_at INTEGER NOT NULL, created_at INTEGER NOT NULL, finished_at INTEGER NOT NULL DEFAULT 0, username TEXT NOT NULL DEFAULT '''', closed INTEGER NOT NULL DEFAULT 0)')
+    # Tables made by the first, unreleased version lack the last two columns; their
+    # finished jobs had already done the Operator steps, so they count as closed.
+    $columns=@(foreach($row in (Query 'PRAGMA table_info(account_deletions)')) { $row['name'] })
+    if ($columns -notcontains 'username') { [void](Query 'ALTER TABLE account_deletions ADD COLUMN username TEXT NOT NULL DEFAULT ''''') }
+    if ($columns -notcontains 'closed') {
+        [void](Query 'ALTER TABLE account_deletions ADD COLUMN closed INTEGER NOT NULL DEFAULT 0')
+        [void](Query 'UPDATE account_deletions SET closed=1 WHERE state=''done''')
+    }
+}
+function Subject([string]$Id) { return 'deleted_'+([RoomKitPasswords]::Digest($Id)).Substring(0,32) }
+# Replaces every case-insensitive occurrence of the user_id and username in free text
+# (reasons, audit snapshots) with the pseudonym.
+function Scrub([string]$Text,[string[]]$Needles,[string]$Replacement) {
+    foreach($needle in $Needles) { if ($needle.Length -ge 3) { $Text=[regex]::Replace($Text,[regex]::Escape($needle),$Replacement,[Text.RegularExpressions.RegexOptions]::IgnoreCase) } }
+    return $Text
+}
+function JobState($Row) { if ($Row['state'] -eq 'assets_pending') { return 'assets_pending' }; if ([int]$Row['closed'] -eq 1) { return 'done' }; return 'operator_pending' }
+function DeletionPending([string]$Id) { return (Query 'SELECT job_id FROM account_deletions WHERE user_id=? AND state=''assets_pending''' @($Id)).Count -gt 0 }
+function AlreadyDeleted([string]$Id) { return (Query 'SELECT job_id FROM account_deletions WHERE subject=? AND state=''done''' @(Subject $Id)).Count -gt 0 }
 function Identity($row) { return @{user_id=$row['user_id'];display_name=$row['display_name'];role=$row['role']} }
 function PublicAccount($row) {
     $until=[long]$row['ban_until']
     $active=(Query 'SELECT expires FROM sessions WHERE user_id=? AND expires>?' @($row['user_id'],[string]$now)).Count -gt 0
-    return @{user_id=$row['user_id'];username=$row['username'];display_name=$row['display_name'];role=$row['role'];created_at=[long]$row['created_at'];ban_until=$until;ban_reason=$row['ban_reason'];banned=($until -eq -1 -or $until -gt $now);active=$active}
+    return @{user_id=$row['user_id'];username=$row['username'];display_name=$row['display_name'];role=$row['role'];created_at=[long]$row['created_at'];ban_until=$until;ban_reason=$row['ban_reason'];banned=($until -eq -1 -or $until -gt $now);active=$active;deletion_pending=(DeletionPending $row['user_id'])}
 }
 function FindUser([string]$UserId) {
     $rows=Query 'SELECT * FROM accounts WHERE user_id=?' @($UserId)
-    if (-not $rows.Count) { Fail 'ACCOUNT_NOT_FOUND' }
+    if (-not $rows.Count) { if (AlreadyDeleted $UserId) { Fail 'ACCOUNT_ALREADY_DELETED' }; Fail 'ACCOUNT_NOT_FOUND' }
     return $rows[0]
 }
 function Authenticate {
@@ -150,6 +176,7 @@ try {
         [void](Query 'CREATE TABLE IF NOT EXISTS invites (invite_id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, max_uses INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0, expires INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, created_by TEXT NOT NULL)')
         [void](Query 'CREATE TABLE IF NOT EXISTS rate_limits (rate_key TEXT PRIMARY KEY, failures INTEGER NOT NULL, window_start INTEGER NOT NULL)')
         [void](Query 'CREATE TABLE IF NOT EXISTS account_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT NOT NULL, action TEXT NOT NULL, target_id TEXT NOT NULL, reason TEXT NOT NULL, result TEXT NOT NULL, before_body TEXT NOT NULL, after_body TEXT NOT NULL, created_at INTEGER NOT NULL)')
+        EnsureDeletions
         [void](Query 'PRAGMA user_version=1')
         [void](Query 'COMMIT'); $transaction=$false
         $result=@{ok=$true;code='';sqlite_version=(Query 'SELECT sqlite_version() AS version')[0]['version']}
@@ -158,6 +185,8 @@ try {
         # One transaction serializes setup, invite consumption, duplicate login,
         # rate limits and credential/session revocation across helper processes.
         [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
+        # Additive table with the same user_version: a restored older backup gains it here.
+        EnsureDeletions
         if ($op -ne 'local.reset_player_sessions') { [void](Query 'DELETE FROM sessions WHERE expires<=?' @([string]$now)) }
         $result=@{ok=$true;code=''}
         switch ($op) {
@@ -252,6 +281,7 @@ try {
                     $reason=TextValue 'reason' 1 256
                 }
                 $target=FindUser $id
+                if (DeletionPending $id) { Fail 'ACCOUNT_DELETION_PENDING' }
                 [void](Query 'UPDATE accounts SET display_name=? WHERE user_id=?' @($display,$id))
                 Audit $op $id $reason 'OK' @{display_name=$target['display_name']} @{display_name=$display}
                 $result.identity=Identity (FindUser $id)
@@ -324,6 +354,8 @@ try {
                 }
                 $target=FindUser $id
                 if ($target['role'] -eq 'admin') { Fail 'ADMIN_SELF_PROTECTION' }
+                # A pending deletion keeps the account blocked until it completes.
+                if (DeletionPending $id) { Fail 'ACCOUNT_DELETION_PENDING' }
                 $before=PublicAccount $target
                 if ($op -eq 'account.reset_password') {
                     $secret=NewPassword (TextValue 'password' 8 128)
@@ -338,6 +370,112 @@ try {
                 }
                 if ($op -ne 'account.unban') { [void](Query 'DELETE FROM sessions WHERE user_id=?' @($id)) }
                 Audit $op $id $reason 'OK' $before (PublicAccount (FindUser $id))
+            }
+            'account.delete_begin' {
+                # Step 1. Blocks sign-in and revokes sessions, then records a job that
+                # stays open until the asset purge, local.deletion_finish and the
+                # Operator's own close-out (local.deletion_close) have all succeeded.
+                # Repeating the request resumes the same job, including after the
+                # account row itself is already gone (job waiting for the Operator).
+                RequireAdmin
+                $reason=TextValue 'reason' 1 256
+                $id=TextValue 'user_id' 1 64
+                $confirm=(TextValue 'confirm_username' 3 32).ToLowerInvariant()
+                $subject=Subject $id
+                # The administrator's free-text reason never keeps the target's names.
+                $reason=Scrub $reason @($id,$confirm) $subject
+                $rows=Query 'SELECT * FROM accounts WHERE user_id=?' @($id)
+                if (-not $rows.Count) {
+                    $waiting=Query 'SELECT * FROM account_deletions WHERE user_id=? AND state=''done'' AND closed=0' @($id)
+                    if (-not $waiting.Count) { if (AlreadyDeleted $id) { Fail 'ACCOUNT_ALREADY_DELETED' }; Fail 'ACCOUNT_NOT_FOUND' }
+                    if ($waiting[0]['username'] -cne $confirm) { Fail 'DELETE_CONFIRMATION_MISMATCH' }
+                    Audit $op $subject $reason 'OK' @{} @{job_id=$waiting[0]['job_id'];state='operator_pending';resumed=$true}
+                    $result.deletion=@{job_id=$waiting[0]['job_id'];user_id=$id;subject=$subject;state='operator_pending';account_created_at=[long]$waiting[0]['account_created_at'];resumed=$true;sessions_revoked=0}
+                    break
+                }
+                $target=$rows[0]
+                if ($target['role'] -eq 'admin') { Fail 'ADMIN_SELF_PROTECTION' }
+                if ($target['username'] -cne $confirm) { Fail 'DELETE_CONFIRMATION_MISMATCH' }
+                $job=Query 'SELECT job_id FROM account_deletions WHERE user_id=? AND state=''assets_pending''' @($id)
+                $resumed=$job.Count -gt 0
+                $jobId=if ($resumed) { $job[0]['job_id'] } else { 'deletion_'+[RoomKitPasswords]::RandomHex(16) }
+                if (-not $resumed) {
+                    [void](Query 'INSERT INTO account_deletions (job_id,subject,user_id,username,state,closed,actor_id,reason,account_created_at,created_at) VALUES (?,?,?,?,''assets_pending'',0,?,?,?,?)' @($jobId,$subject,$id,$target['username'],$actor['user_id'],$reason,[string]$target['created_at'],[string]$now))
+                }
+                $revoked=[long](Query 'SELECT count(*) AS total FROM sessions WHERE user_id=?' @($id))[0]['total']
+                [void](Query 'DELETE FROM sessions WHERE user_id=?' @($id))
+                [void](Query 'UPDATE accounts SET ban_until=-1,ban_reason=''account_deletion_pending'' WHERE user_id=?' @($id))
+                Audit $op $subject $reason 'OK' @{} @{job_id=$jobId;state='assets_pending';resumed=$resumed}
+                $result.deletion=@{job_id=$jobId;user_id=$id;subject=$subject;state='assets_pending';account_created_at=[long]$target['created_at'];resumed=$resumed;sessions_revoked=$revoked}
+            }
+            'local.deletion_pending' {
+                # Local owner-only recovery hook, like local.reset_player_sessions:
+                # absent from the account request schema and from every RPC whitelist.
+                if (@($r.PSObject.Properties.Name).Count -ne 1) { Fail 'INVALID_ACCOUNT_REQUEST' }
+                $rows=Query 'SELECT * FROM account_deletions WHERE state=''assets_pending'' OR closed=0 ORDER BY created_at,job_id LIMIT 100'
+                $result.deletions=@(foreach($row in $rows) { @{job_id=$row['job_id'];user_id=$row['user_id'];username=$row['username'];subject=$row['subject'];state=(JobState $row);account_created_at=[long]$row['account_created_at']} })
+            }
+            'local.deletion_finish' {
+                # Step 3, only after the asset purge succeeded. Removes the account row,
+                # its sessions and login rate-limit key; audit rows about the account get
+                # the pseudonym and lose their snapshots and reason, and the user_id or
+                # username inside any other audit row's text is replaced too. Rows keep
+                # action, time and result. The job then waits for the Operator.
+                if (@($r.PSObject.Properties.Name).Count -ne 2) { Fail 'INVALID_ACCOUNT_REQUEST' }
+                $jobId=TextValue 'job_id' 1 64
+                $job=Query 'SELECT * FROM account_deletions WHERE job_id=?' @($jobId)
+                if (-not $job.Count) { Fail 'DELETION_NOT_FOUND' }
+                $job=$job[0]
+                if ($job['state'] -eq 'done') {
+                    $result.code='DUPLICATE'
+                    $result.deletion=@{job_id=$jobId;subject=$job['subject'];state=(JobState $job)}
+                    break
+                }
+                $id=$job['user_id']; $subject=$job['subject']; $name=$job['username']
+                $actor=@{user_id=$job['actor_id']}
+                $revoked=[long](Query 'SELECT count(*) AS total FROM sessions WHERE user_id=?' @($id))[0]['total']
+                [void](Query 'DELETE FROM sessions WHERE user_id=?' @($id))
+                $limits=0
+                if ($name) {
+                    $key='user:'+[RoomKitPasswords]::Digest($name)
+                    $limits=[long](Query 'SELECT count(*) AS total FROM rate_limits WHERE rate_key=?' @($key))[0]['total']
+                    [void](Query 'DELETE FROM rate_limits WHERE rate_key=?' @($key))
+                }
+                $audited=[long](Query 'SELECT count(*) AS total FROM account_audit WHERE target_id=? OR actor_id=?' @($id,$id))[0]['total']
+                [void](Query 'UPDATE account_audit SET target_id=?,reason=''redacted:account_deleted'',before_body=''{}'',after_body=''{}'' WHERE target_id=?' @($subject,$id))
+                [void](Query 'UPDATE account_audit SET actor_id=? WHERE actor_id=?' @($subject,$id))
+                $scrubbed=0
+                foreach($needle in @($id,$name)) {
+                    if ($needle.Length -lt 3) { continue }
+                    foreach($row in (Query 'SELECT id,reason,before_body,after_body FROM account_audit WHERE instr(lower(reason),lower(?))>0 OR instr(lower(before_body),lower(?))>0 OR instr(lower(after_body),lower(?))>0' @($needle,$needle,$needle))) {
+                        [void](Query 'UPDATE account_audit SET reason=?,before_body=?,after_body=? WHERE id=?' @((Scrub $row['reason'] @($id,$name) $subject),(Scrub $row['before_body'] @($id,$name) $subject),(Scrub $row['after_body'] @($id,$name) $subject),$row['id']))
+                        $scrubbed++
+                    }
+                }
+                [void](Query 'DELETE FROM accounts WHERE user_id=?' @($id))
+                [void](Query 'UPDATE account_deletions SET state=''done'',closed=0,finished_at=? WHERE job_id=?' @([string]$now,$jobId))
+                Audit 'account.delete' $subject (Scrub $job['reason'] @($id,$name) $subject) 'OK' @{} @{job_id=$jobId;state='operator_pending'}
+                $result.deletion=@{job_id=$jobId;subject=$subject;state='operator_pending';sessions_revoked=$revoked;rate_limits_removed=$limits;audit_rows_deidentified=$audited;audit_texts_scrubbed=$scrubbed}
+            }
+            'local.deletion_close' {
+                # Step 5, called by the Operator only after its own audit files are
+                # de-identified and its deletion journal entry is durably written.
+                # Drops the last copies of the user_id, username and reason.
+                if (@($r.PSObject.Properties.Name).Count -ne 2) { Fail 'INVALID_ACCOUNT_REQUEST' }
+                $jobId=TextValue 'job_id' 1 64
+                $job=Query 'SELECT * FROM account_deletions WHERE job_id=?' @($jobId)
+                if (-not $job.Count) { Fail 'DELETION_NOT_FOUND' }
+                $job=$job[0]
+                if ($job['state'] -ne 'done') { Fail 'DELETION_NOT_READY' }
+                if ([int]$job['closed'] -eq 1) {
+                    $result.code='DUPLICATE'
+                    $result.deletion=@{job_id=$jobId;subject=$job['subject'];state='done'}
+                    break
+                }
+                [void](Query 'UPDATE account_deletions SET closed=1,user_id='''',username='''',reason='''',finished_at=? WHERE job_id=?' @([string]$now,$jobId))
+                $actor=@{user_id=$job['actor_id']}
+                Audit 'account.delete_closed' $job['subject'] '' 'OK' @{} @{job_id=$jobId;state='done'}
+                $result.deletion=@{job_id=$jobId;subject=$job['subject'];state='done'}
             }
             'audit.list' {
                 RequireAdmin
@@ -360,8 +498,16 @@ try {
         try {
             $targetId=[string](Value 'user_id' '')
             if ($targetId.Length -gt 64) { $targetId='' }
+            # Never write a deleted (or being deleted) account's user_id back into the audit.
+            $deleted=$op -eq 'account.delete_begin'
+            if ($targetId -and -not $deleted) { try { $deleted=AlreadyDeleted $targetId } catch {} }
             $safeReason=[string](Value 'reason' '')
             if ($safeReason.Length -gt 256) { $safeReason='' }
+            if ($targetId -and $deleted) {
+                # ...nor its user_id or the typed username inside the reason text.
+                $safeReason=Scrub $safeReason @($targetId,[string](Value 'confirm_username' '')) (Subject $targetId)
+                $targetId=Subject $targetId
+            }
             Audit $op $targetId $safeReason $code
         } catch {}
     }

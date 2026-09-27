@@ -80,6 +80,8 @@ func _run() -> void:
 	reject_set("admin.server.stop", ["payload"], "immediate", "false", "server stop requires boolean immediate flag")
 	reject_remove("admin.account.reset_password", ["payload"], "reason", "password reset requires audit reason")
 	reject_set("admin.account.ban", ["payload"], "hours", -1, "negative ban duration rejected")
+	reject_remove("admin.account.delete", ["payload"], "confirm_username", "account deletion requires typed username confirmation")
+	reject_set("admin.account.delete", ["payload"], "database", "accounts.sqlite", "account deletion cannot choose a database")
 	reject_set("admin.backup.restore", ["payload"], "backup_id", "../../accounts.sqlite", "restore cannot accept arbitrary file path")
 	reject_set("admin.config.set", ["payload", "config"], "process_path", "C:/untrusted.exe", "config rejects arbitrary executable setting")
 	for key in ["../racer", "racer/track", "Racer", "x", "r".repeat(65)]:

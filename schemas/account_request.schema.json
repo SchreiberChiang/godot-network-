@@ -23,6 +23,7 @@
         "account.reset_password",
         "account.ban",
         "account.unban",
+        "account.delete_begin",
         "account.list",
         "account.get",
         "session.revoke_all",
@@ -34,6 +35,10 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "username": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{2,31}$"
+    },
+    "confirm_username": {
       "type": "string",
       "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{2,31}$"
     },
@@ -283,6 +288,19 @@
       "required": [
         "token",
         "user_id",
+        "reason"
+      ]
+    },
+    {
+      "properties": {
+        "op": {
+          "const": "account.delete_begin"
+        }
+      },
+      "required": [
+        "token",
+        "user_id",
+        "confirm_username",
         "reason"
       ]
     },

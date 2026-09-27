@@ -60,7 +60,7 @@ func _run() -> void:
 		["room.create", {"game_id": "shooter", "mode": "ffa", "map": "depot", "capacity": 2.5}],
 		["room.create", {"game_id": "shooter", "mode": "ffa", "map": "depot", "capacity": 17}],
 		["server.stop", {"immediate": "false", "reason": "test"}], ["account.ban", {"user_id": "user", "hours": -1, "reason": "test"}],
-		["account.get", {"user_id": ""}], ["logs.read", {"label": "../../data/accounts.sqlite"}],
+		["account.get", {"user_id": ""}], ["account.delete", {"user_id": "user", "reason": "test"}], ["account.delete", {"user_id": "user", "confirm_username": "../x", "reason": "test"}], ["logs.read", {"label": "../../data/accounts.sqlite"}],
 		["setup.create", {"username": "test", "password": "short"}], ["invite.create", {"uses": 1001, "expires_hours": 24, "reason": "test"}],
 		["backup.restore", {"backup_id": "../data/accounts.sqlite", "reason": "test"}], ["player.kick", {"user_id": "user", "reason": "\n"}],
 		["asset.adjust", {"user_id": "user", "game_id": "shooter", "coins_delta": 1000001, "xp_delta": 0, "reason": "test", "operation_id": "test"}],
@@ -194,6 +194,7 @@ func action_payloads() -> Dictionary:
 	values["account.get"] = {"user_id": "user_test"}
 	values["account.reset_password"] = {"user_id": "user_test", "password": "fixture-new-password", "reason": "HTTP fixture"}
 	values["account.ban"] = {"user_id": "user_test", "hours": 24, "reason": "HTTP fixture"}
+	values["account.delete"] = {"user_id": "user_test", "confirm_username": "user_test", "reason": "HTTP fixture"}
 	values["account.rename"] = {"user_id": "user_test", "display_name": "测试玩家", "reason": "HTTP fixture"}
 	values["invite.create"] = {"uses": 5, "expires_hours": 168, "reason": "HTTP fixture"}
 	values["invite.revoke"] = {"invite_id": "invite_test", "reason": "HTTP fixture"}

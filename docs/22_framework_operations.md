@@ -36,13 +36,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_framework.ps1 -M
 
 默认私有目录为 `data/framework/`：accounts.sqlite 保存账号/会话/邀请码，assets.sqlite 保存资产/操作流水/成绩与结果授权，config.json 保存配置，server.key 是私钥。私有文件不进入 Git、玩家分发包或日志。当前单管理员本机后台不对外网监听。
 
-后台可查看账号，重置密码、封禁、解封、踢下线；修改资产需要原因，购买、选用、授权和撤销分别记录。金币和经验调整有上下限，不能通过后台执行任意 SQL 或 shell。等级根据经验计算。首次注册没有测试金币。
+后台可查看账号，重置密码、停用、恢复、踢下线，以及在测试阶段永久删除玩家账号（见下文）；修改资产需要原因，购买、选用、授权和撤销分别记录。金币和经验调整有上下限，不能通过后台执行任意 SQL 或 shell。等级根据经验计算。首次注册没有测试金币。
 
 只有停止游戏宿主后才能切换资产空间。独立和 shared 是不同的已命名空间；切换保留原空间数据，不复制、不合并。即使共享钱包，两款游戏的默认配置仍分别保存。实际房间服只能取得经过确认的配置，客户端不能上传武器属性。
 
 后台默认每三十分钟备份，保留四十八份自动备份；手动和恢复前备份另存。恢复必须停服，先做恢复前备份，校验后恢复，全部账号会话失效，需要重新登录。不要直接替换运行中的 SQLite 文件。无法证明旧进程退出或旧端口空闲时保留 RECOVERY_REQUIRED，不按旧 PID 强杀进程。
 
 宿主发生异常后先确认旧房间退出与端口回收，再尝试重启，十分钟最多三次。重新启动前清理旧玩家会话，玩家可再次登录，管理员会话保留；恢复整个备份会使管理员会话也失效。未完成的对局不续赛。主动停服不自动拉起。这里只管理本项目进程，不是全系统服务管理器。
+
+### 删除测试账号
+
+“玩家 → 详情 → 删除测试账号”永久删除该玩家在当前账号库和资产库中的账号与全部游戏资产，不可恢复；它和“停用账号 / 恢复账号”是两个独立操作。对话框会列出可能仍含该账号的旧备份，要求输入用户名、勾选确认，发送前再确认一次。操作原因里不要写用户名等可识别信息。完成后提示中给出匿名代号、清除的资产空间与回执数、仍提及该玩家的残留文件，以及旧备份清单。
+
+如果提示“删除未完成”，说明删除还没有做完，不能当作已删除：可能是数据库没删完（账号保持停用、无法登录），也可能数据库已删完、只差管理服务改写自己的审计文件和记录备份清单（例如审计文件被设为只读或磁盘写入失败）。在同一对话框再次提交，或对仍在列表里的账号点“继续删除测试账号”即可；重启管理服务也会在启动时自动完成。操作原因里即使写了用户名或 user_id，也会被换成匿名代号。删除进行中，手动备份、恢复和配置保存会提示稍后再试。
+
+旧备份不会被改写。“备份与恢复”页对早于某次删除的备份标注“可能含 N 个”，恢复这类备份会把已删除的账号和资产带回来；如需彻底清除，要在恢复后再删一次，或者删除这些备份文件（后者需人工决定）。复制到项目以外的备份不在后台管理范围内。
 
 ### 常驻存储与回退开关
 
@@ -96,16 +104,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_client_launcher
 node tests/test_admin_room_rules.cjs
 node tests/test_admin_asset_spaces.cjs
 node tests/test_admin_auth_errors.cjs
+node tests/test_admin_account_deletion.cjs
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test_helpers.ps1
 & 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_storage_timing.gd -- --rounds=5 --label=my-run
 & 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_grant_storage.gd
 & 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_asset_snapshot.gd
 & 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_resident_store.gd
+& 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe' --headless --path . --script res://tests/run_account_deletion.gd
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_account_deletion.ps1
 ```
+
+`run_account_deletion.gd` 在隔离目录 `data/test-account-deletion-<id>` 中用假账号直接驱动两个真实 SQLite 库：管理员保护、用户名确认、玩家无权删除、旧 token、多个资产空间、签名结果与迟到结算、资产步骤失败和两库之间中断（用替身制造）、Operator 收尾中断后的重启与重复请求、审计文件和删除日志设为只读时的写入失败、原因里含用户名/user_id 的替换、启动恢复、重复删除、其他玩家不受影响、审计与回执去标识化，最后逐表扫描两个库确认不再含 user_id、用户名和昵称，并确认删除前的备份副本仍含该账号。`test_account_deletion.ps1` 启动真实 Operator、托管宿主和房间，用两个真实 WSS 客户端（被删玩家坐在房间里）走后台 HTTP 删除，检查踢下线、旧凭据、其他玩家资产、审计与删除日志、备份标注；删除时先把 `operator-audit.jsonl` 设为只读，确认返回“删除未完成”，恢复可写后重新提交才完成；各处原因写入被删玩家的用户名和 user_id，最后逐表扫描两个库和 Operator 审计文件确认已替换；再在 Operator 停止时分别制造“只做第一步”和“两库已完成、未收尾”两种中断，重启后确认都已完成；最后恢复删除前的备份，确认账号和资产会被带回。两者都可以设置 `ROOMKIT_STORAGE_MODE=oneshot` 重跑。
 
 `run_resident_store.gd` 检查常驻存储：新旧路径返回完全一致、每个数据库只有一个工作进程、不产生请求文件、新旧路径并发写同一个库、助手报错时进程不退出、超时和崩溃后重试只扣一次、队列上限、空闲退出、模式开关、全部关闭后自动重启，以及会话校验两条路径一致和句柄不泄漏。其余专项默认走常驻路径；在启动 Godot 或测试脚本前设置 `ROOMKIT_STORAGE_MODE=oneshot`，就可以用一次性路径重跑。
 
-`managed_shutdown` 与 `operator_schedules` 会各自创建私有数据目录，运行前需要存在 `artifacts/framework-games.json` 及其中引用的工程产物；`operator_schedules` 用受控时间验证 30 分钟备份和 10 分钟重启窗口，没有真实等待。`test_helpers.ps1` 覆盖有界助手的超时终止、路径白名单和账号请求的 stdin 模式。`run_storage_timing.gd` 在私有测试目录里实测注册、登录、会话校验、登出、发币、购买、重试和结算的存储层耗时，同时检查账号操作期间数据目录没有出现请求文件、Godot 句柄没有增长；报告写入 `logs/storage-timing-<label>.json`，输出 `STORAGE_TIMING_RESULT passed=... failed=0` 且退出 0 才算通过。耗时受机器负载影响，只能在同一台机器上前后对比。`run_grant_storage.gd` 检查房间签名密钥不落盘及授权上限。`run_asset_snapshot.gd` 走真实资产服务，检查购买、选择、重复请求、同 ID 不同内容、重开后重试、同一请求并发、超额并发购买和并发加币；每步之后用回执流水链核对余额与版本，并数出每个操作实际发生的存储调用次数（购买、选择、发币各 2 次，已提交请求的重复调用 1 次）。在这几条之前的七条依次对应托管注册、[托管模板](24_managed_game_template.md)、[房间规则](25_shooter_room_rules.md)、客户端启动器和三个管理页面函数测试；Node 测试用的是 DOM/API 替身，不算浏览器验收。射击渲染平滑对比 `tests/run_shooter_visual.gd` 需要图形窗口，命令见 [docs/25](25_shooter_room_rules.md)。各专项的最新结果与证据见 [STATUS](../STATUS.md#最新有效验证范围)。
+`managed_shutdown` 与 `operator_schedules` 会各自创建私有数据目录，运行前需要存在 `artifacts/framework-games.json` 及其中引用的工程产物；`operator_schedules` 用受控时间验证 30 分钟备份和 10 分钟重启窗口，没有真实等待。`test_helpers.ps1` 覆盖有界助手的超时终止、路径白名单和账号请求的 stdin 模式。`run_storage_timing.gd` 在私有测试目录里实测注册、登录、会话校验、登出、发币、购买、重试和结算的存储层耗时，同时检查账号操作期间数据目录没有出现请求文件、Godot 句柄没有增长；报告写入 `logs/storage-timing-<label>.json`，输出 `STORAGE_TIMING_RESULT passed=... failed=0` 且退出 0 才算通过。耗时受机器负载影响，只能在同一台机器上前后对比。`run_grant_storage.gd` 检查房间签名密钥不落盘及授权上限。`run_asset_snapshot.gd` 走真实资产服务，检查购买、选择、重复请求、同 ID 不同内容、重开后重试、同一请求并发、超额并发购买和并发加币；每步之后用回执流水链核对余额与版本，并数出每个操作实际发生的存储调用次数（购买、选择、发币各 2 次，已提交请求的重复调用 1 次）。在这几条之前的八条依次对应托管注册、[托管模板](24_managed_game_template.md)、[房间规则](25_shooter_room_rules.md)、客户端启动器和四个管理页面函数测试；Node 测试用的是 DOM/API 替身，不算浏览器验收。射击渲染平滑对比 `tests/run_shooter_visual.gd` 需要图形窗口，命令见 [docs/25](25_shooter_room_rules.md)。各专项的最新结果与证据见 [STATUS](../STATUS.md#最新有效验证范围)。
 
 ### 性能测量（评估用，不属于回归门禁）
 

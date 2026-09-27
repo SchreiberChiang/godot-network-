@@ -100,7 +100,10 @@
                                                                      },
                                                           "active":  {
                                                                          "type":  "boolean"
-                                                                     }
+                                                                     },
+                                                                     "deletion_pending":  {
+                                                                          "type":  "boolean"
+                                                                      }
                                                       }
                                    },
                        "accounts":  {
@@ -156,7 +159,10 @@
                                                                                     },
                                                                          "active":  {
                                                                                         "type":  "boolean"
-                                                                                    }
+                                                                                    },
+                                                                                    "deletion_pending":  {
+                                                                                         "type":  "boolean"
+                                                                                     }
                                                                      }
                                                   }
                                     },
@@ -262,6 +268,8 @@
                                                                  }
                                               }
                                 },
+                       "deletion":  {"type":"object","additionalProperties":false,"required":["job_id","subject","state"],"properties":{"job_id":{"type":"string","pattern":"^deletion_[a-f0-9]{32}$"},"subject":{"type":"string","pattern":"^deleted_[a-f0-9]{32}$"},"user_id":{"type":"string","minLength":1,"maxLength":64},"state":{"enum":["assets_pending","operator_pending","done"]},"username":{"type":"string","maxLength":32},"audit_texts_scrubbed":{"type":"integer","minimum":0},"account_created_at":{"type":"integer","minimum":0},"resumed":{"type":"boolean"},"sessions_revoked":{"type":"integer","minimum":0},"rate_limits_removed":{"type":"integer","minimum":0},"audit_rows_deidentified":{"type":"integer","minimum":0}}},
+                       "deletions":  {"type":"array","maxItems":100,"items":{"type":"object","additionalProperties":false,"required":["job_id","subject","state"],"properties":{"job_id":{"type":"string","pattern":"^deletion_[a-f0-9]{32}$"},"subject":{"type":"string","pattern":"^deleted_[a-f0-9]{32}$"},"user_id":{"type":"string","minLength":1,"maxLength":64},"state":{"enum":["assets_pending","operator_pending","done"]},"username":{"type":"string","maxLength":32},"audit_texts_scrubbed":{"type":"integer","minimum":0},"account_created_at":{"type":"integer","minimum":0},"resumed":{"type":"boolean"},"sessions_revoked":{"type":"integer","minimum":0},"rate_limits_removed":{"type":"integer","minimum":0},"audit_rows_deidentified":{"type":"integer","minimum":0}}}},
                        "reauthenticate":  {
                                               "type":  "boolean"
                                           },
