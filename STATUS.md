@@ -15,6 +15,7 @@
 - 2026-09-27 密码长度小阶段（Codex，已本地提交）：账号最低密码长度从 10 降为 8，服务、两套 Schema、管理后台和游戏客户端提示同步；真实账号与契约边界测试覆盖 7 字符拒绝及 8 字符可用。修改清单见 docs/23。已从当前工作区重新构建独立 ZIP。
 - 环境：Windows 10.0.26200；Godot `4.7.2.stable.steam.ed1daf0bf`（`D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`），导出使用同安装目录的 4.7.2 official 模板；Git `2.55.0.windows.3`；系统 `winsqlite3.dll` 3.51.1。
 - 用户提供一台待验收 Linux 笔记本的局域网 SSH 目标，记录于 `docs/10_environment.md`；2026-09-27 尚未连接或检测环境，用户要求暂缓验证。
+- 用户提出后台“删除用户”后选择只停用账号、永久保留资产。现有 `account.ban/unban` 支持此行为；本轮用 `domain-modeling` 固定术语，并调整源码后台提示与默认时长。没有物理删除接口，也不清除账号或游戏数据；新界面尚未人工验证，也未重建到最新独立 ZIP。
 
 ## 当前已实现
 

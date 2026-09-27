@@ -162,6 +162,8 @@ SDK 0.5 的新增内容是可选托管账号客户端、永久资产接入、通
 
 准确的必填、默认与范围以 Schema 为准。`hours:0` 表示永久封禁；内部账号接口将其转换为 `until:0`，账号输出的 `ban_until:-1` 表示永久封禁。邀请创建把相对小时转换成服务端绝对 expires。管理员不能通过重置/封禁接口封禁或重置管理员自身；内部账号服务支持验证旧密码后的自身改密，但当前管理 HTTP action 表尚未暴露管理员改密入口。资产 `coins_delta/xp_delta` 分别转换成内部 credits/experience，选择转换成管理员 `configure` 命令。客户端不能指定资产 actor、启动可执行文件或任意日志路径。
 
+管理后台把 `account.ban/unban` 显示为“停用账号/恢复账号”；停用表单默认 `hours:0`（无限期，之后可恢复）。这是界面措辞与默认值变化，协议 action 未改。停用只撤销会话并拒绝继续登录，不删除账号、资产、回执或比赛结果；当前没有物理删除用户的 API。该界面变化 2026-09-27 尚未运行新测试或人工点击验收。
+
 常见响应形状是 `{ok:true,payload:{...}}` 或 `{ok:false,code,payload:{}}`；账号 helper 原生 `ok/code/identity/...` 常嵌套于外层 payload。HTTP 200 本身不代表业务成功；AUTH_FAILED/AUTH_REQUIRED 通常返回 401，其他业务失败可能仍是 200。`status.payload` 包含 host、rooms、players、metrics、games；room 行还含 pid、port、heartbeats、heartbeat_age_ms、cleaned、joinable、options。这里的玩家在线状态来自托管宿主快照，账号列表的 active 则来自有效会话。
 
 管理员身份检查必须区分凭据无效与暂时无法检查：账号 helper 返回的 `STORAGE_UNAVAILABLE` 或工作线程入口的 `RATE_LIMITED` 原样作为业务错误返回，不转换为 `AUTH_FAILED`，也不撤销浏览器会话。真正的 `AUTH_FAILED/AUTH_REQUIRED/SESSION_EXPIRED/ADMIN_REQUIRED` 才使管理页面回到登录页并显示原因。每次浏览器请求绑定发送时的 token；旧请求晚到的认证失败不得清除后来成功登录的新 token。

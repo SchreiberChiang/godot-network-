@@ -24,6 +24,8 @@
 
 2026-09-27 第二台设备登记（Codex）：`docs/10_environment.md` 记录用户提供的 Linux 笔记本局域网 SSH 目标，STATUS 标记未连接、未验收；没有执行远程命令。
 
+2026-09-27 账号停用安排（Codex，`domain-modeling`）：用户确认“删除用户”指可恢复的账号停用，所有游戏资产永久保留；更新 `CONTEXT.md`、docs/17 第七节、STATUS 与后台提示。沿用 `account.ban/unban`，没有新增删除接口或运行新测试。
+
 ## 完整文件清单
 共 178 个现存文件，另有 2 个已移除文件列在末尾。
 
