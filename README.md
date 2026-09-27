@@ -29,7 +29,7 @@
 
 运行 `tools/build_framework_release.ps1` 构建。最新 ZIP 和解压位置记录在 `artifacts/framework-release.json`。解压后按顺序：`CheckFramework.cmd` 校验 → `StartPanel.cmd` 打开管理后台 → 玩家用 `StartShooter.cmd` / `StartTurns.cmd` → 全部关闭用 `StopFramework.cmd`；`PublishClients.cmd` 生成给玩家的公开连接配置。只分发构建时的干净 ZIP，不要分发跑过测试的解压目录。
 
-注意：目前最新的包是 2026-09-22 构建的，**不含** 2026-09-26 的房间规则、模板注册和启动器修复，射击协议也和当前源码不兼容。要使用新功能，需要重新构建并验收，详见 [STATUS](STATUS.md#当前交付物)。
+最新包已在 2026-09-27 重建，包含房间规则、模板注册和账号/结果授权的请求传递修正；自动包测试已通过，人工试玩尚未做。准确包名、哈希与验收范围见 [STATUS](STATUS.md#当前交付物)。
 
 ## 接入自己的游戏
 
@@ -50,6 +50,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\new_game.ps1 -Manage
 | 当前状态、验证范围、已知问题 | [STATUS](STATUS.md) |
 | 启动、数据维护、局域网、测试与人工验收夹具 | [22 本机启动与验证](docs/22_framework_operations.md) |
 | 分支范围与阶段规格 | [17 框架与射击计划](docs/17_framework_shooter_plan.md) |
+| 跨游戏术语与后续方向 | [CONTEXT](CONTEXT.md)、[17 后续方向（第五节）](docs/17_framework_shooter_plan.md) |
 | 管理后台与 HTTP 接口 | [19 管理后台](docs/19_admin_ui.md) |
 | 射击玩法与房间规则 | [20 射击示例](docs/20_shooter.md)、[25 房间规则](docs/25_shooter_room_rules.md) |
 | 账号/资产/管理协议与错误码 | [21 托管协议](docs/21_managed_protocol.md)（契约唯一来源为 `schemas/`） |

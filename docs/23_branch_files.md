@@ -12,11 +12,14 @@
 
 2026-09-27 Codex 复核：修正 Windows PowerShell 5.1 内层标准输入的 UTF-8 BOM、测试夹具的中文输出编码，以及 `tests/run_admin_http.gd` 的旧分层断言；更新 STATUS。没有增加文件。
 
+2026-09-27 后续方向梳理（仅文档）：新增根目录 `CONTEXT.md` 术语表，更新 docs/17 的多游戏定位、赛车与合作种田边界、授权回收和性能路线；同步 README、STATUS 与本清单。未修改运行代码。
+
 ## 完整文件清单
-共 165 个现存文件，另有 2 个已移除文件列在末尾。
+共 166 个现存文件，另有 2 个已移除文件列在末尾。
 
 - [AGENTS.md](../AGENTS.md)
 - [CHANGELOG.md](../CHANGELOG.md)
+- [CONTEXT.md](../CONTEXT.md)
 - [docs/01_scope_architecture.md](../docs/01_scope_architecture.md)
 - [docs/02_contracts.md](../docs/02_contracts.md)
 - [docs/03_sdk_integration.md](../docs/03_sdk_integration.md)
