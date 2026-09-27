@@ -37,14 +37,9 @@ func reset_player_sessions() -> Dictionary:
 func _dispatch(request: Dictionary) -> Dictionary:
 	if root.is_empty():
 		return Wire.failure("STORAGE_UNAVAILABLE")
-	var path := root.path_join("account-request-" + Wire.uid() + ".json")
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		return Wire.failure("STORAGE_UNAVAILABLE")
-	file.store_string(JSON.stringify(request))
-	file.close()
-	var result := Helper.execute("account_store.ps1", ["-Database", database, "-Request", path], root, 30000)
-	DirAccess.remove_absolute(path)
+	# Passwords and tokens go to the helper over stdin only; no request file is
+	# written, so a host crash mid-call leaves no secret in the data directory.
+	var result := Helper.execute_input("account_store.ps1", ["-Database", database], JSON.stringify(request), 30000)
 	if str(result.get("code", "")).begins_with("HELPER_"):
 		return Wire.failure("STORAGE_UNAVAILABLE")
 	return result

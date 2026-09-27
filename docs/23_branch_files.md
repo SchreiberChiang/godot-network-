@@ -6,8 +6,12 @@
 
 2026-09-27 补记：AGENTS.md 由协作规则轮次修改（仅文档）；Claude 文档整理新增 `docs/archive/` 四个文件，修改 README、STATUS、CHANGELOG、docs/01、08、15、16、22、23，并把根目录 START_HERE.md、VALIDATION.md 的原文移入归档后删除原文件。随后按用户要求保存 Claude 角色立绘为 `docs/assets/claude-character.png`，其路径记入 AGENTS.md、STATUS.md 和本清单；未改游戏代码。
 
+2026-09-27 账号请求 stdin 改造（Claude 实现、Codex 复核，本地提交）：新增 `tests/run_storage_timing.gd`、`tests/fixtures/storage_cost_breakdown.ps1`，修改 `host/core/account_service.gd`、`host/platform/bounded_helper.gd`、`tools/account_store.ps1`、`tools/bounded_helper.ps1`、`tools/test_helpers.ps1`、docs/21、22、23 和 STATUS。
+
+2026-09-27 Codex 复核：修正 Windows PowerShell 5.1 内层标准输入的 UTF-8 BOM、测试夹具的中文输出编码，以及 `tests/run_admin_http.gd` 的旧分层断言；更新 STATUS。没有增加文件。
+
 ## 完整文件清单
-共 158 个现存文件，另有 2 个已移除文件列在末尾。
+共 162 个现存文件，另有 2 个已移除文件列在末尾。
 
 - [AGENTS.md](../AGENTS.md)
 - [CHANGELOG.md](../CHANGELOG.md)
@@ -72,6 +76,7 @@
 - [host/managed_host.gd](../host/managed_host.gd)
 - [host/managed_lobby.gd](../host/managed_lobby.gd)
 - [host/operator.gd](../host/operator.gd)
+- [host/platform/bounded_helper.gd](../host/platform/bounded_helper.gd)
 - [host/platform/process_launcher.gd](../host/platform/process_launcher.gd)
 - [README.md](../README.md)
 - [schemas/account_request.schema.json](../schemas/account_request.schema.json)
@@ -118,6 +123,7 @@
 - [tests/fixtures/account_database.ps1](../tests/fixtures/account_database.ps1)
 - [tests/fixtures/account_recovery_database.ps1](../tests/fixtures/account_recovery_database.ps1)
 - [tests/fixtures/result_reward_database.ps1](../tests/fixtures/result_reward_database.ps1)
+- [tests/fixtures/storage_cost_breakdown.ps1](../tests/fixtures/storage_cost_breakdown.ps1)
 - [tests/run_account_recovery.gd](../tests/run_account_recovery.gd)
 - [tests/run_accounts.gd](../tests/run_accounts.gd)
 - [tests/run_admin_http.gd](../tests/run_admin_http.gd)
@@ -137,6 +143,7 @@
 - [tests/run_result_rewards.gd](../tests/run_result_rewards.gd)
 - [tests/run_shooter.gd](../tests/run_shooter.gd)
 - [tests/run_shooter_visual.gd](../tests/run_shooter_visual.gd)
+- [tests/run_storage_timing.gd](../tests/run_storage_timing.gd)
 - [tests/run_ui_opponent.ps1](../tests/run_ui_opponent.ps1)
 - [tests/test_admin_asset_spaces.cjs](../tests/test_admin_asset_spaces.cjs)
 - [tests/test_admin_auth_errors.cjs](../tests/test_admin_auth_errors.cjs)
@@ -166,6 +173,7 @@
 - [tools/operator_maintenance.ps1](../tools/operator_maintenance.ps1)
 - [tools/run.ps1](../tools/run.ps1)
 - [tools/run_framework.ps1](../tools/run_framework.ps1)
+- [tools/test_helpers.ps1](../tools/test_helpers.ps1)
 - [tools/sqlite_store.ps1](../tools/sqlite_store.ps1)
 
 已移除（原文已移入 [docs/archive/design_package_v0.2.md](archive/design_package_v0.2.md)）：`START_HERE.md`、`VALIDATION.md`。

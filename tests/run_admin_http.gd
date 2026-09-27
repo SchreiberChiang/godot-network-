@@ -48,6 +48,13 @@ func _run() -> void:
 		invalid.executable = "C:/unexpected.exe"
 		result = await fetch(post(action, invalid, "fixture-session"))
 		check(status(result) == 400 and received.size() == start_count, "unexpected payload field rejected before service: " + action)
+	# Asset-space membership is checked by the Operator's trusted registry, not
+	# by the transport schema. A well-formed but unregistered mapping reaches it.
+	var registry_checked: Dictionary = valid_payloads["config.set"].duplicate(true)
+	registry_checked.config.asset_spaces["shooter"] = "turns"
+	start_count = received.size()
+	result = await fetch(post("config.set", registry_checked, "fixture-session"))
+	check(status(result) == 200 and received.size() == start_count + 1, "well-formed asset mapping reaches registry authorization boundary")
 	for invalid in [
 		["room.create", {}], ["room.create", {"game_id": "shooter", "mode": "ffa", "map": "depot", "capacity": "8"}],
 		["room.create", {"game_id": "shooter", "mode": "ffa", "map": "depot", "capacity": 2.5}],
@@ -58,7 +65,7 @@ func _run() -> void:
 		["backup.restore", {"backup_id": "../data/accounts.sqlite", "reason": "test"}], ["player.kick", {"user_id": "user", "reason": "\n"}],
 		["asset.adjust", {"user_id": "user", "game_id": "shooter", "coins_delta": 1000001, "xp_delta": 0, "reason": "test", "operation_id": "test"}],
 		["config.set", {"config": {"lobby_bind": "0.0.0.0", "advertised_host": "127.0.0.1", "lobby_port": 28300, "max_rooms": 17, "asset_spaces": {"shooter": "shooter", "turns": "turns"}}, "reason": "test"}],
-		["config.set", {"config": {"lobby_bind": "0.0.0.0", "advertised_host": "127.0.0.1", "lobby_port": 28300, "max_rooms": 16, "asset_spaces": {"shooter": "turns", "turns": "turns"}}, "reason": "test"}]
+		["config.set", {"config": {"lobby_bind": "0.0.0.0", "advertised_host": "127.0.0.1", "lobby_port": 28300, "max_rooms": 16, "asset_spaces": {"shooter": "../turns", "turns": "turns"}}, "reason": "test"}]
 	]:
 		start_count = received.size()
 		result = await fetch(post(invalid[0], invalid[1], "fixture-session"))

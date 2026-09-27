@@ -1,8 +1,9 @@
-param([Parameter(Mandatory=$true)][string]$Database,[Parameter(Mandatory=$true)][string]$Request)
+param([Parameter(Mandatory=$true)][string]$Database)
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)
-# Passwords and session tokens are passed only in the private request file, never
-# in process arguments, SQL diagnostics, audit fields or exception output.
+# Passwords and session tokens arrive only on standard input as one base64 line
+# from bounded_helper.ps1, never in files, process arguments, SQL diagnostics,
+# audit fields or exception output.
 $bindingSource=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $PSScriptRoot 'sqlite_store.ps1')
 $binding=[regex]::Match($bindingSource,"(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@")
 if (-not $binding.Success) { Write-Output '{"ok":false,"code":"STORAGE_UNAVAILABLE"}'; exit 0 }
@@ -124,9 +125,12 @@ function CheckPassword($Row,[string]$Password) {
     return [RoomKitPasswords]::Verify($Password,$Row['salt'],[int]$Row['iterations'],$Row['password_hash'])
 }
 try {
-    $info=Get-Item -LiteralPath $Request
-    if ($info.Length -gt 8192) { Fail 'INVALID_ACCOUNT_REQUEST' }
-    $r=Get-Content -Encoding UTF8 -LiteralPath $Request -Raw | ConvertFrom-Json
+    # 10924 base64 characters encode the same 8192-byte request limit as before.
+    $line=[Console]::In.ReadLine()
+    if ([string]::IsNullOrEmpty($line) -or $line.Length -gt 10924 -or $line.Length % 4 -ne 0 -or $line -notmatch '^[A-Za-z0-9+/]*={0,2}$') { Fail 'INVALID_ACCOUNT_REQUEST' }
+    $bytes=[Convert]::FromBase64String($line)
+    if ($bytes.Length -gt 8192) { Fail 'INVALID_ACCOUNT_REQUEST' }
+    $r=[Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
     if ($r -isnot [PSCustomObject]) { Fail 'INVALID_ACCOUNT_REQUEST' }
     $op=TextValue 'op' 1 40
     $db=New-Object RoomKitSqlite($Database)
