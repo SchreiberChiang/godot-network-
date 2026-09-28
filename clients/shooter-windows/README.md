@@ -22,4 +22,4 @@ GitHub 单个文件不能超过 100 MiB，而 `Client.exe` 有 104 MiB，所以�
 
 ## 开始游戏
 
-双击 `StartGame.cmd`，然后用邀请码注册、登录，创建或加入房间。
+双击 `Client.exe`（它会读取同一文件夹里的 `connection.json`；`StartGame.cmd` 效果相同，保留作兼容入口），然后用邀请码注册、登录，创建或加入房间。

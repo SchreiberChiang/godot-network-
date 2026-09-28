@@ -3,6 +3,12 @@
 <a id="next-plan"></a>
 ## 2026-09-28 已确认的下一阶段规划
 
+### 下一次任务：GitHub 获取验收
+
+直接 EXE 启动、内容摘要版本配对和 Release 附件准备已实现，用户已人工试玩，状态及验证边界见 STATUS。下一次由 Claude 先核对最新 main、仓库 client-version.json 与对应 Release 附件清单/哈希，准备简短发布说明，明确“需要服务器提供公开配置、当前仅 Windows、尚未跨设备验证”。本轮授权提交推送源码，不包括发布 Release；下一次确认具体发布后再上传现有原文件附件，不重新导出造成 tag/哈希漂移。
+
+发布后在全新隔离目录分别验证 Git 克隆 + FetchClient 和浏览器获取附件：校验全部文件、确认不带服务端秘密、直接 EXE 启动；使用隔离服务器提供公开配置完成真实登录/入房/退房。不能只看下载成功就宣称联机通过。输出一个下载入口、最多三步玩家说明和真实证据；用户真实服务/数据不动，不做 UI、音效、Linux 或清理。完成后由 Codex 复核，再进入后台 UI 小阶段。
+
 ### 下次交给 Claude：客户端交付收尾（2026-09-28 收口）
 
 从最新 main 核实基准、AGENTS 与工作区后实施；主要工作交 Claude，Codex 复核。用户已反馈单账号启动、入房、退房正常，本次收录当前成果，未宣称跨设备或 GitHub 下载通过。
@@ -15,6 +21,51 @@
 交付只给用户一个直接启动入口和最多三步验收；测试使用隔离数据/公开配置/端口，保留原有未提交改动，不操作用户真实服务或数据，不自行提交推送。
 
 客户端入口补充（2026-09-28）：按用户要求，PreparePlayerClient 默认生成完整根目录 `PlayerClient/`，打开该目录后运行 StartGame.cmd；也可用根 StartPlayerClient.cmd。该目录含本机公开连接配置，Git 忽略；仓库副本与 GitHub 获取流程仍单独验收。此前记录中的 artifacts/player-clients/shooter-windows 是旧默认位置，不再作为当前操作入口；备份和临时产物仍位于 artifacts。
+
+#### 客户端交付收尾实施（2026-09-28）
+
+Claude 实施，基于 `main` `f91e6cc`，未提交，待 Codex 复核。回归 `tests/test_player_client.ps1` 28/0，证据在 `logs/player-client-90442badd27f4874bae0f6acef4eb661/`。
+
+**1. 直接双击 Client.exe**
+- `examples/framework/client.gd`：显式 `--connection-config` 优先。没有传入时，导出版（非编辑器）读取 `OS.get_executable_path()` 同目录的 `connection.json`；源码版读取 `res://artifacts/client/connection.json`（源码入口一直显式传参，行为不变）。找不到配置时提示“应与 Client.exe 在同一文件夹”。WSS、DTLS、版本校验都不变。
+- Godot 模板会自动加载同名的 `Client.pck`，所以双击即可运行。
+- 控制台行为已实测，没有凭隐藏窗口推定：经 `explorer.exe` 启动（父进程没有控制台）时窗口正常出现；另起一个探针进程调用 `AttachConsole(pid)`，结果失败，说明游戏没有挂任何控制台，关闭任何黑色窗口都不会影响它。`StartGame.cmd` 保留作兼容入口。
+- 测试覆盖：客户端 a 不带任何参数、工作目录设为系统临时目录、客户端目录路径含中文和空格（`RoomKit 玩家 客户端-<id>`），完成注册、登录、入房、退房；客户端 b 仍用显式参数，两人互相可见。
+
+**2. 构建标识（设计）**
+- **问题**：源码清单的 `build_id` 固定为 `shooter-dev-002`，代码改了也不变，旧客户端会被当作兼容版本放行。
+- **方案**：`tools/build_framework.ps1` 准备好每个游戏工程后，用 `tools/content_digest.ps1` 计算内容摘要（排除 `.godot/` 和两个清单文件；按相对路径排序，拼接“路径=SHA256”后再做 SHA256，取前 12 位），写成 `build_id=<源码 id>-src-<摘要>`，同时写入索引和两个清单文件。
+  - 服务器大厅（`lobby_server.gd` 逐字比对 `build_id`）、房间进程和导出客户端都读取同一目录，所以必然一致；任一运行文件变化，标识就变。
+  - 没有改协议字段或 schema（`build_id` 本来就是长度不超过 128 的字符串），没有改只让客户端带标签，独立包构建（自带随机 id）也不变。
+- **验证**：
+  - 两次构建标识相同；
+  - 标识等于对工程重新计算的摘要，房间清单与索引一致；
+  - 在工程副本的 `client.gd` 末尾加一行注释，摘要随之改变，由此导出的客户端被未改动的服务器拒绝（“客户端与服务器版本不匹配”）。
+- **代价**：代码更新后重启 `StartManagement.cmd`，需要重新运行 `PreparePlayerClient.cmd`，旧客户端会被明确拒绝。
+
+**3. 同源生成与 Release 附件**
+- `-RepositoryCopy` 在同一次导出中生成三份：
+  - 本地目录（含本机连接配置）；
+  - `clients/shooter-windows/`（不含连接配置，附 FetchClient）；
+  - `artifacts/player-clients/release-<tag>/`：平铺的附件目录，文件与仓库副本完全一致，含 `Client.exe`；旁边附 `release-<tag>.json`（tag、build_id、每个附件的大小和 SHA256）和 `release-<tag>-SHA256SUMS.txt`。
+- 三处都经过私有文件扫描（数据、运行、日志、备份目录，`.key`/`.sqlite`/`.db`/token，私钥），测试核对附件清单、哈希与仓库副本一致。
+- **Godot 导出不是逐字节确定的**：同一源码两次导出的 `Client.pck` 哈希不同，所以 tag（`<build_id>-<pck 前 8 位>`）对应某一次具体导出。客户端与服务器配对靠 `build_id`；FetchClient 只下载 Client.exe（官方模板，哈希固定）。
+- **当前准备好的附件**：tag 为 `shooter-client-shooter-dev-002-src-0f559378dddc-4c2ef956`，12 个文件共 109,654,328 字节，由当前源码生成到 `artifacts/player-clients/`。仓库副本已同步为这次导出。
+
+**Release 发布与验收步骤（单独授权后执行；本轮没有推送或发布）**：
+1. 提交并推送包含 `clients/shooter-windows/` 的提交，确认其中 `client-version.json` 的 `release_tag` 与附件目录名一致。
+2. 在 GitHub 网页新建 Release，tag 取上面的 `release_tag`，目标为该提交；把 `release-<tag>/` 里的 12 个文件逐个上传，不要打包，不启用 LFS。
+3. 核对 Release 页面的文件名和大小与 `release-<tag>.json` 一致。
+4. 在全新目录验收：
+   - (a) 克隆仓库，进入 `clients/shooter-windows`，运行 `FetchClient.cmd`，确认下载后通过校验，`CheckClient.cmd` 通过；
+   - (b) 另开一个空目录，只用浏览器下载全部附件，`CheckClient.cmd` 通过；
+   - 两种方式都用 `SetServer.cmd` 放入服务器的公开文件后双击 `Client.exe`，登录并入房。服务器必须运行同一份源码（`build_id` 相同）。
+5. 下载验收完成前，GitHub 获取流程一律标为“待验证”。
+
+**限制**：
+- 双击测试里获取窗口标题时返回空字符串，窗口句柄存在，所以只断言窗口出现，不断言标题；
+- 已知 DTLS -30464 问题、旧独立包启动方式未修复，维持原状；
+- `artifacts/player-clients/` 里还留着一个早先的附件目录（`…-4dce1b3d`），它是我在更新 README 前生成的，已被 `…-4c2ef956` 取代；按“只列不删”规则保留。
 
 本节通过 `grilling` 逐轮确认，是当前开发顺序；下文早期 S0–S5 与逐轮记录保留各自时点含义。实际完成和验证范围仍以 [STATUS](../STATUS.md) 为准。用户确认本次先记录规划、安排第一阶段；并非本次就实施三个阶段。
 

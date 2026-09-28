@@ -4,6 +4,18 @@
 
 ## 当前下一步（2026-09-28）
 
+最新收口：用户按重启管理服务、重新生成 PlayerClient、直接双击 Client.exe 注册/登录/入房/退房的步骤试玩，反馈未发现可见问题。Codex 复核直接配置读取、内容摘要与附件生成代码；独立启动器专项 14/0、退出 0（`logs/client-launcher-883f852cbdfd43abad7f880906b10839/`）。独立隔离构建两次，两种游戏 build_id 均稳定；仓库客户端与当前源码 build_id 一致，Release 与仓库副本的 generated_files 哈希全部匹配，检查退出 0（索引在 `logs/codex-client-final-a449f131fba94438b1af26273b8b4f16/`）；git diff --check 退出 0。Claude 的 28/0 联机回归未由 Codex 重跑。用户授权本轮提交并推送 main；Release 未发布，GitHub 下载、跨设备、DTLS 原因和旧独立包仍未验收/解决。下次优先执行 docs/17 的“GitHub 获取验收”任务，不重复已完成的直接启动实现。
+
+客户端交付收尾（Claude，基于 `main` `f91e6cc`，未提交，待 Codex 复核），详见 [docs/17](docs/17_framework_shooter_plan.md#客户端交付收尾实施2026-09-28)。隔离回归 `tests/test_player_client.ps1` 28/0、退出 0，证据在 `logs/player-client-90442badd27f4874bae0f6acef4eb661/`。
+- **直接双击 `Client.exe`**：显式 `--connection-config` 仍然优先；没有传入时，导出版读取可执行文件同目录的 `connection.json`，源码版仍读项目内的发布文件。已测：无参数、从无关工作目录、在中文加空格的路径下启动，完成注册、登录、入房、退房；经 `explorer.exe` 模拟双击时窗口正常出现，独立探针确认游戏没有挂任何控制台。
+- **构建标识与服务器绑定**：`build_framework.ps1` 用 `tools/content_digest.ps1` 对准备好的工程内容算摘要，得到 `build_id=<源码清单 id>-src-<12 位>`。服务器索引、房间清单和导出客户端都来自同一目录，所以一致；改一行客户端代码，标识就变，改动后的客户端被未改动的服务器以 BUILD_MISMATCH 拒绝。重复构建得到相同标识。没有改协议字段，也没有改独立包构建。
+  - 影响：代码改动后重启 `StartManagement.cmd`，需要重新运行 `PreparePlayerClient.cmd`；之前生成的客户端（`shooter-dev-002`，没有后缀）连不上重启后的服务器。
+- **GitHub 附件**：`PreparePlayerClient.cmd -RepositoryCopy` 在同一次导出中同时生成本地目录、`clients/shooter-windows/` 和 Release 附件目录 `artifacts/player-clients/release-<tag>/`（12 个文件，含 Client.exe），旁边附清单 `.json` 和 `-SHA256SUMS.txt`。
+  - 当前 tag 为 `shooter-client-shooter-dev-002-src-0f559378dddc-4c2ef956`，共 109,654,328 字节。
+  - Godot 导出的 `Client.pck` 不是逐字节确定的，所以 tag 对应某一次具体导出；配对靠 `build_id`。
+  - Release 尚未创建；真实下载和全新目录验收都待 Release 发布后进行。
+- **未变**：DTLS -30464 仍是原因不明的已知问题；旧独立包启动方式仍未修复。本轮未做 UI、音效、Linux 或文件清理。
+
 本轮提交前核验：Codex 独立运行 `tests/test_client_launcher.ps1` 14/0、退出 0（`logs/client-launcher-2bdec546bc1c46ce9bbc57f98a52425f/`）；重新导出到隔离产物目录并同步仓库副本，退出 0，tag `shooter-client-shooter-dev-002-95c33788`，未替换用户 PlayerClient。仓库副本只提交公开客户端文件，不包含 EXE、本机连接配置或证书，Release 尚未创建，克隆后暂不能直接下载运行。此前真实联机和控制台隔离测试沿用 Claude 报告，Codex 未重跑；DTLS 未复现和旧独立包启动方式仍是限制。下次任务见 docs/17 顶部“客户端交付收尾”：直接 EXE 启动体验、构建标识方案与 GitHub 获取验收；不是开始 UI/音效/Linux。
 
 2026-09-28 客户端位置调整与人工反馈：用户再次反馈启动游戏、入房、退房看起来正常；未确认其他用例。默认生成目录现为根目录 `PlayerClient/`（完整独立目录，进入后双击 StartGame.cmd），根 StartPlayerClient.cmd 同步指向它，PreparePlayerClient.cmd 生成后打开它。临时构建与 previous 备份仍留在 artifacts；显式 OutputRoot 的隔离测试行为保留。已重新生成根目录客户端（shooter-dev-002，tag `shooter-client-shooter-dev-002-2dc08b12`），生成退出 0，CheckClient 退出 0；入口/目录路径与 Git 忽略检查通过，git diff --check 退出 0。未重启服务、未修改真实库、未删除原 artifacts 玩家目录；未对本次新目录重新运行图形界面或联机测试。地址仍为 127.0.0.1，只适用于本机。PlayerClient 含本机连接配置，不纳入 Git；仓库分发副本 clients/shooter-windows 与 GitHub 发布另行维护，不据此声称 GitHub 已可下载。

@@ -2,13 +2,13 @@
     "format":  2,
     "source":  "StartManagement",
     "game_id":  "shooter",
-    "build_id":  "shooter-dev-002",
+    "build_id":  "shooter-dev-002-src-0f559378dddc",
     "compatibility_id":  "shooter-v2",
     "game_protocol":  2,
     "engine_template":  "4.7.2.stable windows_release_x86_64",
-    "prepared_at":  "2026-09-28T15:24:26.0404589Z",
-    "release_tag":  "shooter-client-shooter-dev-002-95c33788",
-    "release_url":  "https://github.com/SchreiberChiang/godot-network-/releases/download/shooter-client-shooter-dev-002-95c33788/",
+    "prepared_at":  "2026-09-28T15:40:12.2853106Z",
+    "release_tag":  "shooter-client-shooter-dev-002-src-0f559378dddc-4c2ef956",
+    "release_url":  "https://github.com/SchreiberChiang/godot-network-/releases/download/shooter-client-shooter-dev-002-src-0f559378dddc-4c2ef956/",
     "files":  [
                   {
                       "path":  "Client.exe",
@@ -17,8 +17,8 @@
                   },
                   {
                       "path":  "Client.pck",
-                      "size":  371152,
-                      "sha256":  "95c33788760d34965f3e28125aa4ea2499a96b0126adbae5021f9e8f1c9b27da"
+                      "size":  371664,
+                      "sha256":  "4c2ef9567ea0e0a25074d925a74c782a2e5e3eb81f3a18868adf6faa4b8881c7"
                   },
                   {
                       "path":  "RunGame.ps1",
@@ -46,7 +46,7 @@
                             },
                             {
                                 "path":  "Client.pck",
-                                "sha256":  "95c33788760d34965f3e28125aa4ea2499a96b0126adbae5021f9e8f1c9b27da"
+                                "sha256":  "4c2ef9567ea0e0a25074d925a74c782a2e5e3eb81f3a18868adf6faa4b8881c7"
                             },
                             {
                                 "path":  "FetchClient.cmd",
@@ -58,7 +58,7 @@
                             },
                             {
                                 "path":  "README.md",
-                                "sha256":  "dd9d48ef6f6ffa7043e59335342d8d66c074eff2b540ec5cffcf9042a84575ee"
+                                "sha256":  "494bd1c5073c008084e23961ccbe783a6402b9bca61a860a484c040b4db62324"
                             },
                             {
                                 "path":  "RunGame.ps1",

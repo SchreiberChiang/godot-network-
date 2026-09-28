@@ -194,6 +194,20 @@ binary_format/architecture="x86_64"
         $repoPrevious=SafeReplace $RepositoryDestination $repoStage (Join-Path $OutputRoot 'previous-repository')
         if($repoPrevious) { Write-Output ('REPOSITORY_CLIENT_PREVIOUS '+$repoPrevious) }
         Write-Output ('REPOSITORY_CLIENT_READY '+$RepositoryDestination+' tag='+$tag)
+        # GitHub Release attachments: exactly the repository copy's files, Client.exe
+        # included, uploaded one by one (no archive). The list and hashes sit beside
+        # the folder so the folder holds only what gets uploaded.
+        $releaseDir=Join-Path $OutputRoot ('release-'+$tag)
+        $releaseStage=Join-Path $staging 'release'
+        Copy-Item -LiteralPath $RepositoryDestination -Destination $releaseStage -Recurse
+        $releasePrevious=SafeReplace $releaseDir $releaseStage (Join-Path $OutputRoot 'previous-release')
+        if($releasePrevious) { Write-Output ('RELEASE_ASSETS_PREVIOUS '+$releasePrevious) }
+        $assets=@(Get-ChildItem -LiteralPath $releaseDir -File | Sort-Object Name | ForEach-Object { [ordered]@{name=$_.Name;size=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} })
+        if(@(Get-ChildItem -LiteralPath $releaseDir -Directory).Count) { throw 'Release attachments must be a flat folder.' }
+        if(-not ($assets | Where-Object { $_.name -eq 'Client.exe' })) { throw 'Release attachments are missing Client.exe.' }
+        [IO.File]::WriteAllText(($releaseDir+'.json'),([ordered]@{tag=$tag;build_id=$manifest.build_id;repository=$Repository;target_path='clients/shooter-windows';assets=$assets}|ConvertTo-Json -Depth 4),$utf8)
+        [IO.File]::WriteAllText(($releaseDir+'-SHA256SUMS.txt'),((($assets | ForEach-Object { $_.sha256+'  '+$_.name }) -join "`n")+"`n"),$utf8)
+        Write-Output ('RELEASE_ASSETS_READY '+$releaseDir+' files='+$assets.Count+' bytes='+(Get-ChildItem -LiteralPath $releaseDir -File | Measure-Object Length -Sum).Sum)
     }
 } finally {
     if(Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }

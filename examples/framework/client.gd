@@ -77,9 +77,15 @@ func _run() -> void:
 		message = "游戏清单缺失或与启动游戏不匹配"
 		return
 	manifest = parsed
-	var connection_path: String = args.get("--connection-config", Paths.absolute("res://artifacts/connection.json"))
+	# An explicit --connection-config wins. Otherwise an exported Client.exe reads
+	# connection.json beside itself (double-click start); source runs keep the
+	# project's published res://artifacts/client/connection.json.
+	var default_connection := OS.get_executable_path().get_base_dir().path_join("connection.json")
+	if OS.has_feature("editor"):
+		default_connection = Paths.absolute("res://artifacts/client/connection.json")
+	var connection_path: String = args.get("--connection-config", default_connection)
 	if not FileAccess.file_exists(connection_path):
-		message = "未找到公共连接配置。先启动管理面板与服务器，再使用客户端启动器。"
+		message = "未找到连接配置 connection.json（应与 Client.exe 在同一文件夹）。请向服务器主机索取完整客户端目录，或运行 SetServer.cmd 设置服务器。"
 		return
 	var connection: Variant = JSON.parse_string(FileAccess.get_file_as_string(connection_path))
 	if not connection is Dictionary:

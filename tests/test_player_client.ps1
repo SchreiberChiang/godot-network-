@@ -11,7 +11,7 @@ $runId=[Guid]::NewGuid().ToString('N')
 $evidence=Join-Path $project ('logs\player-client-'+$runId)
 $out=Join-Path $evidence 'out'
 $repoCopy=Join-Path $out 'repository-copy'
-$fresh=Join-Path ([IO.Path]::GetTempPath()) ('RoomKit-player-client-'+$runId)
+$fresh=Join-Path ([IO.Path]::GetTempPath()) ('RoomKit 玩家 客户端-'+$runId)
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $utf8=New-Object Text.UTF8Encoding($false)
 $script:passed=0; $script:failed=0
@@ -37,6 +37,14 @@ $sharedIndex=Join-Path $project 'artifacts\framework-games.json'
 $sharedBefore=(Tree $sharedPublic)+'|'+$(if(Test-Path $sharedIndex){(Get-FileHash $sharedIndex).Hash})
 $gamesIndex=Join-Path $evidence 'framework-games.json'
 & (Join-Path $project 'tools\build_framework.ps1') -IndexPath $gamesIndex | Out-Null
+. (Join-Path $project 'tools\content_digest.ps1')
+$builtIndex=Get-Content -Encoding UTF8 -Raw -LiteralPath $gamesIndex | ConvertFrom-Json
+$secondIndex=Join-Path $evidence 'framework-games-second.json'
+& (Join-Path $project 'tools\build_framework.ps1') -IndexPath $secondIndex | Out-Null
+$secondBuilt=Get-Content -Encoding UTF8 -Raw -LiteralPath $secondIndex | ConvertFrom-Json
+$roomManifest=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $builtIndex.shooter.project 'game\game_manifest.json') | ConvertFrom-Json
+Check ($builtIndex.shooter.manifest.build_id -match '^shooter-dev-002-src-[0-9a-f]{12}$' -and $builtIndex.shooter.manifest.build_id -eq ('shooter-dev-002-src-'+(ContentDigest $builtIndex.shooter.project)) -and $roomManifest.build_id -eq $builtIndex.shooter.manifest.build_id) ('build_id is bound to the prepared project content ('+$builtIndex.shooter.manifest.build_id+')')
+Check ($secondBuilt.shooter.manifest.build_id -eq $builtIndex.shooter.manifest.build_id -and $secondBuilt.turns.manifest.build_id -eq $builtIndex.turns.manifest.build_id) 'rebuilding unchanged sources gives the same build_id'
 $publicDir=Join-Path $evidence 'public-client'
 $pointer=Join-Path $project 'run\operator-test-context.json'
 $started=[DateTime]::UtcNow
@@ -74,6 +82,17 @@ try {
     $lp=@($lv.files|Where-Object path -eq 'Client.pck')[0].sha256; $rp=@($rv.files|Where-Object path -eq 'Client.pck')[0].sha256
     Check ($lv.build_id -eq $idx.shooter.manifest.build_id -and $rv.build_id -eq $lv.build_id -and $lp -eq $rp -and $rv.release_tag -eq $lv.release_tag -and $lv.release_tag -match $lp.Substring(0,8)) 'local and GitHub copies share build, Client.pck hash and release tag'
     Check (-not (Test-Path (Join-Path $repoCopy 'connection.json')) -and -not (Test-Path (Join-Path $repoCopy 'server.crt')) -and (Test-Path (Join-Path $repoCopy 'FetchClient.ps1'))) 'repository copy has no server files and has FetchClient'
+    $releaseDir=Join-Path $out ('release-'+$rv.release_tag)
+    $releaseList=$(if(Test-Path ($releaseDir+'.json')){Get-Content -Encoding UTF8 -Raw ($releaseDir+'.json') | ConvertFrom-Json})
+    $releaseOk=$null -ne $releaseList -and $releaseList.tag -eq $rv.release_tag -and $releaseList.build_id -eq $rv.build_id
+    if($releaseOk) {
+        $repoNames=@(Get-ChildItem -LiteralPath $repoCopy -File | ForEach-Object Name | Sort-Object)
+        $releaseOk=((@($releaseList.assets.name) | Sort-Object) -join '|') -eq ($repoNames -join '|') -and (@($releaseList.assets.name) -contains 'Client.exe') -and -not (@($releaseList.assets.name) | Where-Object { $_ -in @('connection.json','server.crt') })
+        foreach($asset in $releaseList.assets) { $releaseOk=$releaseOk -and (Get-FileHash (Join-Path $releaseDir $asset.name)).Hash -ieq $asset.sha256 -and (Get-FileHash (Join-Path $repoCopy $asset.name)).Hash -ieq $asset.sha256 }
+        $sums=@(Get-Content -Encoding UTF8 ($releaseDir+'-SHA256SUMS.txt') | Where-Object { $_ })
+        $releaseOk=$releaseOk -and $sums.Count -eq @($releaseList.assets).Count
+    }
+    Check $releaseOk ('Release attachment folder, list and SHA256SUMS match the repository copy incl. Client.exe ('+@($releaseList.assets).Count+' files)')
     $names=@(Get-ChildItem -LiteralPath $local -Recurse -File | ForEach-Object Name)
     Check (-not ($names | Where-Object { $_ -match '\.(key|sqlite|db)$' }) -and -not ((Get-Content -Raw (Join-Path $local 'server.crt')) -match 'PRIVATE KEY')) 'local directory has no private key or database'
 
@@ -111,9 +130,21 @@ try {
         $plan=Join-Path $ctx.test_root ('player-plan-'+$name+'.json')
         $report=Join-Path $evidence ('report-'+$name+'.json')
         [IO.File]::WriteAllText($plan,(@{username=('pc_'+$name+'_'+$runId.Substring(0,8));password=('Player!'+[Guid]::NewGuid().ToString('N'));display_name=('player_'+$name);invite_code=$ctx.invite_code;register=$true;room_id=$ctx.room_id;expect_players=2;hold_ms=4000;timeout_ms=120000;report_path=$report}|ConvertTo-Json),$utf8)
-        $arguments=@('--','--game=shooter',('--connection-config='+(Join-Path $fresh 'connection.json')),('--autoplay='+$plan))
+        # Player a: no --game and no --connection-config, started from an unrelated
+        # working directory, so Client.exe must find connection.json beside itself.
+        # It also leaves the room afterwards. Player b keeps the explicit arguments.
+        if($name -eq 'a') {
+            $arguments=@('--',('--autoplay='+$plan))
+            $workingDirectory=[IO.Path]::GetTempPath()
+            $planData=Get-Content -Encoding UTF8 -Raw $plan | ConvertFrom-Json
+            $planData | Add-Member -NotePropertyName after -NotePropertyValue 'leave'
+            [IO.File]::WriteAllText($plan,($planData|ConvertTo-Json),$utf8)
+        } else {
+            $arguments=@('--','--game=shooter',('--connection-config='+(Join-Path $fresh 'connection.json')),('--autoplay='+$plan))
+            $workingDirectory=$fresh
+        }
         if(-not $Visual) { $arguments=@('--headless')+$arguments }
-        $process=Start-Process -FilePath (Join-Path $fresh 'Client.exe') -ArgumentList (Quote $arguments) -WorkingDirectory $fresh -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $evidence ('client-'+$name+'.log')) -RedirectStandardError (Join-Path $evidence ('client-'+$name+'-stderr.log'))
+        $process=Start-Process -FilePath (Join-Path $fresh 'Client.exe') -ArgumentList (Quote $arguments) -WorkingDirectory $workingDirectory -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $evidence ('client-'+$name+'.log')) -RedirectStandardError (Join-Path $evidence ('client-'+$name+'-stderr.log'))
         $clients+=@{name=$name;process=$process;handle=$process.Handle;report=$report;plan=$plan}
     }
     foreach($client in $clients) {
@@ -125,25 +156,51 @@ try {
         $rep=$null
         if(Test-Path -LiteralPath $client.report) { $rep=Get-Content -Encoding UTF8 -Raw -LiteralPath $client.report | ConvertFrom-Json }
         $reports[$client.name]=$rep
-        Check ($null -ne $rep -and $rep.ok -and $rep.stage -eq 'in_room_synced' -and $rep.room_id -eq $ctx.room_id -and $rep.build_id -eq $idx.shooter.manifest.build_id) ('exported client '+$client.name+' registered, logged in and joined the room (stage='+$(if($rep){$rep.stage}else{'none'})+')')
+        $expected=$(if($client.name -eq 'a'){'left_room'}else{'in_room_synced'})
+        Check ($null -ne $rep -and $rep.ok -and $rep.stage -eq $expected -and $rep.room_id -eq $ctx.room_id -and $rep.build_id -eq $idx.shooter.manifest.build_id) ('exported client '+$client.name+' registered, logged in, joined'+$(if($client.name -eq 'a'){' and left'})+' the room (stage='+$(if($rep){$rep.stage}else{'none'})+')')
+    }
+    Check ($reports.a -and $reports.a.ok) 'Client.exe without arguments, from another working directory and a Chinese/space path, uses connection.json beside itself'
+
+    # Explorer double-click: explorer.exe starts Client.exe with no arguments and no
+    # console parent. The window must appear and the game must not own a console.
+    $before=@(Get-CimInstance Win32_Process -Filter "Name='Client.exe'" | ForEach-Object ProcessId)
+    Start-Process -FilePath 'explorer.exe' -ArgumentList ('"'+(Join-Path $fresh 'Client.exe')+'"')
+    $opened=$null; $d=[DateTime]::UtcNow.AddSeconds(30)
+    do { Start-Sleep -Milliseconds 300; $opened=Get-CimInstance Win32_Process -Filter "Name='Client.exe'" | Where-Object { $_.ProcessId -notin $before -and $_.ExecutablePath -ieq (Join-Path $fresh 'Client.exe') } | Select-Object -First 1 } while($null -eq $opened -and [DateTime]::UtcNow -lt $d)
+    Check ($null -ne $opened) 'explorer double-click starts Client.exe'
+    if($opened) {
+        $game=Get-Process -Id ([int]$opened.ProcessId)
+        $d=[DateTime]::UtcNow.AddSeconds(30); do { Start-Sleep -Milliseconds 300; $game.Refresh() } while($game.MainWindowHandle -eq [IntPtr]::Zero -and -not $game.HasExited -and [DateTime]::UtcNow -lt $d)
+        Check ($game.MainWindowHandle -ne [IntPtr]::Zero) ('double-clicked Client.exe shows its window ('+$game.MainWindowTitle+')')
+        # A separate probe process: AttachConsole(pid) succeeds only if the game owns a console.
+        $probe='Add-Type -Namespace P -Name K -MemberDefinition ''[DllImport("kernel32.dll")] public static extern bool FreeConsole(); [DllImport("kernel32.dll")] public static extern bool AttachConsole(uint p);''; [void][P.K]::FreeConsole(); if([P.K]::AttachConsole('+$game.Id+')){ exit 10 } else { exit 0 }'
+        $p=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-EncodedCommand',[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probe))) -PassThru -WindowStyle Hidden -Wait
+        Check ($p.ExitCode -eq 0) ('double-clicked Client.exe has no console (probe exit '+$p.ExitCode+')')
+        if(-not $game.HasExited -and $game.Path -ieq (Join-Path $fresh 'Client.exe')) { $game.CloseMainWindow() | Out-Null; if(-not $game.WaitForExit(8000)) { $game.Kill(); [void]$game.WaitForExit(5000) } }
     }
     if($reports.a -and $reports.b -and $reports.a.ok -and $reports.b.ok) {
         Check (@($reports.a.players) -contains $reports.b.user_id -and @($reports.b.players) -contains $reports.a.user_id) 'both players see each other in the room snapshot'
     }
 
-    # Negative: a client exported from a copy whose build_id differs is refused.
+    # Negative: a client built from changed code (one comment line in client.gd)
+    # gets a different content-bound build_id, exactly as build_framework.ps1
+    # would assign, and the unchanged server refuses it.
     $mismatchProject=Join-Path $evidence 'mismatch-project'
     Copy-Item -LiteralPath $idx.shooter.project -Destination $mismatchProject -Recurse
+    Add-Content -LiteralPath (Join-Path $mismatchProject 'client.gd') -Value '# changed client code'
+    $baseId=$idx.shooter.manifest.build_id -replace '-src-[0-9a-f]{12}$',''
+    $changedId=$baseId+'-src-'+(ContentDigest $mismatchProject)
+    Check ($changedId -ne $idx.shooter.manifest.build_id) ('changed client code yields a new build_id ('+$changedId+')')
     foreach($relative in @('game_manifest.json','game\game_manifest.json')) {
         $file=Join-Path $mismatchProject $relative
         $m=Get-Content -Encoding UTF8 -Raw -LiteralPath $file | ConvertFrom-Json
-        $m.build_id=$m.build_id+'-mismatch'
+        $m.build_id=$changedId
         [IO.File]::WriteAllText($file,($m|ConvertTo-Json -Depth 20),$utf8)
     }
     $mismatchIndex=Join-Path $evidence 'mismatch-index.json'
     $alt=Get-Content -Encoding UTF8 -Raw -LiteralPath $gamesIndex | ConvertFrom-Json
     $alt.shooter.project=$mismatchProject
-    $alt.shooter.manifest.build_id=$alt.shooter.manifest.build_id+'-mismatch'
+    $alt.shooter.manifest.build_id=$changedId
     [IO.File]::WriteAllText($mismatchIndex,($alt|ConvertTo-Json -Depth 30),$utf8)
     $mismatchOut=Join-Path $evidence 'mismatch-out'
     [void](Prepare @('-IndexPath',$mismatchIndex,'-ConnectionDirectory',$publicDir,'-OutputRoot',$mismatchOut))

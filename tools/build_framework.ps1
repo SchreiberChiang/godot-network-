@@ -9,6 +9,7 @@ if ($IndexPath -eq '') { $IndexPath=Join-Path $projectRoot 'artifacts\framework-
 $IndexPath=[IO.Path]::GetFullPath($IndexPath)
 if (-not $IndexPath.StartsWith($projectRoot+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Framework index must stay within this project.' }
 New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($IndexPath)) | Out-Null
+. (Join-Path $PSScriptRoot 'content_digest.ps1')
 foreach($item in @(@{id='shooter';source='shooter'},@{id='turns';source='turn_based'})) {
     $destination=Join-Path $buildRoot $item.id
     New-Item -ItemType Directory -Force -Path (Join-Path $destination 'game'),(Join-Path $destination 'schemas') | Out-Null
@@ -44,6 +45,11 @@ file_logging/enable_file_logging=false
         $manifest.compatibility_id='turns-managed-v1'
         $manifest.server_artifact='turns-managed-project-v1'
     }
+    # Bind the build identity to the prepared project's content. The server index,
+    # the room's manifest and every exported client come from this same directory,
+    # so a client built from different code carries a different build_id and the
+    # lobby rejects it (BUILD_MISMATCH) instead of admitting a stale client.
+    $manifest.build_id=$manifest.build_id+'-src-'+(ContentDigest $destination)
     $manifestText=$manifest | ConvertTo-Json -Depth 20
     [IO.File]::WriteAllText((Join-Path $destination 'game_manifest.json'),$manifestText,$utf8)
     [IO.File]::WriteAllText((Join-Path $destination 'game\game_manifest.json'),$manifestText,$utf8)
