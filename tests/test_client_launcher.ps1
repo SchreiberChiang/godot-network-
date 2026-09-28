@@ -32,7 +32,7 @@ function RunFailureCase([string]$Name,[string]$Expected) {
     $gameRoot=Join-Path $fixture 'game project'
     $public=Join-Path $artifacts 'client'
     New-Item -ItemType Directory -Path $toolsRoot,$artifacts,$gameRoot,$public | Out-Null
-    Copy-Item -LiteralPath (Join-Path $project 'tools\run_framework.ps1') -Destination (Join-Path $toolsRoot 'run_framework.ps1')
+    foreach($toolFile in @('run_framework.ps1','detached_process.ps1','detached_start.ps1')) { Copy-Item -LiteralPath (Join-Path $project ('tools\'+$toolFile)) -Destination (Join-Path $toolsRoot $toolFile) }
     SaveText (Join-Path $gameRoot 'project.godot') "config_version=5`n"
     if($Name -ne 'missing-client') { SaveText (Join-Path $gameRoot 'client.gd') "extends SceneTree`n" }
     if($Name -ne 'missing-connection') { SaveText (Join-Path $public 'connection.json') '{}' }

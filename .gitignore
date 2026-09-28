@@ -6,6 +6,7 @@
 /data/
 /logs/
 /artifacts/
+/PlayerClient/
 .env
 .env.*
 !.env.example
@@ -18,3 +19,11 @@ config/secrets/
 .DS_Store
 Thumbs.db
 *.tmp
+
+# Standalone shooter client: Client.exe (>100 MiB) ships as a GitHub Release
+# asset; per-server public connection files are placed by each player.
+/clients/*/Client.exe
+/clients/*/connection.json
+/clients/*/server.crt
+/clients/*/server-config/
+/clients/*/*.partial

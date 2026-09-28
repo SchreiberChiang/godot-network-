@@ -10,6 +10,7 @@ $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $dataRoot=Join-Path $project 'data\framework'
 $metadata=Join-Path $dataRoot 'operator.json'
 function Quote-Arguments($arguments) { foreach($argument in $arguments) { '"'+($argument -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' } }
+. (Join-Path $PSScriptRoot 'detached_process.ps1')
 if($Mode -eq 'stop') {
     if(-not (Test-Path -LiteralPath $metadata)) { Write-Output 'No running operator descriptor.'; exit 0 }
     [IO.File]::WriteAllText((Join-Path $dataRoot 'operator-stop.request'),'stop')
@@ -32,7 +33,8 @@ if($Mode -eq 'client') {
     $stderr=Join-Path $clientLogs 'stderr.log'
     $arguments=@('--path',$gameRoot,'--log-file',(Join-Path $clientLogs 'engine.log'),'--script','res://client.gd','--',('--game='+$Game),('--connection-config='+[IO.Path]::GetFullPath($ConnectionConfig)))
     # This is the player's interactive window. Hidden is only for background services.
-    $process=Start-Process -FilePath $Godot -ArgumentList (Quote-Arguments $arguments) -PassThru -WindowStyle Normal -RedirectStandardOutput (Join-Path $clientLogs 'console.log') -RedirectStandardError $stderr
+    try { $process=Start-Detached $Godot $arguments $project (Join-Path $clientLogs 'console.log') $stderr 'Normal' }
+    catch { if($_.Exception.Message -like 'DETACHED_PROCESS_EXITED*') { throw ('Client exited before its window was ready. See '+$clientLogs) }; throw }
     $ownedHandle=$process.Handle
     $deadline=[DateTime]::UtcNow.AddSeconds(20)
     $visibleSince=$null
@@ -91,7 +93,7 @@ if(Test-Path -LiteralPath $metadata) {
 $logs=Join-Path $dataRoot 'logs'
 New-Item -ItemType Directory -Path $logs -Force | Out-Null
 $arguments=@('--headless','--path',$project,'--log-file',(Join-Path $logs 'operator.log'),'--script','res://host/operator.gd','--',('--data-root='+$dataRoot),('--operator-log-path='+(Join-Path $logs 'operator.log')))
-$process=Start-Process -FilePath $Godot -ArgumentList (Quote-Arguments $arguments) -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logs 'console.log') -RedirectStandardError (Join-Path $logs 'stderr.log')
+$process=Start-Detached $Godot $arguments $project (Join-Path $logs 'console.log') (Join-Path $logs 'stderr.log')
 $ownedHandle=$process.Handle
 $deadline=[DateTime]::UtcNow.AddSeconds(45)
 while(-not (Test-Path -LiteralPath $metadata) -and -not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 200 }

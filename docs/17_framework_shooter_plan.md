@@ -3,6 +3,19 @@
 <a id="next-plan"></a>
 ## 2026-09-28 已确认的下一阶段规划
 
+### 下次交给 Claude：客户端交付收尾（2026-09-28 收口）
+
+从最新 main 核实基准、AGENTS 与工作区后实施；主要工作交 Claude，Codex 复核。用户已反馈单账号启动、入房、退房正常，本次收录当前成果，未宣称跨设备或 GitHub 下载通过。
+
+1. 优化独立客户端直接启动：导出程序在未提供命令行配置时，读取可执行文件同目录的 connection.json；显式参数仍优先，源码入口兼容。缺配置给清楚提示，不关闭 WSS/DTLS 或版本校验。验证从不同工作目录、中文/空格目录直接运行 Client.exe 可注册/登录/入房/退房，且不依赖 PowerShell 窗口。StartGame.cmd 保留为兼容入口；先验证引擎的控制台行为，不凭隐藏窗口推定进程生命周期安全。
+2. 收口源码 build_id 固定的问题：给出可重复、与对应服务端绑定的构建标识方案，保证不兼容的旧客户端能被拒绝；避免只改客户端标签。先审查设计再做涉及协议或服务器构建的更改。
+3. 同源生成 PlayerClient 与仓库分发副本，检查不携带运行数据和秘密；准备 GitHub Release 的精确附件清单与哈希。Release 发布是独立动作，本轮代码推送不等于允许自动发布附件；发布后才做真实下载与全新目录验收，不将缺失的 Client.exe 或 LFS 指针当完整交付。
+4. 原因不明的 DTLS -30464 保持已知问题，不屏蔽日志；旧独立服务器 ZIP 的启动修复另列未完成。暂不做后台 UI、音效、Linux、文件清理或全量游戏回归。
+
+交付只给用户一个直接启动入口和最多三步验收；测试使用隔离数据/公开配置/端口，保留原有未提交改动，不操作用户真实服务或数据，不自行提交推送。
+
+客户端入口补充（2026-09-28）：按用户要求，PreparePlayerClient 默认生成完整根目录 `PlayerClient/`，打开该目录后运行 StartGame.cmd；也可用根 StartPlayerClient.cmd。该目录含本机公开连接配置，Git 忽略；仓库副本与 GitHub 获取流程仍单独验收。此前记录中的 artifacts/player-clients/shooter-windows 是旧默认位置，不再作为当前操作入口；备份和临时产物仍位于 artifacts。
+
 本节通过 `grilling` 逐轮确认，是当前开发顺序；下文早期 S0–S5 与逐轮记录保留各自时点含义。实际完成和验证范围仍以 [STATUS](../STATUS.md) 为准。用户确认本次先记录规划、安排第一阶段；并非本次就实施三个阶段。
 
 | 顺序 | 交付目标 | 用户怎样验收 |
@@ -87,6 +100,104 @@ Claude 的下一项主要实现任务为独立射击客户端，接手时以本�
 客户端任务允许修改相关构建/发布脚本、客户端启动与公开连接配置处理、仓库内分发目录、必要的项目级 Git 属性/忽略规则及文档；不得携带测试账号数据、私钥或管理员凭据，不改认证/资产协议，不读改 `data/framework/`。大文件方案尚未确定，不能预先启用付费存储或把本条视为推送授权。
 
 验收采用全新目录，确认玩家不依赖本仓库父目录或 Godot 安装，能启动、配置目标服务器、登录并入房；构建检查与实际玩家操作分别记录。GitHub 获取流程尚未实际下载验证时，必须标为待验证。提交/推送/主线变更由 Codex 整合，不让双方同时写同一目录。完成后交付修改清单、目录体积、测试证据和最多 5 条用户试玩步骤。该任务单尚未自动发送给 Claude。
+
+#### 玩家客户端入口（2026-09-28）
+
+用户要求：继续使用 `StartManagement.cmd`；新增“准备玩家客户端”入口，自动生成与当前服务器匹配的客户端和公开连接配置；朋友只双击 `StartGame.cmd`；保留版本校验；先用隔离测试完成真实登录和入房，GitHub 发布以后单独做。
+
+**实现**：
+- 根目录 `PreparePlayerClient.cmd` 调用 `tools/prepare_player_client.ps1`：
+  - 读取 `artifacts/framework-games.json` 中当前服务器的射击工程，确认其清单与索引一致；
+  - 复制到临时目录后用本机 Godot 导出 `Client.pck`，`Client.exe` 用 4.7.2 官方发布模板；
+  - 用 `SetServer.ps1` 校验并写入 `artifacts/client` 中的公开 `connection.json` / `server.crt`；
+  - 检查私有文件后，替换 `artifacts/player-clients/shooter-windows/`，并在资源管理器中打开。
+- 对外地址是回环地址时给出提示：发给朋友前，要先在后台把对外 IP 设为局域网地址。
+- 目录中含 `client-version.json`（build_id、compatibility_id、game_protocol、文件 SHA256）、`CheckClient`、`SetServer` 和中文 README。
+- 版本校验沿用服务器原有检查，没有跳过或放宽。
+- `examples/framework/client.gd` 新增仅在 `--autoplay=<私有 JSON>` 时启用的测试流程：调用和按钮相同的注册、登录、入房函数，报告中不写密码。
+- `tests/test_operator.ps1` 新增可选参数 `-GamesIndex`，默认行为不变。
+
+**复核修正（2026-09-28）**：按 Codex 意见处理了三项，最新隔离验收 20/0，证据在 `logs/player-client-0972f570501e429aad94dfc66d8f71b3/`：
+- **输出目录**：只写入 `artifacts` 或 `logs`（参数 `-OutputRoot`），仓库副本只允许写入固定的 `clientsshooter-windows`（`-RepositoryCopy`）；越界或经链接的路径拒绝。新版本先在 `.staging-*` 完整生成；替换前按 `client-version.json` 中的 `generated_files` 比对，发现新增或改动的文件就停止并列出，旧目录不动；旧目录移入 `previous`（仓库副本移入 `previous-repository`）保留，替换失败自动回退。`-TestFailAt swap` 仅供测试注入失败。previous 不会自动清理，每份约 105 MB。
+- **测试隔离**：`host/operator.gd` 新增可选参数 `--public-client-dir`（默认仍为 `res://artifacts/client`），`tests/test_operator.ps1` 新增 `-PublicClientDir`。测试使用自己的游戏索引和公开配置目录，前后比对共享的 `artifacts/client` 与 `artifacts/framework-games.json`，都没有改动。
+- **统一来源**：删除基于旧 ZIP 的 `tools/publish_shooter_client.ps1`，本地目录和仓库目录来自同一次导出。Release tag 为 `shooter-client-<build_id>-<Client.pck 哈希前 8 位>`，因为源码版 build_id（`shooter-dev-002`）在代码更新时不变，用 pck 哈希区分。
+- **20 项检查**：
+  - 隔离 Operator 使用专属公开配置目录；越界输出和越界仓库副本被拒；
+  - 同一次导出生成两份目录，build、pck 哈希、tag 一致；仓库副本不含连接配置；两份目录都没有私钥或数据库；
+  - 重新生成时旧目录进入 previous；用户新增或改动文件时拒绝替换，目录保持原样；注入替换失败后回退，没有暂存残留；
+  - 全新目录自检通过；两名玩家真实注册、登录、入房并互相可见；版本不符被拒；
+  - Operator 正常关闭；共享文件没有改动。
+- **已知限制**：源码版服务器的版本校验只比对 build_id 等字段，而 `shooter-dev-002` 在射击代码改动时不会变化，所以旧客户端连到代码已更新的源码服务器时不会被拒。这是原有的清单机制，本轮没有改协议；更新代码后请重新生成客户端。
+
+**首次隔离验收（已被上面取代）** `tests/test_player_client.ps1`（2026-09-28，12/0，退出 0，证据 `logs/player-client-40f0ef066f064566b0ec33a57c562217/`）：
+- 用当前源码生成独立游戏索引，启动独立数据目录、独立端口的 Operator，以及真实宿主和 READY 射击房间；
+- 生成客户端，复制到系统临时目录（仓库外），`CheckClient` 通过；
+- 两个导出的 `Client.exe`（无窗口模式）用邀请码注册、登录，进入同一房间，在房间快照里互相可见；
+- 从改过 build_id 的工程副本导出的客户端被拒绝，提示“客户端与服务器版本不匹配”；
+- Operator 正常关闭。测试期间被隔离 Operator 覆盖的 `artifacts/client` 已恢复，并逐字节比对一致。
+- 测试没有读写 `data/framework/`，也没有碰用户正在运行的服务器。
+
+**已为用户生成**：基于 21:50 启动的服务器，得到 `artifacts/player-clients/shooter-windows/`（109,645,254 字节，build `shooter-dev-002`，`wss://127.0.0.1:28300`，只能本机使用），`CheckClient` 通过。
+
+**未验证**：
+- 真人图形界面点击试玩；
+- 另一台电脑的局域网连接（需在后台设置对外 IP 并放行防火墙）；
+- 服务器程序或射击代码更新后旧客户端被拒（机制与上面的反向测试相同，未另测）。
+
+#### 独立射击客户端实施（2026-09-28）
+
+Claude 实施，基于 `main` `f318c10`，未提交，待 Codex 复核。没有改游戏、认证或资产代码，没有碰 `data/framework/`，没有启用付费服务，也没有提交或推送。
+
+**大文件核实**（2026-09-28 查阅 GitHub 文档）：
+- 普通 Git 文件超过 100 MiB 会被拒收；
+- Git LFS 免费额度是存储和流量各 10 GiB/月，下载源码压缩包也计入流量。预算设为 0 时超额会被阻止，未设预算时会计费；
+- Release 附件单个文件要求小于 2 GiB，不限流量。
+
+`Client.exe` 就是 Godot 4.7.2 官方 `windows_release_x86_64` 模板，109,268,480 字节（104.2 MiB），放不进普通 Git。每次下载约消耗 LFS 流量 0.1 GiB，免费额度一个月只够约 95 次，还有超额计费风险，所以不用 LFS。
+
+**方案**：
+- 仓库跟踪 `clients/shooter-windows/` 中除 `Client.exe` 以外的文件（约 0.37 MiB）：`Client.pck`、启动脚本、`SetServer` / `FetchClient` / `CheckClient`、`README.md`、`client-version.json`。
+- `Client.exe` 作为 Release `shooter-client-<包 id 前 8 位>` 的原文件附件，不压缩。
+- 朋友有三种获取方式：
+  1. 克隆仓库后运行 `FetchClient.cmd`，它按 `client-version.json` 里的大小和 SHA256 校验；
+  2. 在 Release 页面把全部附件下载到同一文件夹；
+  3. 直接复制整个目录。
+- `.gitignore` 排除 `Client.exe`、`connection.json`、`server.crt`、`server-config/` 和下载残留文件；`.gitattributes` 把 `*.exe`、`*.pck` 标为二进制。
+
+**生成方式（已被取代）**：原先由 `tools/publish_shooter_client.ps1` 从独立包 ZIP 取客户端；复核后该脚本已删除，改由 `PreparePlayerClient.cmd -RepositoryCopy` 生成，见上方“复核修正”。
+- 文件直接从 ZIP 读取，按包内 `checksums.json` 校验后才写入，不从可能含测试数据的解压目录复制，也不重新导出。因此客户端与该包的服务器属于同一次构建（`build_id` 必须一致）。
+- 玩家辅助脚本的源文件在 `tools/shooter_client/`。
+- 脚本最后会检查目录里不含 data/run/logs/备份、`.key`/`.sqlite`/token 或 admin/secret 字样的文件，并对所有 PowerShell 文件做语法解析。
+- 以后每发布新包，重新运行这个脚本、提交目录，并用新 tag 上传 Release。
+
+**设置服务器**：`SetServer.cmd` 接收服务器主机运行 `PublishClients.cmd` 后得到的 `connection.json` 和 `server.crt`（可把文件夹拖到它上面，或放进 `server-config/`）。
+- 只允许 url、ca_certificate、server_hostname、managed、secure_enet 这几个字段；url 必须是 `wss://主机:端口`。
+- 证书中出现私钥时拒绝。
+- 没有新增图形界面。
+- `PublishClients.cmd` 只在独立包根目录里，仓库根目录没有。客户端必须搭配同一个包的服务器：源码版 `StartManagement.cmd` 的射击版本号是 `shooter-dev-002`，和独立客户端对不上，不能配对。
+
+**Release 发布步骤**（尚未执行，需要用户或 Codex 授权推送后再做，GitHub 网页即可，不需要 `gh`）：
+1. 推送包含 `clients/shooter-windows/` 的提交；
+2. 新建 Release，tag 取 `clients/shooter-windows/client-version.json` 的 `release_tag`（当前为 `shooter-client-shooter-dev-002-22250f37`），目标为该提交；
+3. 上传 `Client.exe` 和目录中其余全部文件作为附件，不要打包成 zip；
+4. 在新目录里跑一遍获取方式 1 和 2。
+
+**测试（2026-09-28，本机）**：
+
+| 项目 | 结果 |
+|---|---|
+| `publish_shooter_client.ps1` 从 `aa019dbc…` 包生成目录 | 通过，`SHOOTER_CLIENT_READY`，109,641,709 字节 |
+| 复制到仓库外的全新临时目录后运行 `CheckClient` | 通过，4 个文件校验一致，服务器未设置 |
+| 用本机开发服务器发布的公开 `connection.json` + `server.crt` 运行 `SetServer` | 通过，退出 0；再次 `CheckClient` 显示已设置 |
+| 在证书中加入私钥标记后运行 `SetServer` | 按预期拒绝，退出 1 |
+| 全新目录中的导出 `Client.exe --headless --ui-smoke` | 退出 0，`login_ready=true`：配置和证书被接受，不依赖仓库或 Godot 安装；未连网 |
+| 删除 `Client.exe` 后运行 `CheckClient` / `FetchClient` | 正确报告缺失，退出 1；Release 尚不存在，下载失败（“连接被意外关闭”），未留下 `.partial` |
+| `git status --ignored` | `Client.exe` 被忽略，其余文件可纳入 Git |
+
+**待验证**：
+- Release 上传后按获取方式 1 和 2 实际下载；
+- 在另一台电脑（或本机新目录）连接正在运行的服务器，真人完成登录并入房；
+- 由 Windows 智能屏幕或杀毒软件造成的首次运行提示（exe 没有代码签名）。
 
 以下是第二、三阶段的建议顺序与门槛，本阶段没有开始这些工作。
 

@@ -1,0 +1,80 @@
+{
+    "format":  2,
+    "source":  "StartManagement",
+    "game_id":  "shooter",
+    "build_id":  "shooter-dev-002",
+    "compatibility_id":  "shooter-v2",
+    "game_protocol":  2,
+    "engine_template":  "4.7.2.stable windows_release_x86_64",
+    "prepared_at":  "2026-09-28T15:24:26.0404589Z",
+    "release_tag":  "shooter-client-shooter-dev-002-95c33788",
+    "release_url":  "https://github.com/SchreiberChiang/godot-network-/releases/download/shooter-client-shooter-dev-002-95c33788/",
+    "files":  [
+                  {
+                      "path":  "Client.exe",
+                      "size":  109268480,
+                      "sha256":  "d34d36f3be1a6c49c56525ae86469b92e4f417ddf0b43cf00dd80c385c4b0562"
+                  },
+                  {
+                      "path":  "Client.pck",
+                      "size":  371152,
+                      "sha256":  "95c33788760d34965f3e28125aa4ea2499a96b0126adbae5021f9e8f1c9b27da"
+                  },
+                  {
+                      "path":  "RunGame.ps1",
+                      "size":  1706,
+                      "sha256":  "a4f666bf2af748cfa3669bef937aa8ea84c8c21635fbeb03b3ec3410d1662a8e"
+                  },
+                  {
+                      "path":  "StartGame.cmd",
+                      "size":  176,
+                      "sha256":  "68c061babf274c0ffd9c35b92478d1cc39435bd274efea97840a96785864bad7"
+                  }
+              ],
+    "generated_files":  [
+                            {
+                                "path":  "CheckClient.cmd",
+                                "sha256":  "9ee90b36c04e2c65c23c5568f2247f2e735794a1f758e23fd9b5f35c6ef8b727"
+                            },
+                            {
+                                "path":  "CheckClient.ps1",
+                                "sha256":  "3431b943aa9ec10f1884d3756cb1556a2845a4132c5a41d2046c735c80221939"
+                            },
+                            {
+                                "path":  "Client.exe",
+                                "sha256":  "d34d36f3be1a6c49c56525ae86469b92e4f417ddf0b43cf00dd80c385c4b0562"
+                            },
+                            {
+                                "path":  "Client.pck",
+                                "sha256":  "95c33788760d34965f3e28125aa4ea2499a96b0126adbae5021f9e8f1c9b27da"
+                            },
+                            {
+                                "path":  "FetchClient.cmd",
+                                "sha256":  "8355c85b9b593f5e7e2bab775393040ef6c40cb1c6b3023708bc9031adf94911"
+                            },
+                            {
+                                "path":  "FetchClient.ps1",
+                                "sha256":  "a8ebd9afb94925a2e5e930e242ca3331020dab9432b77f625b76f12b88f83351"
+                            },
+                            {
+                                "path":  "README.md",
+                                "sha256":  "dd9d48ef6f6ffa7043e59335342d8d66c074eff2b540ec5cffcf9042a84575ee"
+                            },
+                            {
+                                "path":  "RunGame.ps1",
+                                "sha256":  "a4f666bf2af748cfa3669bef937aa8ea84c8c21635fbeb03b3ec3410d1662a8e"
+                            },
+                            {
+                                "path":  "SetServer.cmd",
+                                "sha256":  "2f7255409c3c81086391f81494856ceaa0f55952df25e788d26b868dfcbeed17"
+                            },
+                            {
+                                "path":  "SetServer.ps1",
+                                "sha256":  "e3acf1ae86dd9d8a6e2e767fa0cd9e0151ea476298bed53254d3843c95543e62"
+                            },
+                            {
+                                "path":  "StartGame.cmd",
+                                "sha256":  "68c061babf274c0ffd9c35b92478d1cc39435bd274efea97840a96785864bad7"
+                            }
+                        ]
+}

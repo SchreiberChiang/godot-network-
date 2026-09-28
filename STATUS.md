@@ -4,6 +4,24 @@
 
 ## 当前下一步（2026-09-28）
 
+本轮提交前核验：Codex 独立运行 `tests/test_client_launcher.ps1` 14/0、退出 0（`logs/client-launcher-2bdec546bc1c46ce9bbc57f98a52425f/`）；重新导出到隔离产物目录并同步仓库副本，退出 0，tag `shooter-client-shooter-dev-002-95c33788`，未替换用户 PlayerClient。仓库副本只提交公开客户端文件，不包含 EXE、本机连接配置或证书，Release 尚未创建，克隆后暂不能直接下载运行。此前真实联机和控制台隔离测试沿用 Claude 报告，Codex 未重跑；DTLS 未复现和旧独立包启动方式仍是限制。下次任务见 docs/17 顶部“客户端交付收尾”：直接 EXE 启动体验、构建标识方案与 GitHub 获取验收；不是开始 UI/音效/Linux。
+
+2026-09-28 客户端位置调整与人工反馈：用户再次反馈启动游戏、入房、退房看起来正常；未确认其他用例。默认生成目录现为根目录 `PlayerClient/`（完整独立目录，进入后双击 StartGame.cmd），根 StartPlayerClient.cmd 同步指向它，PreparePlayerClient.cmd 生成后打开它。临时构建与 previous 备份仍留在 artifacts；显式 OutputRoot 的隔离测试行为保留。已重新生成根目录客户端（shooter-dev-002，tag `shooter-client-shooter-dev-002-2dc08b12`），生成退出 0，CheckClient 退出 0；入口/目录路径与 Git 忽略检查通过，git diff --check 退出 0。未重启服务、未修改真实库、未删除原 artifacts 玩家目录；未对本次新目录重新运行图形界面或联机测试。地址仍为 127.0.0.1，只适用于本机。PlayerClient 含本机连接配置，不纳入 Git；仓库分发副本 clients/shooter-windows 与 GitHub 发布另行维护，不据此声称 GitHub 已可下载。
+
+Claude 最新退出排查交接：报告已隔离复现控制台 Ctrl+C 导致 Operator 强制退出，并修改源码启动与新客户端启动方式；报告 detached_launch 13/0、room_exit_logs 17/0、client_launcher 14/0、player_client 20/0。Codex 本轮未独立复跑或完成该改动的全面复核，这些数字按 Claude 报告记录；DTLS -30464 仍未复现、原因未确认，旧独立包启动方式尚未更新。上述客户端重新生成已带入当前 RunGame.ps1。
+
+用户最新人工验收：使用一个账号完成注册并进入房间；未多开，未进行双人对战或跨设备验收。用户报告退房时服务器报错。Codex 只读检查发现：`artifacts/framework-6e8a5b2ccec7444ebbf9ae3f5322c529/shooter/server.log` 有 `TLS handshake error: -30464`，堆栈落在 `room_runtime.gd:123`；`data/framework/logs/operator.log`、`stderr.log` 有未等待 Thread 完成和退出资源泄漏/静态字符串错误；`managed-host.log` 记录房间正常走到 STOPPED。日志缺少逐条时间戳，未证明这些错误由退房触发，也未证明无害。未重启或修改运行服务/真实数据。下一项交 Claude：使用独立数据、端口、公开配置与构建目录，分别复现单人退房、关闭客户端、停止宿主、停止 Operator，记录时间/退出码/堆栈；确认原因后修复并跑相关回归，不能吞日志或关闭 DTLS。新客户端安全替换等 20/0 报告尚未由 Codex 完整复核。
+
+便捷入口：新增根目录 `StartPlayerClient.cmd`，转调已生成的 `artifacts/player-clients/shooter-windows/StartGame.cmd`；缺失时提示先运行 PreparePlayerClient。只检查入口目标存在和 `git diff --check`，未实际打开游戏窗口，未重建客户端。未提交或推送。
+
+Codex 玩家客户端复核（2026-09-28，待 Claude 修正）：已阅读生成器、启动脚本和隔离测试；三个 PowerShell 文件语法解析无错误，抽查 `logs/player-client-40f0ef066f064566b0ec33a57c562217/` 的成功/错版报告及 Operator 11/0 收尾记录。未独立重跑真实联机，也未操作当前服务器。暂不提交发布，需处理：① 生成器仅凭目标目录存在 `client-version.json` 就递归删除整个目录，且自定义 Destination 缺少范围约束；改为受控输出目录、保留旧目录并可回退，覆盖前识别用户新增文件，补失败保留与越界拒绝检查。② 测试会覆盖共享 `artifacts/client` 再恢复，不能称为与当前服务完全隔离；改用专属公开配置输出，避免中断或并发时污染正常发布文件。③ 新生成目录与旧 GitHub 候选目录仍是两套不同构建，发布前统一生成来源与版本，不能让 GitHub 下载继续指向旧客户端。上述为代码复核发现，当前用户尚未进行新版图形界面试玩或跨设备验收。
+
+复核修正（Claude，2026-09-28，未提交，待 Codex 复核）：上述三项已处理，隔离验收 `tests/test_player_client.ps1` 20/0、退出 0，证据在 `logs/player-client-0972f570501e429aad94dfc66d8f71b3/`。① 输出只允许写入 Git 忽略的 `artifacts`、`logs` 或固定的 `clientsshooter-windows`，越界或经链接的路径直接拒绝；新版本先在同一目录下暂存，完整生成后再替换；替换前按 `client-version.json` 的 `generated_files` 逐个比对哈希，发现新增或改动的文件就停止，旧目录不动；旧目录移入 `previous` 保留，替换失败自动回退（已用注入失败验证）。② Operator 新增可选参数 `--public-client-dir`，默认仍为 `artifacts/client`；测试把公开配置发布到自己的目录，测试前后比对共享的 `artifacts/client` 与游戏索引，均未改动，不再覆盖后恢复。③ 删除基于旧 ZIP 的 `publish_shooter_client.ps1`；`PreparePlayerClient.cmd -RepositoryCopy` 用同一次导出同时生成本地目录和仓库目录 `clients/shooter-windows`（后者不含连接配置，附 FetchClient），两者 build、Client.pck 哈希和 Release tag 相同，测试已核对。仓库目录已按当前服务器重新生成，tag 为 `shooter-client-shooter-dev-002-22250f37`，旧目录保留在 `artifacts/player-clients/previous-repository/`。
+
+玩家客户端入口（Claude，2026-09-28，未提交，待 Codex 复核）：新增根目录 `PreparePlayerClient.cmd`（`tools/prepare_player_client.ps1`）。它从 `StartManagement.cmd` 当前服务器所用的射击工程导出 `Client.exe` + `Client.pck`，附上服务器发布的公开 `connection.json` / `server.crt`，生成 `artifacts/player-clients/shooter-windows/`（约 104.6 MiB）。整个目录发给朋友后，朋友只需双击 `StartGame.cmd`。版本校验保留不变：客户端带的就是服务器自己的 build_id / compatibility_id / game_protocol。隔离验收 `tests/test_player_client.ps1` 12/0、退出 0：全新目录中两个导出客户端完成真实注册、登录、进入同一射击房间并互相可见；另一个 build_id 被改过的客户端被服务器以 BUILD_MISMATCH 拒绝。真人图形界面试玩和另一台电脑的局域网连接尚未验证。GitHub 发布另行完成（下面的 `clients/shooter-windows/` 方案）。
+
+GitHub 获取方案（Claude，2026-09-28）：`Client.exe` 为 104.2 MiB，超过 GitHub 普通文件上限，所以不进 Git，改作 GitHub Release 的原文件附件；LFS 有计费风险，没有启用。仓库目录 `clients/shooter-windows/` 现在与本地客户端同源生成（见“复核修正”）。方案见 [docs/17](docs/17_framework_shooter_plan.md#独立射击客户端实施2026-09-28)。尚未创建 Release，GitHub 下载流程为待验证。
+
 第一阶段收口：用户已基本验收路线图与文档，清理候选尚未确认；Codex 已完成脚本语法、节点/文件引用与差异范围的静态复核。本轮将第一阶段成果整理为本地提交，未推送。下一小阶段交接见 [docs/17](docs/17_framework_shooter_plan.md#下一阶段实施建议与验收门槛)：先核实主线整理条件，再由 Claude 主要实现独立射击客户端；任务尚未自动发送。下方“未提交/待复核”为此前交接时点，具体以 Git 状态及本段收口记录为准。
 
 用户通过 `grilling` 确认三阶段顺序：项目分析/清晰文档/离线路线图 → 主线整理与独立射击客户端、后台 UI、基础音效 → Linux 完整服务器与后台，同时保留 Windows 一键运行。详细要求和可转交的 [Claude 第一阶段任务单](docs/17_framework_shooter_plan.md#claude-phase1) 已记录；主要实现、测试和整理交 Claude，Codex 负责复核。
@@ -31,6 +49,8 @@ Codex 规划轮记录（原文保留）：规划文档检查：`git diff --check
 |---|---|
 | 源码入口 `StartManagement.cmd` / `StartShooterClient.cmd` / `StartManagedTurns.cmd` / `StopManagement.cmd` | 当前推荐，包含 `b0a707d` 的全部功能 |
 | 最新独立包 `artifacts/RoomKit-0.5.0-framework-windows-aa019dbc45f9461099ad5a8136b1e4a1.zip`（索引 `artifacts/framework-release.json`，SHA256 `e5d1cfb7c91975815bfda57cda85cd3e4f26d313780f7cb6ec947332ec44f48b`） | 2026-09-27 构建，含测试账号删除及收尾修正、常驻存储、8 字符密码。全新解压后 `tests/test_framework_release.ps1` 44/0、退出 0，覆盖原生启动、房间与基本联机；不含包内删除操作，新包旧路径与人工试玩未验证。旁边的解压目录含测试数据，分发只用 ZIP |
+| 玩家客户端 `PreparePlayerClient.cmd` → `artifacts/player-clients/shooter-windows/`（匹配源码服务器 `shooter-dev-002`） | 2026-09-28；复核修正后隔离验收 20/0；已为当前服务器重新生成（对外地址为 127.0.0.1，只能本机使用）；真人图形界面试玩待验证 |
+| GitHub 仓库目录 `clients/shooter-windows/`（`PreparePlayerClient.cmd -RepositoryCopy` 生成，tag `shooter-client-shooter-dev-002-22250f37`） | 与本地客户端同源；Git 中约 0.37 MiB（不含 Client.exe）；Release 未创建 |
 | `ROADMAP.html` | 2026-09-28 新增的项目地图，双击打开，不需要后台或网络 |
 | 早期无账号演示入口（仓库根 `StartPanel.cmd`、`StartPlay.cmd`、`StartTurns.cmd`、`StartDemo.cmd`、`ShowResults.cmd`）及 0.1.0 包 | 保留但不推荐，见 [早期入口](docs/archive/early_entrypoints.md)；已列入清理候选 |
 
@@ -57,6 +77,7 @@ Codex 规划轮记录（原文保留）：规划文档检查：`git diff --check
 
 - 第二台实体设备的局域网联机、Linux 完整宿主（测试机已登记未连接）、公网与公网 WSS、长期满载压测、24 小时备份保留周期。
 - 常驻存储进程数小时以上的耐久与内存观察；房间内（死亡背包）购买和复活前资产刷新的单独计时。
+- 独立射击客户端：GitHub Release 实际上传和下载（`FetchClient.cmd` 在 Release 不存在时下载失败，并清理了残留文件）、另一台电脑上的真人登录与入房、新包发布后重新生成客户端目录的流程。
 - 最新独立包（`aa019dbc…`）的人工浏览器操作、原生客户端试玩、包内删除端到端，以及新包的旧存储路径。
 - 新后台表单（房间规则、8 字符密码、删除对话框）的真实浏览器点击；托管模板的图形界面；真人操作手感。
 - 账号删除：删除时房间正在进行、之后才提交结果的完整真实对局；outbox 中已有待处理/已拒绝结果文件时的残留报告；大量账号或大审计文件下的耗时；磁盘满等真实系统级写入失败（测试用只读属性模拟）。

@@ -534,7 +534,8 @@ func _valid_config(value: Dictionary) -> bool:
 	return value.asset_spaces is Dictionary and not game_services.catalog_for(value.asset_spaces).is_empty()
 
 func _publish_connection() -> void:
-	var directory := Paths.absolute("res://artifacts/client")
+	# Tests pass their own directory so the normal public files are never touched.
+	var directory := Paths.absolute(args.get("--public-client-dir", "res://artifacts/client"))
 	DirAccess.make_dir_recursive_absolute(directory)
 	DirAccess.copy_absolute(root_path.path_join("server.crt"), directory.path_join("server.crt"))
 	_write_json(directory.path_join("connection.json"), {"url": "wss://" + str(settings.advertised_host) + ":" + str(int(settings.lobby_port)), "ca_certificate": "server.crt", "server_hostname": "localhost", "secure_enet": true, "managed": true})

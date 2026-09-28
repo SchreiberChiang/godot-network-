@@ -1,6 +1,8 @@
 param(
     [switch]$HoldForIntegration,
     [switch]$Lifecycle,
+    [string]$GamesIndex = '',
+    [string]$PublicClientDir = '',
     [string]$Godot = 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe'
 )
 $ErrorActionPreference = 'Stop'
@@ -41,6 +43,8 @@ function Check($condition,$name) {
     else { $script:failed++; Write-Output ('FAIL ' + $name) }
 }
 $arguments = @('--headless','--path',$project,'--log-file',(Join-Path $evidence 'operator.log'),'--script','res://host/operator.gd','--',('--data-root=' + $testRoot),('--panel-port=' + $panelPort))
+if ($GamesIndex) { $arguments += ('--games=' + [IO.Path]::GetFullPath($GamesIndex)) }
+if ($PublicClientDir) { $arguments += ('--public-client-dir=' + [IO.Path]::GetFullPath($PublicClientDir)) }
 $quoted = foreach ($argument in $arguments) { '"' + ($argument -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"' }
 $process = Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $evidence 'console.log') -RedirectStandardError (Join-Path $evidence 'stderr.log')
 $ownedHandle = $process.Handle

@@ -105,6 +105,80 @@ func _run() -> void:
 		await _capture_if_requested()
 		print("FRAMEWORK_UI_RESULT login_ready=", configuration_ready)
 		quit(0)
+	elif args.has("--autoplay"):
+		_autoplay(str(args["--autoplay"]))
+
+## Test-only acceptance driver: runs the same login/room functions the buttons
+## call, from a private JSON file, and writes a report without credentials.
+func _autoplay(path: String) -> void:
+	var plan: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not plan is Dictionary or not plan.has("report_path"):
+		push_error("autoplay plan invalid")
+		quit(2)
+		return
+	var report := {"stage": "configured", "ok": false, "build_id": str(manifest.get("build_id", ""))}
+	var deadline := Time.get_ticks_msec() + int(plan.get("timeout_ms", 90000))
+	if plan.get("register", false):
+		await register_account(str(plan.username), str(plan.password), str(plan.get("display_name", plan.username)), str(plan.get("invite_code", "")))
+		report.register_message = message
+	await login(str(plan.username), str(plan.password))
+	report.login_message = message
+	if not authenticated:
+		report.stage = "login_failed"
+		_autoplay_finish(plan, report, 3)
+		return
+	report.stage = "logged_in"
+	selected_room = str(plan.get("room_id", ""))
+	if selected_room == "":
+		await create_room()
+		report.created_room = selected_room
+	while client.state == "LOBBY" and Time.get_ticks_msec() < deadline:
+		await _refresh_rooms()
+		var ready := rooms.any(func(room): return str(room.get("room_id", "")) == selected_room and str(room.get("state", "")) == "READY")
+		if ready and not busy:
+			await join_selected()
+		if client.state != "IN_ROOM":
+			await create_timer(0.5).timeout
+	report.join_message = message
+	if client.state != "IN_ROOM":
+		report.stage = "join_failed"
+		_autoplay_finish(plan, report, 4)
+		return
+	report.stage = "in_room"
+	report.room_id = current_room
+	var wanted := int(plan.get("expect_players", 1))
+	while Time.get_ticks_msec() < deadline:
+		var ids: Array = []
+		for player in world.latest.get("players", []):
+			ids.append(str(player.get("user_id", "")))
+		report.players = ids
+		report.self_visible = ids.has(str(client.identity.get("user_id", "")))
+		if report.self_visible and ids.size() >= wanted:
+			break
+		await create_timer(0.2).timeout
+	report.user_id = str(client.identity.get("user_id", ""))
+	report.ok = report.get("self_visible", false) and report.players.size() >= wanted
+	if report.ok:
+		report.stage = "in_room_synced"
+		await create_timer(float(plan.get("hold_ms", 0)) / 1000.0).timeout
+		if str(plan.get("after", "close")) == "leave":
+			await leave_room()
+			report.left_state = str(client.state)
+			report.leave_message = message
+			report.stage = "left_room" if client.state == "LOBBY" else "leave_failed"
+			report.ok = client.state == "LOBBY"
+			await create_timer(float(plan.get("lobby_ms", 3000)) / 1000.0).timeout
+	_autoplay_finish(plan, report, 0 if report.ok else 5)
+
+func _autoplay_finish(plan: Dictionary, report: Dictionary, code: int) -> void:
+	var file := FileAccess.open(str(plan.report_path), FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(report))
+		file.close()
+	print("FRAMEWORK_AUTOPLAY stage=", report.stage, " ok=", report.ok)
+	await _close()
+	if code != 0:
+		quit(code)
 
 func login(username: String, password: String) -> void:
 	if busy or not configuration_ready:
