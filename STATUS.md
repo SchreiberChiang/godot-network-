@@ -1,6 +1,6 @@
 # 当前状态：通用管理服务、账号、资产与射击示例
 
-更新：2026-09-28。分支 `codex/shooter-framework`，提交 `b0a707d`，已与 `origin/codex/shooter-framework` 一致；工作区另有第一阶段未提交的文档改动（见文末）。本文件只放当前结论、未验收项、已知问题和证据位置；逐轮过程和完整验证表见 [STATUS 历史归档](docs/archive/status_history.md)。怎样启动见 [README](README.md)，模块和开发顺序一览见根目录 **`ROADMAP.html`**（双击打开）。
+更新：2026-09-28。当前主线 `main`，已从旧主线快进整合到 `74f3413`（包括第一阶段文档与路线图）。本轮只同步主线说明，其他分支保留；远端同步结果以 Git 核实为准。下方各轮提交和工作区描述保留当时含义。本文件只放当前结论、未验收项、已知问题和证据位置；逐轮过程和完整验证表见 [STATUS 历史归档](docs/archive/status_history.md)。怎样启动见 [README](README.md)，模块和开发顺序一览见根目录 **`ROADMAP.html`**（双击打开）。
 
 ## 当前下一步（2026-09-28）
 
