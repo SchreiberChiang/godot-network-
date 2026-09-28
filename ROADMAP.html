@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoomKit 项目地图</title>
+<meta name="description" content="RoomKit 模块、状态与开发顺序一览；双击本地文件即可打开。">
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1f23; --muted: #5d636e; --line: #dedbd4;
+  --accent: #b4561f; --accent-ink: #ffffff; --focus: #1f6fb4;
+  --verified: #1e7a4a; --verified-bg: #e3f3ea;
+  --implemented: #1f5fa8; --implemented-bg: #e3edf8;
+  --pending: #9a6a00; --pending-bg: #fbf0d4;
+  --planned: #6b4fa0; --planned-bg: #eee8f7;
+  --candidate: #8a4b3a; --candidate-bg: #f5e6e1;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171a; --panel: #1e2125; --ink: #e8e6e1; --muted: #a2a8b3; --line: #33373d;
+    --accent: #e08a55; --accent-ink: #1a1a1a; --focus: #6fb0ea;
+    --verified: #6fd39c; --verified-bg: #1c3528;
+    --implemented: #8fb9ec; --implemented-bg: #1c2b3d;
+    --pending: #e7c15f; --pending-bg: #382e14;
+    --planned: #bba3e6; --planned-bg: #2c2440;
+    --candidate: #e4a18c; --candidate-bg: #3b2621;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171a; --panel: #1e2125; --ink: #e8e6e1; --muted: #a2a8b3; --line: #33373d;
+  --accent: #e08a55; --accent-ink: #1a1a1a; --focus: #6fb0ea;
+  --verified: #6fd39c; --verified-bg: #1c3528;
+  --implemented: #8fb9ec; --implemented-bg: #1c2b3d;
+  --pending: #e7c15f; --pending-bg: #382e14;
+  --planned: #bba3e6; --planned-bg: #2c2440;
+  --candidate: #e4a18c; --candidate-bg: #3b2621;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif; }
+a { color: var(--implemented); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 20px 16px 48px; }
+header h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: .01em; }
+header p { margin: 0; color: var(--muted); }
+.lede { margin-top: 10px !important; color: var(--ink) !important; max-width: 70ch; }
+.meta { font-size: 13px; margin-top: 6px !important; }
+.toolbar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 0 10px; margin-top: 12px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { border: 0; background: transparent; color: var(--ink); padding: 7px 14px; font: inherit; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.search { position: relative; flex: 1 1 260px; min-width: 0; }
+.search input { width: 100%; padding: 8px 64px 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
+.search .clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 4px 8px; font: inherit; font-size: 13px; }
+.search kbd { position: absolute; right: 60px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; pointer-events: none; }
+select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
+.chip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="false"] { opacity: .55; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.count { color: var(--muted); font-size: 13px; margin-left: auto; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; margin-top: 16px; align-items: start; }
+.col { background: transparent; }
+.col h2 { font-size: 15px; margin: 0 0 2px; }
+.col .hint { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
+.cards { display: grid; gap: 8px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.card > button { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 10px 12px; cursor: pointer; border-radius: 10px; }
+.card > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.card .top { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+.card h3 { font-size: 14.5px; margin: 0; line-height: 1.4; }
+.card .sum { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+.badge { flex: none; font-size: 12px; padding: 1px 8px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+.s-verified { color: var(--verified); background: var(--verified-bg); }
+.s-implemented { color: var(--implemented); background: var(--implemented-bg); }
+.s-pending { color: var(--pending); background: var(--pending-bg); }
+.s-planned { color: var(--planned); background: var(--planned-bg); }
+.s-candidate { color: var(--candidate); background: var(--candidate-bg); }
+.d-verified { background: var(--verified); } .d-implemented { background: var(--implemented); } .d-pending { background: var(--pending); } .d-planned { background: var(--planned); } .d-candidate { background: var(--candidate); }
+.more { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.detail { border-top: 1px solid var(--line); padding: 10px 12px 12px; font-size: 13.5px; }
+.detail h4 { margin: 10px 0 4px; font-size: 12.5px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+.detail h4:first-child { margin-top: 0; }
+.detail p { margin: 0; }
+.detail ul { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 4px; }
+.detail li { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.detail code { font: 12.5px/1.4 Consolas, "Cascadia Mono", monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; word-break: break-all; }
+.copy { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 4px; font: inherit; font-size: 11.5px; padding: 0 6px; cursor: pointer; }
+.empty { margin: 32px 0; padding: 20px; text-align: center; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); }
+.legend { display: grid; gap: 4px; font-size: 13px; color: var(--muted); margin-top: 28px; }
+.legend strong { color: var(--ink); font-weight: 600; }
+footer { margin-top: 20px; font-size: 12.5px; color: var(--muted); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 14px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+@media (max-width: 640px) { .toolbar { position: static; } .search kbd { display: none; } .count { margin-left: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>RoomKit 项目地图</h1>
+    <p class="lede">本机运行的多游戏房间框架：一个管理后台，加上邀请码账号、永久资产和每房一进程的游戏服务器。示例游戏有横版射击和取石子。</p>
+    <p class="meta" id="meta"></p>
+  </header>
+
+  <div class="toolbar" role="region" aria-label="视图与筛选">
+    <div class="row">
+      <div class="seg" role="group" aria-label="视图">
+        <button type="button" id="viewModule" aria-pressed="true">按模块</button>
+        <button type="button" id="viewPhase" aria-pressed="false">按开发顺序</button>
+      </div>
+      <div class="search">
+        <label class="sr" for="q">搜索</label>
+        <input id="q" type="search" placeholder="搜索：账号、房间、资产、游戏接入、文件名…" autocomplete="off">
+        <kbd>/</kbd>
+        <button type="button" class="clear" id="clear" hidden>清空</button>
+      </div>
+      <label class="sr" for="area">模块</label>
+      <select id="area"></select>
+    </div>
+    <div class="row" id="chips" role="group" aria-label="按状态筛选"></div>
+  </div>
+
+  <main>
+    <div class="board" id="board" aria-live="polite"></div>
+    <div class="empty" id="empty" hidden>没有符合条件的条目。<button type="button" class="chip" id="reset">清空搜索与筛选</button></div>
+  </main>
+
+  <section class="legend" aria-label="状态说明" id="legend"></section>
+  <footer>
+    状态以 <a href="STATUS.md">STATUS.md</a> 为准，本页只做导航；清理候选以 <a href="docs/17_framework_shooter_plan.md">docs/17 清理候选表</a> 为准。本页没有声称第二台设备、Linux 或公网已通过验证。
+    数据文件：<code>docs/assets/roadmap/roadmap-data.js</code>。快捷键：<kbd>/</kbd> 聚焦搜索，<kbd>Esc</kbd> 清空搜索。
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="docs/assets/roadmap/roadmap-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.ROADMAP_DATA;
+  var board = document.getElementById("board");
+  if (!D) { board.textContent = "未能载入 docs/assets/roadmap/roadmap-data.js，请确认本页与 docs 目录在同一仓库中。"; return; }
+  var store = { get: function (k) { try { return localStorage.getItem("roadmap." + k); } catch (e) { return null; } },
+                set: function (k, v) { try { localStorage.setItem("roadmap." + k, v); } catch (e) {} } };
+  var statusOrder = ["verified", "implemented", "pending", "planned", "candidate"];
+  var state = { view: store.get("view") === "phase" ? "phase" : "module", q: "", area: "", statuses: {}, open: {} };
+  statusOrder.forEach(function (s) { state.statuses[s] = true; });
+
+  var el = function (tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  var areaLabel = {}; D.areas.forEach(function (a) { areaLabel[a.id] = a.label; });
+  var phaseLabel = {}; D.phases.forEach(function (p) { phaseLabel[p.id] = p.label; });
+
+  document.getElementById("meta").textContent = "核对基准：" + D.baseline + "；核对日期 " + D.checkedAt + "。共 " + D.nodes.length + " 个条目。";
+
+  var areaSelect = document.getElementById("area");
+  areaSelect.appendChild(new Option("全部模块", ""));
+  D.areas.forEach(function (a) { areaSelect.appendChild(new Option(a.label, a.id)); });
+
+  var chips = document.getElementById("chips");
+  statusOrder.forEach(function (s) {
+    var b = el("button", "chip"); b.type = "button"; b.setAttribute("aria-pressed", "true"); b.dataset.status = s;
+    b.title = D.statuses[s].hint;
+    b.appendChild(el("span", "dot d-" + s)); b.appendChild(document.createTextNode(D.statuses[s].label));
+    b.addEventListener("click", function () { state.statuses[s] = !state.statuses[s]; b.setAttribute("aria-pressed", String(state.statuses[s])); render(); });
+    chips.appendChild(b);
+  });
+  var count = el("span", "count"); count.id = "count"; chips.appendChild(count);
+
+  var legend = document.getElementById("legend");
+  statusOrder.forEach(function (s) { var p = el("div"); p.appendChild(el("strong", null, D.statuses[s].label + "：")); p.appendChild(document.createTextNode(D.statuses[s].hint)); legend.appendChild(p); });
+
+  function haystack(n) {
+    return [n.title, n.summary, n.details, n.evidence, areaLabel[n.area], phaseLabel[n.phase], D.statuses[n.status].label]
+      .concat(n.files || [], n.docs || []).join(" \n ").toLowerCase();
+  }
+  function matches(n) {
+    if (!state.statuses[n.status]) return false;
+    if (state.area && n.area !== state.area) return false;
+    if (!state.q) return true;
+    var h = haystack(n);
+    return state.q.toLowerCase().split(/\s+/).filter(Boolean).every(function (t) { return h.indexOf(t) >= 0; });
+  }
+  function toast(msg) { var t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(function () { t.classList.remove("show"); }, 1600); }
+  function copy(text) {
+    var done = function () { toast("已复制：" + text); };
+    var fallback = function () { var ta = el("textarea"); ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); done(); } catch (e) { toast("复制失败，请手动选择：" + text); } ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  }
+  function pathList(items, title) {
+    var wrap = el("div"); wrap.appendChild(el("h4", null, title));
+    var ul = el("ul");
+    items.forEach(function (p) {
+      var li = el("li"); var a = el("a"); a.href = p; a.appendChild(el("code", null, p)); li.appendChild(a);
+      var b = el("button", "copy", "复制路径"); b.type = "button"; b.setAttribute("aria-label", "复制路径 " + p);
+      b.addEventListener("click", function (e) { e.stopPropagation(); copy(p.split("#")[0]); });
+      li.appendChild(b); ul.appendChild(li);
+    });
+    wrap.appendChild(ul); return wrap;
+  }
+  function card(n) {
+    var c = el("article", "card"); c.id = "node-" + n.id;
+    var btn = el("button"); btn.type = "button"; var open = !!state.open[n.id];
+    btn.setAttribute("aria-expanded", String(open)); btn.setAttribute("aria-controls", "detail-" + n.id);
+    var top = el("div", "top"); top.appendChild(el("h3", null, n.title)); top.appendChild(el("span", "badge s-" + n.status, D.statuses[n.status].label));
+    btn.appendChild(top); btn.appendChild(el("p", "sum", n.summary));
+    btn.appendChild(el("div", "more", (state.view === "module" ? phaseLabel[n.phase] : areaLabel[n.area]) + " · " + (open ? "收起详情" : "展开详情")));
+    btn.addEventListener("click", function () { state.open[n.id] = !state.open[n.id]; render(n.id); });
+    c.appendChild(btn);
+    if (open) {
+      var d = el("div", "detail"); d.id = "detail-" + n.id;
+      d.appendChild(el("h4", null, "技术细节")); d.appendChild(el("p", null, n.details));
+      if (n.files && n.files.length) d.appendChild(pathList(n.files, "实现文件"));
+      if (n.docs && n.docs.length) d.appendChild(pathList(n.docs, "说明文档"));
+      d.appendChild(el("h4", null, "验收证据")); d.appendChild(el("p", null, n.evidence));
+      c.appendChild(d);
+    }
+    return c;
+  }
+  function render(focusId) {
+    board.textContent = "";
+    var groups = state.view === "module"
+      ? D.areas.map(function (a) { return { key: a.id, label: a.label, hint: "", test: function (n) { return n.area === a.id; } }; })
+      : D.phases.map(function (p) { return { key: p.id, label: p.label, hint: p.hint, test: function (n) { return n.phase === p.id; } }; });
+    var shown = 0;
+    groups.forEach(function (g) {
+      var items = D.nodes.filter(function (n) { return g.test(n) && matches(n); });
+      if (!items.length) return;
+      shown += items.length;
+      var col = el("section", "col"); col.setAttribute("aria-label", g.label);
+      col.appendChild(el("h2", null, g.label + "（" + items.length + "）"));
+      if (g.hint) col.appendChild(el("p", "hint", g.hint));
+      var list = el("div", "cards"); items.forEach(function (n) { list.appendChild(card(n)); });
+      col.appendChild(list); board.appendChild(col);
+    });
+    document.getElementById("empty").hidden = shown !== 0;
+    document.getElementById("count").textContent = "显示 " + shown + " / " + D.nodes.length;
+    document.getElementById("clear").hidden = !state.q;
+    document.querySelector(".search kbd").hidden = !!state.q;
+    document.getElementById("viewModule").setAttribute("aria-pressed", String(state.view === "module"));
+    document.getElementById("viewPhase").setAttribute("aria-pressed", String(state.view === "phase"));
+    if (focusId) { var b = document.querySelector("#node-" + focusId + " > button"); if (b) b.focus(); }
+  }
+  function setView(v) { state.view = v; store.set("view", v); render(); }
+  document.getElementById("viewModule").addEventListener("click", function () { setView("module"); });
+  document.getElementById("viewPhase").addEventListener("click", function () { setView("phase"); });
+  var q = document.getElementById("q");
+  q.addEventListener("input", function () { state.q = q.value.trim(); render(); });
+  document.getElementById("clear").addEventListener("click", function () { q.value = ""; state.q = ""; render(); q.focus(); });
+  areaSelect.addEventListener("change", function () { state.area = areaSelect.value; render(); });
+  document.getElementById("reset").addEventListener("click", function () {
+    q.value = ""; state.q = ""; state.area = ""; areaSelect.value = "";
+    statusOrder.forEach(function (s) { state.statuses[s] = true; });
+    Array.prototype.forEach.call(chips.querySelectorAll("[data-status]"), function (b) { b.setAttribute("aria-pressed", "true"); });
+    render(); q.focus();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "/" && document.activeElement !== q && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); q.select(); }
+    else if (e.key === "Escape" && document.activeElement === q && q.value) { q.value = ""; state.q = ""; render(); }
+  });
+  var hash = decodeURIComponent(location.hash.slice(1));
+  if (hash) { state.q = hash; q.value = hash; }
+  render();
+})();
+</script>
+</body>
+</html>

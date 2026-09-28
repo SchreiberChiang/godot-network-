@@ -122,7 +122,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_account_deletio
 
 ### 性能测量（评估用，不属于回归门禁）
 
-`tests/perf/` 下的脚本只用于测量，结论见 [docs/17 第六节](17_framework_shooter_plan.md#六常驻存储评估2026-09-27claude-实测仅评估未实施)：
+`tests/perf/` 下的脚本只用于测量，结论见 [docs/17 第六节](17_framework_shooter_plan.md#六常驻存储评估与第一阶段实施2026-09-27)：
 
 ```powershell
 # 客户端视角的资产耗时：先在另一个终端运行 tests\test_operator.ps1 -HoldForIntegration，

@@ -2,6 +2,8 @@
 
 在 Windows 本机运行的多游戏房间框架，从零开发：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。开发分支 `codex/shooter-framework`；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。目前只在同一台电脑上验证过，第二台设备、Linux 和公网都还没有验收。
 
+**想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
+
 ## 环境
 
 - Windows 10/11，自带 Windows PowerShell 5.1 和系统 `winsqlite3.dll`；不需要 Node、数据库服务或其它后端。
@@ -25,7 +27,7 @@
 
 管理后台的“玩家 → 详情 → 停用账号”会撤销玩家登录并保留账号与所有游戏资产；需要时用“恢复账号”。停用默认无限期，**不是删除数据**。这次界面更新尚未人工验收。
 
-测试阶段要永久删除某个玩家时，用同一页面单独的“删除测试账号”：它清除该玩家在当前账号库和资产库中的账号与全部游戏资产，不可恢复；旧备份不改写，后台会列出并标注可能仍含该账号的备份。源码版已通过隔离测试，用户从项目目录启动并试玩后反馈删除正常。新独立 ZIP 已包含此功能，但自动包测试没有单独执行删除流程。说明见 [规划第七节](docs/17_framework_shooter_plan.md#七测试阶段账号删除2026-09-27已实现待复核)。
+测试阶段要永久删除某个玩家时，用同一页面单独的“删除测试账号”：它清除该玩家在当前账号库和资产库中的账号与全部游戏资产，不可恢复；旧备份不改写，后台会列出并标注可能仍含该账号的备份。源码版已通过隔离测试，用户从项目目录启动并试玩后反馈删除正常。新独立 ZIP 已包含此功能，但自动包测试没有单独执行删除流程。说明见 [规划第七节](docs/17_framework_shooter_plan.md#七测试阶段账号删除2026-09-27已实现)。
 
 新注册、改密及管理员重置的密码长度为 8–128 字符；已有密码继续有效。源码和最新独立 ZIP 均已包含。
 
@@ -35,7 +37,7 @@
 
 运行 `tools/build_framework_release.ps1` 构建。最新 ZIP 和解压位置记录在 `artifacts/framework-release.json`。解压后按顺序：`CheckFramework.cmd` 校验 → `StartPanel.cmd` 打开管理后台 → 玩家用 `StartShooter.cmd` / `StartTurns.cmd` → 全部关闭用 `StopFramework.cmd`；`PublishClients.cmd` 生成给玩家的公开连接配置。只分发构建时的干净 ZIP，不要分发跑过测试的解压目录。
 
-最新包已在 2026-09-27 重建，包含测试账号删除与收尾修正、常驻存储试点和 8 字符最低密码长度。默认使用常驻模式；需要回退时，在启动前设置环境变量 `ROOMKIT_STORAGE_MODE=oneshot`。从 ZIP 全新解压后的自动包测试为 44/0，覆盖原生启动、房间和基本联机，不包含删除操作；新包的旧路径与人工试玩尚未验证。准确包名、哈希与验收范围见 [STATUS](STATUS.md#当前交付物)。
+包默认使用常驻存储；需要回退时，在启动前设置环境变量 `ROOMKIT_STORAGE_MODE=oneshot`。最新包的名称、哈希、包含的功能和验收范围只看 [STATUS 当前交付物](STATUS.md#当前交付物)。
 
 ## 接入自己的游戏
 
@@ -51,8 +53,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\new_game.ps1 -Manage
 
 ## 文档导航
 
+开发顺序：第一阶段项目分析、文档整理与项目地图（已交付，待复核）→ 第二阶段主线整理、独立射击客户端、后台 UI、基础音效 → 第三阶段 Linux 完整服务器。见 [已确认规划](docs/17_framework_shooter_plan.md#next-plan)、[清理候选表](docs/17_framework_shooter_plan.md#清理候选表) 和 [下一阶段建议](docs/17_framework_shooter_plan.md#下一阶段实施建议与验收门槛)。
+
 | 需要了解 | 文档 |
 |---|---|
+| 模块、状态与开发顺序一览 | `ROADMAP.html`（双击打开） |
+| 项目分析：模块耦合、Windows 依赖、跨平台边界、性能待测项 | [01 项目分析](docs/01_scope_architecture.md#项目分析2026-09-28) |
 | 当前状态、验证范围、已知问题 | [STATUS](STATUS.md) |
 | 启动、数据维护、局域网、测试与人工验收夹具 | [22 本机启动与验证](docs/22_framework_operations.md) |
 | 分支范围与阶段规格 | [17 框架与射击计划](docs/17_framework_shooter_plan.md) |

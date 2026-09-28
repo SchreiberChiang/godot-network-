@@ -4,7 +4,7 @@
 
 | 文件 | 内容 |
 |---|---|
-| [status_history.md](status_history.md) | 2026-09-19 至 2026-09-27 的逐轮 STATUS 记录（M0/M1 到托管模板与房间规则），以及原 docs/22 的 09-22 停服/调度专项结果；包含全部命令、计数、失败修复和证据路径 |
+| [status_history.md](status_history.md) | 2026-09-19 至 2026-09-27 的逐轮 STATUS 记录（M0/M1 到托管模板与房间规则），原 docs/22 的 09-22 停服/调度专项结果，以及第〇节：2026-09-28 从 STATUS 迁出的 09-27 状态快照（旧独立包列表、09-21 至 09-27 完整验证表、账号/存储/删除各轮记录、未运行与已知问题原文）；包含全部命令、计数、失败修复和证据路径 |
 | [early_entrypoints.md](early_entrypoints.md) | 早期无账号演示入口一览，以及 2026-09-27 整理前的 README 原文 |
 | [design_package_v0.2.md](design_package_v0.2.md) | 最初设计包的 START_HERE（Codex 新建项目入门）与 VALIDATION（设计包检查记录） |
 
