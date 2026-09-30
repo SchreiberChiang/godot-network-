@@ -1,6 +1,6 @@
 # 当前状态：通用管理服务、账号、资产与射击示例
 
-当前安排（用户授权，2026-09-30）：先提交推送已有 UI/音效/入房/构建摘要及 Linux 安装验证、L1 存储切片成果，再由 Claude 下载 godot-sqlite 做隔离小原型并补测性能。只用假数据，不切换正式存储后端，不动真实服务或防火墙。下一任务及边界见 [已授权任务](docs/17_framework_shooter_plan.md#next-plan)；提交与远端状态由本轮实际 Git 结果确认。
+当前交接（2026-09-30）：已有 UI/音效/入房/构建摘要（`c96e848`）及 Linux 安装验证、L1 存储切片（`481f69f8892e4fcf89bd253fd863bd91bb8950e1`）已实际推送到 GitHub `main`，Git push 退出 0。下一步由 Claude 按 [已授权任务](docs/17_framework_shooter_plan.md#next-plan) 下载 godot-sqlite 做隔离小原型并补测性能，用户已批准。只用假数据，不切换正式存储后端，不动真实服务或防火墙。本轮提交前失败注入 6/0、退出 0，PowerShell/Shell 语法与 diff 检查通过；功能复测沿用下方独立 49/0 与 Claude 证据，没有重新跑 Linux 或完整服务器。交接记录作为后续文档提交，不改变成果基准。
 
 L1 复核（Codex，2026-09-30）：脚本兼容性范围认可，Linux 完整服务器仍未实现。本轮独立 Windows 存储专项 49/0、not_run=2、退出 0，失败注入 6/0、退出 0；证据 `logs/l1-codex-review-b57a318667eb4fcf99efd5adf6cb6125/windows-slice.txt`。Linux 和双向互开结果来自下方交付日志，本轮未连接 Linux。一次性调用超 2 秒属实；448 MB 是两个 worker 独立采样工作集相加，原定“管理服务＋宿主＋一个房间”内存门槛尚未测。下一项建议由 Claude 补测并做原生 SQLite 隔离小原型，先评估、不重写正式存储；新依赖尚未下载，任务见 [当前建议](docs/17_framework_shooter_plan.md#next-plan)。本轮只改本文和 docs/17，未提交推送。
 
