@@ -8,8 +8,29 @@ Add-Type -TypeDefinition @'
 using System;
 using System.Text;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.InteropServices;
 public sealed class RoomKitSqlite : IDisposable {
+    // One binding for both platforms. Windows keeps the system winsqlite3.dll. On
+    // other systems the same import name is resolved to the system SQLite library
+    // before the first call; the resolver API only exists on modern .NET, so it is
+    // reached through reflection and this source still compiles for Windows
+    // PowerShell 5.1. SQL, transactions and text handling are identical.
+    const string PosixLibrary = "libsqlite3.so.0";
+    static RoomKitSqlite() {
+        if(System.IO.Path.DirectorySeparatorChar == '\\') return;
+        Type native = Type.GetType("System.Runtime.InteropServices.NativeLibrary");
+        Type resolver = Type.GetType("System.Runtime.InteropServices.DllImportResolver");
+        if(native == null || resolver == null) throw new PlatformNotSupportedException("SQLITE_LIBRARY_UNAVAILABLE");
+        MethodInfo resolve = typeof(RoomKitSqlite).GetMethod("Resolve", BindingFlags.NonPublic | BindingFlags.Static);
+        native.GetMethod("SetDllImportResolver").Invoke(null, new object[] { typeof(RoomKitSqlite).Assembly, Delegate.CreateDelegate(resolver, resolve) });
+    }
+    static IntPtr Resolve(string name, Assembly assembly, DllImportSearchPath? path) {
+        if(name != "winsqlite3.dll") return IntPtr.Zero;
+        Type native = Type.GetType("System.Runtime.InteropServices.NativeLibrary");
+        return (IntPtr)native.GetMethod("Load", new Type[] { typeof(string) }).Invoke(null, new object[] { PosixLibrary });
+    }
+    public static string LibraryName() { return System.IO.Path.DirectorySeparatorChar == '\\' ? "winsqlite3.dll" : PosixLibrary; }
     [DllImport("winsqlite3.dll", CallingConvention=CallingConvention.Cdecl)] static extern int sqlite3_open16([MarshalAs(UnmanagedType.LPWStr)] string path, out IntPtr db);
     [DllImport("winsqlite3.dll", CallingConvention=CallingConvention.Cdecl)] static extern int sqlite3_close(IntPtr db);
     [DllImport("winsqlite3.dll", CallingConvention=CallingConvention.Cdecl)] static extern int sqlite3_busy_timeout(IntPtr db, int ms);
@@ -62,6 +83,10 @@ public sealed class RoomKitSqlite : IDisposable {
 '@
 $db=$null
 $transaction=$false
+# PowerShell 7 turns date-looking JSON strings into DateTime values by default;
+# Windows PowerShell 5.1 keeps them as text. Keep text on both.
+$jsonKeepsText=(Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')
+function ParseJson([string]$Text) { if ($jsonKeepsText) { return ConvertFrom-Json -InputObject $Text -DateKind String }; return ConvertFrom-Json -InputObject $Text }
 function Query([string]$Sql,[string[]]$Values=@()) { return ,($db.Query($Sql,$Values)) }
 # Deleted test accounts (docs/17 section 7) leave only this pseudonym, the same one
 # account_store.ps1 derives. Additive table under the same user_version.
@@ -85,15 +110,15 @@ function RewardInteger($Value,[long]$Maximum) {
 }
 try {
     if ($RequestJson) {
-        $requestObject=$RequestJson | ConvertFrom-Json
+        $requestObject=ParseJson $RequestJson
     } elseif ($Request) {
-        $requestObject=Get-Content -Encoding UTF8 -LiteralPath $Request -Raw | ConvertFrom-Json
+        $requestObject=ParseJson (Get-Content -Encoding UTF8 -LiteralPath $Request -Raw)
     } else {
         # Stdin mode from bounded_helper.ps1: one base64 UTF-8 JSON line. Used for
         # requests carrying room result signing keys, so they never touch disk.
         $line=[Console]::In.ReadLine()
         if ([string]::IsNullOrEmpty($line) -or $line.Length -gt 65536 -or $line.Length % 4 -ne 0 -or $line -notmatch '^[A-Za-z0-9+/]*={0,2}$') { throw 'INVALID_STORAGE_REQUEST' }
-        $requestObject=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line)) | ConvertFrom-Json
+        $requestObject=ParseJson ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($line)))
     }
     $db=New-Object RoomKitSqlite($Database)
     $result=@{ok=$true;code=''}
@@ -135,7 +160,7 @@ try {
         }
     } elseif ($requestObject.op -eq 'asset.commit') {
         # This is an internal CAS transaction, never a public SQL/asset write endpoint.
-        $body=$requestObject.body | ConvertFrom-Json
+        $body=ParseJson $requestObject.body
         if ($requestObject.body.Length -gt 65536 -or [long]$requestObject.expected_revision -lt 0 -or [long]$body.revision -ne ([long]$requestObject.expected_revision+1) -or [long]$body.revision -gt 2147483647) { throw 'INVALID_ASSET_COMMIT' }
         [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
         [void](Query $tombstoneTable)
@@ -215,7 +240,7 @@ try {
                 foreach($reward in $rewards) {
                     $rows=Query 'SELECT revision,body FROM asset_states WHERE user_id=? AND space_id=?' @($reward.user_id,$reward.space_id)
                     $previous=if($rows.Count){$rows[0]['body']}else{''}
-                    $state=if($rows.Count){$previous|ConvertFrom-Json}else{[pscustomobject]@{revision=0;credits=0;experience=0;owned=@();profiles=@{}}}
+                    $state=if($rows.Count){ParseJson $previous}else{[pscustomobject]@{revision=0;credits=0;experience=0;owned=@();profiles=@{}}}
                     if ($state -isnot [PSCustomObject] -or -not (RewardInteger $state.credits 1000000000) -or -not (RewardInteger $state.experience 1000000000) -or -not (RewardInteger $state.revision 2147483647) -or ($rows.Count -and [long]$rows[0]['revision'] -ne [long]$state.revision)) { throw 'ASSET_LIMIT_EXCEEDED' }
                     $state.credits=[long]$state.credits+[long]$reward.credits
                     $state.experience=[long]$state.experience+[long]$reward.experience
@@ -280,7 +305,10 @@ try {
     } elseif ($requestObject.op -eq 'backup') {
         $target=[IO.Path]::GetFullPath($requestObject.destination)
         $parent=[IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($Database))
-        if (-not $target.StartsWith($parent+'\',[StringComparison]::OrdinalIgnoreCase) -or (Test-Path -LiteralPath $target)) { throw 'INVALID_BACKUP_PATH' }
+        # Platform separator; names are case-insensitive only on Windows.
+        $separator=[IO.Path]::DirectorySeparatorChar
+        $comparison=if ($separator -eq '\') { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+        if (-not $target.StartsWith($parent+$separator,$comparison) -or (Test-Path -LiteralPath $target)) { throw 'INVALID_BACKUP_PATH' }
         $db.Backup($target)
     } else { throw 'UNKNOWN_STORAGE_OPERATION' }
     # Godot's Windows OS.execute pipe may decode through the system code page.

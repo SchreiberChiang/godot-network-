@@ -1,5 +1,26 @@
 # 当前状态：通用管理服务、账号、资产与射击示例
 
+当前安排（用户授权，2026-09-30）：先提交推送已有 UI/音效/入房/构建摘要及 Linux 安装验证、L1 存储切片成果，再由 Claude 下载 godot-sqlite 做隔离小原型并补测性能。只用假数据，不切换正式存储后端，不动真实服务或防火墙。下一任务及边界见 [已授权任务](docs/17_framework_shooter_plan.md#next-plan)；提交与远端状态由本轮实际 Git 结果确认。
+
+L1 复核（Codex，2026-09-30）：脚本兼容性范围认可，Linux 完整服务器仍未实现。本轮独立 Windows 存储专项 49/0、not_run=2、退出 0，失败注入 6/0、退出 0；证据 `logs/l1-codex-review-b57a318667eb4fcf99efd5adf6cb6125/windows-slice.txt`。Linux 和双向互开结果来自下方交付日志，本轮未连接 Linux。一次性调用超 2 秒属实；448 MB 是两个 worker 独立采样工作集相加，原定“管理服务＋宿主＋一个房间”内存门槛尚未测。下一项建议由 Claude 补测并做原生 SQLite 隔离小原型，先评估、不重写正式存储；新依赖尚未下载，任务见 [当前建议](docs/17_framework_shooter_plan.md#next-plan)。本轮只改本文和 docs/17，未提交推送。
+
+L1 存储切片（Claude，2026-09-30，未提交，待 Codex 复核）：只到共用 SQLite 绑定、平台路径和编码，以及隔离验证；没有实现 Linux 的 Godot 仓储接入、进程管理或完整服务器。没有安装，没有用 sudo，没有动真实服务和数据。详见 [docs/17 L1 存储切片结果](docs/17_framework_shooter_plan.md#l1-存储切片结果claude2026-09-30未提交待-codex-复核)。
+- **改动**：`tools/sqlite_store.ps1`、`tools/account_store.ps1`。同一份绑定在 Windows 上用 `winsqlite3.dll`，在 Linux 上用 `libsqlite3.so.0`；备份路径检查按平台分隔符；JSON 里像日期的字符串在两个平台都保持为文本；密码派生改成两个运行时都能编译的写法，算法和参数不变。
+- **对照**：同一个驱动 `tests/storage_slice_portable.ps1`，Windows（PowerShell 5.1）49/0，带 Linux 库时 57/0；Linux（PowerShell 7.6.6，.NET 10，SQLite 3.45.1）58/0。覆盖管理员初始化、邀请码注册、登录、会话、错误密码，资产幂等和冲突，备份恢复，中文加空格的路径，Unicode 文本，PBKDF2 已知答案。两个平台新生成的测试库能互相打开、登录并继续写入。
+- **测试驱动**：汇总退出码已修，任何失败、超时或脚本错误都返回非零；失败注入自测在两个平台都是 6/0。
+- **Windows 回归**：资产 83/0、账号 85/0、快照 40/0、结算 74/0、授权 24/0、常驻 34/0、删除 83/0、备份恢复 35/0、账号恢复 30/0。
+- **性能待决**：Linux 一次性调用 2.1–3.1 秒超过 2 秒门槛；两个 worker 独立测量的工作集加总约 448 MB（Windows 257 MB），不能当成独占内存或整套服务总量。原定完整服务内存门槛尚未测。常驻请求中位数 12–25 ms 达标；会话 p95 54.1 ms。下一项建议补测并评估方案 G 小原型。
+- **未运行**：Linux 上经 Godot 调用存储、结算、删除、维护脚本，并发和长时间运行，进程管理，完整服务器。
+
+安装阶段复核（Codex，2026-09-30，历史）：Windows 便携摘要驱动 11/0、not_run=0、退出 0，证据 `logs/linux-review-11dcba4d4c3a466a91b6015380006c6f/windows-digest.txt`；Linux 单元 292/1 保留为失败。当时发现的测试汇总退出码问题已在 L1 修正并通过失败注入，安装脚本尚未在 Linux 完整重跑。
+
+Linux 依赖安装与隔离验证（Claude，2026-09-30，未提交，待 Codex 复核）：只写了笔记本的 `~/roomkit/`；没有用 sudo，没有改防火墙，没有带真实数据；密码由用户输入。详见 [docs/17 安装与隔离验证结果](docs/17_framework_shooter_plan.md#安装与隔离验证结果claude2026-09-30未提交待-codex-复核)，原始输出在 `logs/linux-setup/run-20260930121157-ab0563.txt`。
+- **安装**：Godot `4.7.2.stable.official.ed1daf0bf`，PowerShell 7.6.6（官方当前 LTS，.NET 10）。安装包由用户在笔记本浏览器里从官方地址下载，哈希与官方值一致后才安装。源码是本地提交 `c96e848` 的归档，两端哈希一致。
+- **摘要实机对照**：由 Linux 上的 `pwsh` 实际运行生产摘要脚本，11/0。合成夹具复现了基准值 `05f794ef76f0`；射击 `de37edca7f1d`、取石子 `772421bf94d2`，与 Windows 完全相同。Windows 那边的文件是 CRLF，Linux 这边是 LF。
+- **纯 GDScript 测试**：射击规则 83/0、客户端反馈 7/0、音效 41/0、入房回归 16/0、托管契约 286/0，都与 Windows 一致。`run_unit` 是 292/1，失败点是房间管理器在非 Windows 平台返回 `UNSUPPORTED_PLATFORM`，属于预期的平台边界，不算通过。
+- **未运行**：Linux 上的存储、进程管理、Operator、房间和跨机联机。笔记本不能直接访问 GitHub。
+- **下一步**：L1 存储最小切片。新增的 `tests/content_digest_portable.ps1` 和 `tools/linux_isolated_setup.sh` 还没有提交。
+
 当前授权（2026-09-30）：用户同意本地提交现有成果、不推送；随后由 Claude 在 Linux 笔记本 `~/roomkit/` 内安装官方 Godot、PowerShell 7 和该提交源码，执行隔离测试。SSH 保留密码、不配置免密；不用 sudo、不改防火墙、不复制真实数据库。任务见 docs/17 顶部已授权任务，本轮未连接设备或安装。此前等待安装授权/只读阶段描述保留为历史；远端代码与旧发布候选尚未同步，部署必须取此次本地提交，不能直接用旧 origin/main。
 
 Linux 设备只读检查（Claude，2026-09-30，未提交，待 Codex 复核）：用户本人确认主机指纹并输入密码后运行了 `tools/linux_device_check.sh`，脚本跑完。没有安装、写入或复制任何东西。结果见 [docs/17 设备检查结果](docs/17_framework_shooter_plan.md#设备检查结果claude2026-09-30未提交待-codex-复核) 和 [环境记录](docs/10_environment.md#linux-测试机只读检查2026-09-30claude)，原始输出在 `logs/linux-device-check/check-20260930.txt`。

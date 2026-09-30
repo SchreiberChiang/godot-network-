@@ -12,6 +12,7 @@ if (-not $binding.Success) { Write-Output '{"ok":false,"code":"STORAGE_UNAVAILAB
 Add-Type -TypeDefinition ($binding.Groups[1].Value.Replace('sqlite3_busy_timeout(handle,1500)','sqlite3_busy_timeout(handle,10000)'))
 Add-Type -TypeDefinition @'
 using System;
+using System.Reflection;
 using System.Security.Cryptography;
 public static class RoomKitPasswords {
     public static string RandomHex(int count) {
@@ -19,8 +20,15 @@ public static class RoomKitPasswords {
         using(var rng = RandomNumberGenerator.Create()) rng.GetBytes(bytes);
         return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
     }
+    // PBKDF2-HMAC-SHA256 over the UTF-8 password, 32 bytes, on every platform.
+    // Modern .NET marks the constructor obsolete in favour of a static method that
+    // .NET Framework does not have, so both are reached without a compile-time
+    // reference; the algorithm, parameters and stored format are unchanged.
     public static string Derive(string password, string salt, int iterations) {
-        using(var kdf = new Rfc2898DeriveBytes(password, Convert.FromBase64String(salt), iterations, HashAlgorithmName.SHA256))
+        byte[] saltBytes = Convert.FromBase64String(salt);
+        MethodInfo direct = typeof(Rfc2898DeriveBytes).GetMethod("Pbkdf2", new Type[] { typeof(string), typeof(byte[]), typeof(int), typeof(HashAlgorithmName), typeof(int) });
+        if(direct != null) return Convert.ToBase64String((byte[])direct.Invoke(null, new object[] { password, saltBytes, iterations, HashAlgorithmName.SHA256, 32 }));
+        using(var kdf = (Rfc2898DeriveBytes)Activator.CreateInstance(typeof(Rfc2898DeriveBytes), new object[] { password, saltBytes, iterations, HashAlgorithmName.SHA256 }))
             return Convert.ToBase64String(kdf.GetBytes(32));
     }
     public static bool Verify(string password, string salt, int iterations, string expected) {
@@ -44,6 +52,10 @@ public static class RoomKitPasswords {
 $db=$null
 $transaction=$false
 $actor=$null
+# PowerShell 7 turns date-looking JSON strings into DateTime values by default;
+# Windows PowerShell 5.1 keeps them as text. Keep text on both.
+$jsonKeepsText=(Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')
+function ParseJson([string]$Text) { if ($jsonKeepsText) { return ConvertFrom-Json -InputObject $Text -DateKind String }; return ConvertFrom-Json -InputObject $Text }
 $now=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $iterations=600000
 function Query([string]$Sql,[string[]]$Values=@()) { return ,($db.Query($Sql,$Values)) }
@@ -162,7 +174,7 @@ try {
         $bytes=[Convert]::FromBase64String($line)
     }
     if ($bytes.Length -gt 8192) { Fail 'INVALID_ACCOUNT_REQUEST' }
-    $r=[Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
+    $r=ParseJson ([Text.Encoding]::UTF8.GetString($bytes))
     if ($r -isnot [PSCustomObject]) { Fail 'INVALID_ACCOUNT_REQUEST' }
     $op=TextValue 'op' 1 40
     $db=New-Object RoomKitSqlite($Database)

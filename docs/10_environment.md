@@ -81,3 +81,21 @@ Windows正式模板已经运行真实宿主/房间/客户端及十轮进程句�
 | 工具 | bash 5.2、tar、unzip、curl、wget、git 2.43、python3 3.12、openssl 3.0、sha256sum 都在 | 已读到 |
 | Node | 脚本没有检查 | 未知 |
 | 区域 | zh_CN.UTF-8 | 已读到 |
+
+## Linux 测试机依赖安装（2026-09-30，Claude）
+
+用户同意后，只在 `~/roomkit/` 内安装。没有用 sudo，没有改 PATH、登录配置或防火墙，没有常驻服务，没有复制真实数据。原始输出在 `logs/linux-setup/run-20260930121157-ab0563.txt`；第一次尝试在 `logs/linux-setup/run-20260930114137-46a6c3.txt`，那次因为笔记本连不上 GitHub，停在下载这一步，没有安装任何东西。
+
+| 项目 | 位置 | 版本与校验 |
+|---|---|---|
+| Godot | `~/roomkit/tools/godot/4.7.2-stable/`（140 MB） | `4.7.2.stable.official.ed1daf0bf`，与 Windows 是同一个提交；压缩包与官方 `SHA512-SUMS.txt` 一致 |
+| PowerShell | `~/roomkit/tools/pwsh/7.6.6/`（180 MB） | 7.6.6 Core，.NET 10.0.12；7.6.6 是官方元数据里标注的当前 LTS；压缩包与官方 `hashes.sha256` 一致 |
+| 源码 | `~/roomkit/src/c96e848b7b216ec1273edf77cca9e94155fe6e11/`（5.9 MB，360 个文件） | 本地提交 `c96e848` 的 `git archive`，全部是 LF 换行；传输包 SHA256 为 `df5b6e8b35bf0867a95f82b0460842714861d1372e6efab81c86ceb58f3e6f89`，两端一致 |
+| 安装包原件 | `~/roomkit/downloads/` | 用户在笔记本浏览器里从官方地址下载 |
+| 运行输出 | `~/roomkit/runs/20260930121157-ab0563/` | 引擎和 pwsh 的配置、缓存、临时文件都重定向到这里 |
+
+补查到：Node v18.19.1（系统已有）；系统 SQLite 3.45.1。`~/roomkit` 合计 485 MB。笔记本不能直接访问 GitHub（curl 连接超时）。
+
+## Linux 测试机 L1 存储切片（2026-09-30，Claude）
+
+复用已安装的 PowerShell 7.6.6，没有新安装任何东西。新增源码目录 `~/roomkit/src/c96e848b7b21-worktree-1b02768baf5e/`，内容是本地提交 `c96e848` 加未提交改动的工作区快照，共 366 个文件。运行输出在 `~/roomkit/runs/20260930124548-a50b91/`。系统 SQLite 库是 `/lib/x86_64-linux-gnu/libsqlite3.so.0`，版本 3.45.1，由存储脚本实际加载。测试数据全部是新生成的假账号和假资产，目录权限 700、数据库 600。结果见 [docs/17 L1 存储切片结果](17_framework_shooter_plan.md#l1-存储切片结果claude2026-09-30未提交待-codex-复核)。

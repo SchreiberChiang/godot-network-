@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-09-30 Linux 安装验证及 L1 存储切片（main，Claude 实现、Codex 复核）：新增 `tests/content_digest_portable.ps1`、`tests/storage_slice_portable.ps1`、`tests/linux_test_lib_selftest.sh`、`tools/linux_isolated_setup.sh`、`tools/linux_storage_slice.sh`、`tools/linux_test_lib.sh`；修改 `tools/sqlite_store.ps1`、`tools/account_store.ps1`、STATUS、docs/10、17 和本清单。Linux 仅存储脚本与纯逻辑有证据，完整服务器未实现。测试输出及假数据库位于忽略目录，不纳入提交；原生 SQLite 评估尚未实施。
+
 2026-09-26，分支 `codex/shooter-framework`，相对起点提交 `711a657`。包含此前已提交与当前工作区源码；不包含 logs/data/artifacts 的运行产物。
 
 已完成托管模板、客户端启动修复，以及射击平滑显示、短弹迹和房间规则。本次单独修改清单和证据见 [docs/25](25_shooter_room_rules.md)，全程进度见 [STATUS](../STATUS.md)。
