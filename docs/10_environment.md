@@ -1,5 +1,26 @@
 # M0 本机环境与启动入口
 
+<a id="linux-current"></a>
+## Linux 现状速查（2026-10-01）
+
+下文按日期保留安装与验收历史；旧条目“未连接/未安装”不代表现状。硬件/发行版沿用 Claude 记录；2026-10-01 Codex 复验重新核对的运行时、内核、可用资源和工具哈希见下方。
+
+| 项目 | 当前记录与证据边界 |
+|---|---|
+| 设备 | zhao@192.168.10.105；Mint 22.3、x86_64、i5-5200U（2 核 4 线程）、7.7 GB RAM；IP/负载/空闲磁盘需运行前复查 |
+| 主线引擎 | ~/roomkit/tools/godot/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64，official ed1daf0bf；不替换 |
+| 正式存储运行时 | ~/roomkit/tools/pwsh/7.6.6/pwsh；系统 libsqlite3.so.0；不接实验扩展 |
+| 主线源码/证据 | ~/roomkit/src/<快照>/、incoming/<运行号>/、runs/<运行号>/；库在该源码快照 data/，不用真实库 |
+| 旁路实验 | ~/roomkit/experiments/sqlite-import-lab/；另一 AI 负责，最新仅报告准备补丁、未编译；本轮未进入核查 |
+| Codex 独立复验 | codex-l2b1-7f1a0ba8-r2 已新建 incoming/src/runs 并完成；16 步失败 1 步（既有 unit），退出 1 |
+| SSH | 保留密码登录和主机指纹核验；此前探测及首次交互尝试失败；retry-02 经用户输入密码已成功认证并完成测试；不在聊天/文件保存密码 |
+| 尚不支持的结论 | 不能声称 Linux 完整后台、房间、联机或部署已通过；不能从旧进程快照推定实验现在已暂停 |
+
+现场核查按需集中一次完成，不反复让用户输密码。主线核查只读共享工具与本次快照、进程元数据；不扫描实验和用户配置目录。实验源码哈希/补丁需要另行明确只读范围，本次先标待核实。未授权安装、sudo、SSH/防火墙修改、主线与实验并跑。
+
+分工与下一步只看 [协作总览](17_framework_shooter_plan.md#coordination-current)。
+
+
 环境首次检测：2026-09-18；启动与权限说明更新：2026-09-19。工作目录 `F:\文档\GodotGame\Net\RoomKit`。
 
 - 操作系统：Microsoft Windows NT 10.0.26200.0。
@@ -99,3 +120,43 @@ Windows正式模板已经运行真实宿主/房间/客户端及十轮进程句�
 ## Linux 测试机 L1 存储切片（2026-09-30，Claude）
 
 复用已安装的 PowerShell 7.6.6，没有新安装任何东西。新增源码目录 `~/roomkit/src/c96e848b7b21-worktree-1b02768baf5e/`，内容是本地提交 `c96e848` 加未提交改动的工作区快照，共 366 个文件。运行输出在 `~/roomkit/runs/20260930124548-a50b91/`。系统 SQLite 库是 `/lib/x86_64-linux-gnu/libsqlite3.so.0`，版本 3.45.1，由存储脚本实际加载。测试数据全部是新生成的假账号和假资产，目录权限 700、数据库 600。结果见 [docs/17 L1 存储切片结果](17_framework_shooter_plan.md#l1-存储切片结果claude2026-09-30未提交待-codex-复核)。
+
+## Linux 测试机：P 补测与原生 SQLite 原型（2026-09-30，Claude）
+
+复用已安装的 Godot 4.7.2 和 PowerShell 7.6.6，没有安装系统包，没有用 sudo。新增的内容：
+- 第三方扩展 godot-sqlite v4.9（MIT，内置 SQLite 3.51.0）：`~/roomkit/prototypes/godot-sqlite-v4.9/`，约 300 MB（包里带所有平台的库）。`addons.zip` 由用户在笔记本浏览器里从官方地址下载到 `~/Downloads`，脚本核对 SHA256 `95e91b72…7c2cb0` 后复制到 `~/roomkit/downloads/`。
+- 源码快照：`~/roomkit/src/b9aa587e5a5d-worktree-a88b31b8b401/`，内容是提交 `b9aa587` 加未提交改动。
+- 运行输出：`~/roomkit/runs/20260930135302-8e17ee/`，约 305 MB，因为每次运行的临时工程里带了一份扩展。
+
+`~/roomkit` 合计约 1.2 GB。运行结束后没有残留进程。结果见 [docs/17 补测与原型结果](17_framework_shooter_plan.md#补测与原型结果claude2026-09-30未提交待-codex-复核)。
+
+## Linux 测试机：L2-A 进程与权限（2026-09-30，Claude）
+
+复用已安装的 Godot 4.7.2（official），没有安装任何东西，没有用 sudo。新增源码快照 `~/roomkit/src/b9aa587e5a5d-worktree-2503cedd7903/`（提交 `b9aa587` 加未提交改动，379 个文件）和运行输出 `~/roomkit/runs/20260930145153-ed5871/`（128 KB）。只启动了测试子程序和一个由脚本自己管理的哨兵 `sleep`，结束后没有残留进程。内核 7.0.0-34；测试时 1 分钟负载约 5.4。结果见 [docs/17 L2-A 结果](17_framework_shooter_plan.md#l2-a-结果claude2026-09-30未提交待-codex-复核)。
+
+补修验收（同日）：同样复用已装 Godot 4.7.2 official（`ed1daf0bf`，所有权模块现在只接受这一提交），没有安装、没有 sudo。新增源码快照 `~/roomkit/src/b9aa587e5a5d-worktree-9ed0faa14705/`（379 个文件）、传入包 `~/roomkit/incoming/20260930152015-6c116e/` 和运行输出 `~/roomkit/runs/20260930152015-6c116e/`（168 KB）。引擎以运行目录下的 `process/` 为工作目录启动，测试不再调用 `stat`、`ln`，`mkfifo` 经所有权模块直接 exec。只启动测试子程序和脚本自管的哨兵 `sleep`，结束后无残留进程。测试时 1 分钟负载约 2.1。权限保护模块会拒绝经过符号链接的路径（包括祖先目录）；本机 `~/roomkit` 路径不含链接。结果见 [docs/17 L2-A 补修结果](17_framework_shooter_plan.md#l2-a-补修结果claude2026-09-30未提交待-codex-复核)。
+
+## Linux 测试机：L2-B1 存储接入（2026-10-01，Claude）
+
+复用已安装的 Godot 4.7.2 official 和 pwsh 7.6.6，没有安装、没有 sudo。四次运行：`~/roomkit/runs/20260930160333-dac463`、`20260930164826-d4d496`、`20260930165629-d50c6d`、`20260930171501-208b39`（最终，448 KB），对应源码快照在 `~/roomkit/src/b9aa587e5a5d-worktree-*`（每个约 385 个文件），传入包在 `~/roomkit/incoming/<运行号>/`。测试库在快照的 `data/l2b1-*` 下（服务只接受项目 `data/` 内的目录，每次约 592 KB，全部 700/600）。
+
+- **宿主启动条件**：以 `trap '' PIPE` 忽略 SIGPIPE、`umask 022`（有意放宽，用来证明保护不依赖调用方 umask）启动；`ROOMKIT_PWSH` 指向 `~/roomkit/tools/pwsh/7.6.6/pwsh`；XDG 与 TMPDIR 指向各自的运行目录。
+- **助手环境**：`posix_helper.gd` 在启动助手前设置 `DOTNET_EnableDiagnostics=0` 和 `POWERSHELL_DIAGNOSTICS_OPTOUT=1`，避免强杀的 pwsh 在临时目录留下 FIFO 和套接字。
+- **只读环境核对**：`tools/linux_env_check.sh` 在验收前执行，核对共享工具与原始安装包是否一致、主线快照有无扩展、用户级目录和 `.godot` 是否共享、实验进程和资源占用。结论见 [docs/17](17_framework_shooter_plan.md#l2-b1-结果claude2026-10-01未提交待-codex-复核)。
+- **核对时的机器状态**：4 核，内存 7.7 GB（可用约 5.1 GB，交换区已用 1.2 GB），磁盘可用 372 GB；桌面上有远程串流（sunshine）等程序占用 CPU。`~/roomkit` 中 experiments 1.6 GB、runs 311 MB、tools 320 MB、prototypes 300 MB、downloads 216 MB。
+
+另外，本机 Windows 上有 WSL Ubuntu（内核 6.6.87.2）。用它加官方 Linux 调试模板可以在本地试跑 Linux 行为，这只是开发调试手段，不算验收证据。模板会忽略 `--script`，需要把目标测试设为打包工程的主循环来运行。
+
+**超时补修验收（同日，Claude）**：同样复用已装依赖，没有安装、没有 sudo。新增源码快照 `~/roomkit/src/b9aa587e5a5d-worktree-1359779ebcdb/`（386 个文件）、传入包 `~/roomkit/incoming/20260930182509-d7d0cd/` 和运行目录 `~/roomkit/runs/20260930182509-d7d0cd/`。`tools/linux_env_check.sh` 已改用 Codex 收窄后的版本，不进入 `~/roomkit/experiments/` 和用户配置目录。开跑时负载 0.02，没有匹配的实验、编译、Godot 或 pwsh 进程；运行中没有持续监视。结果见 [docs/17 管道超时补修结果](17_framework_shooter_plan.md#管道超时补修结果claude2026-10-01未提交待-codex-复核)。
+
+**绝对截止与预算补修验收（同日，Claude）**：同样复用已装依赖，没有安装、没有 sudo，环境核对沿用收窄版本。新增源码快照 `~/roomkit/src/b9aa587e5a5d-worktree-a5f135e32e43/`、传入包和运行目录 `20260930185629-ebc89a`。开跑时负载 1.0，内存可用约 5.2 GB，没有匹配的实验、编译、Godot 或 pwsh 进程；运行中没有持续监视。本机 WSL 另跑了一次旧代码副本做对照，只是开发环路。结果见 [docs/17](17_framework_shooter_plan.md#绝对截止与原子预算补修结果claude2026-10-01未提交待-codex-复核)。
+
+## Linux 测试机：L2-B2 房间生命周期（2026-10-01，Claude）
+
+复用已安装的 Godot 4.7.2 official，没有安装、没有 sudo，也没有用 pwsh。新增源码快照 `~/roomkit/src/b9aa587e5a5d-worktree-3f6049b0471a/`（388 个文件）、传入包 `~/roomkit/incoming/20260930193037-54ca61/` 和运行目录 `~/roomkit/runs/20260930193037-54ca61/`（308 KB）。房间运行目录是快照里的 `run/`（700），测试结束后只剩 `.gdignore`。房间子进程只在本机回环地址和 28100–28199 端口段上绑定 UDP，运行前后本用户在这个端口段上都没有 UDP 套接字；没有改防火墙。环境核对使用收窄版本（不进入实验目录）；开跑时没有匹配的实验、编译、Godot 或 pwsh 进程，运行中没有持续监视。结果见 [docs/17](17_framework_shooter_plan.md#l2-b2-第一小项结果linux-房间生命周期claude2026-10-01未提交待-codex-复核)。
+
+## Codex 独立 L2-B1 实机复验（2026-10-01）
+
+运行号 codex-l2b1-7f1a0ba8-r2。内核 7.0.0-34-generic，Godot 4.7.2.stable.official.ed1daf0bf，pwsh 7.6.6 / .NET 10.0.12；开始时内存总量 7851 MB、可用约 5212 MB，磁盘可用 372 GB，负载 0.51/0.95/0.74。桌面还有 sunshine 等进程，不能称独占整机。
+
+源码包哈希已匹配，共享 Godot 和 pwsh 启动程序与本地保留安装包一致；没有逐文件校验 pwsh 全目录。仅在新源码/运行目录写测试库、日志和缓存，未进入 experiments 或扫描用户 Godot 配置目录。收尾报告无 Godot/pwsh 残留，权限、请求文件和 FIFO/套接字扫描通过。结果及边界见 [协作总览](17_framework_shooter_plan.md#coordination-current)。这次复验后尚未安排实验重启。

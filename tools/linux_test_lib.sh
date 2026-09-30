@@ -44,3 +44,25 @@ rk_summary() {
   printf 'steps=%s failures=%s\n' "${#rk_names[@]}" "$rk_failures"
   [ "$rk_failures" -eq 0 ]
 }
+
+# rk_install_source <archive.tar> <destination folder> <expected sha256>
+# Verifies the archive, unpacks it into a NEW folder and records one step. An
+# existing folder is kept only when it came from the same archive. Any failure
+# (hash, unpack, empty result) is recorded as FAIL and returns non-zero, so the
+# caller must stop instead of testing a half-installed tree.
+rk_install_source() {
+  local archive="$1" destination="$2" expected="$3" actual
+  actual="$(sha256sum "$archive" 2>/dev/null | awk '{print $1}')"
+  if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then rk_record source FAIL "archive hash mismatch or unreadable archive"; return 1; fi
+  if [ -e "$destination" ]; then
+    if [ "$(cat "$destination.sha256" 2>/dev/null)" = "$actual" ]; then rk_record source PASS "kept existing folder from the same archive sha256=$actual"; return 0; fi
+    rk_record source FAIL "folder exists with a different or unknown archive"; return 1
+  fi
+  if ! mkdir -p "$destination" || ! tar -xf "$archive" -C "$destination" 2>"$RK_OUT/source-unpack.err"; then
+    rm -rf "$destination"
+    rk_record source FAIL "archive could not be unpacked; nothing installed"; return 1
+  fi
+  if [ "$(find "$destination" -type f | wc -l)" -eq 0 ]; then rm -rf "$destination"; rk_record source FAIL "archive was empty; nothing installed"; return 1; fi
+  printf '%s\n' "$actual" > "$destination.sha256"
+  rk_record source PASS "installed sha256=$actual files=$(find "$destination" -type f | wc -l)"
+}

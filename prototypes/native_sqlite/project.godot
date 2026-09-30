@@ -1,0 +1,5 @@
+config_version=5
+[application]
+config/name="RoomKit native SQLite prototype"
+[debug]
+file_logging/enable_file_logging=false

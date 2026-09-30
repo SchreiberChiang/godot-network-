@@ -1,15 +1,18 @@
 extends RefCounted
-## Windows private SQLite account adapter. Call execute() on a worker thread.
+## Private SQLite account adapter (Windows, and Linux through posix_helper.gd). Call execute() on a worker thread.
 ## The network adapter must set client_ip from its accepted connection.
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Helper = preload("res://host/platform/bounded_helper.gd")
 const Paths = preload("res://sdk/roomkit/shared/paths.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const Resident = preload("res://host/storage/resident_store.gd")
+const DataRoot = preload("res://host/platform/posix_data_root.gd")
 var root := ""
 var database := ""
 
 func initialize(directory: String) -> Dictionary:
+	if OS.get_name() == "Linux":
+		return _initialize_posix(directory)
 	if OS.get_name() != "Windows":
 		return Wire.failure("UNSUPPORTED_STORAGE")
 	root = Paths.absolute(directory)
@@ -19,6 +22,20 @@ func initialize(directory: String) -> Dictionary:
 	if code != 0:
 		return Wire.failure("PRIVATE_DATA_FAILED")
 	return _dispatch({"op": "init"})
+
+## Linux: folders 700 and the database 600, verified before and after the helper
+## creates or opens it. When protection fails the service stays unusable.
+func _initialize_posix(directory: String) -> Dictionary:
+	root = Paths.absolute(directory)
+	database = root.path_join("accounts.sqlite")
+	if not DataRoot.prepare(root) or not DataRoot.seal(database, false):
+		root = ""
+		return Wire.failure("PRIVATE_DATA_FAILED")
+	var result := _dispatch({"op": "init"})
+	if result.get("ok", false) and not DataRoot.seal(database, true):
+		root = ""
+		return Wire.failure("PRIVATE_DATA_FAILED")
+	return result
 
 func execute(request: Dictionary) -> Dictionary:
 	if Validator.validate_file(request, "res://schemas/account_request.schema.json") != "":

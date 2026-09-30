@@ -216,9 +216,12 @@ func _start_host() -> Dictionary:
 		descriptor = {"executable": Paths.absolute("res://ManagedHost.exe"), "args": ["--headless", "--log-file", root_path.path_join("logs/managed-host.log"), "--"]}
 	var launched: Dictionary = await _work(_launch.bind(descriptor, host_launch, path))
 	if not launched.owned.is_empty():
-		launcher.import_owned(launched.owned)
-		host_owned = true
+		# The hand-over (Linux: a single-use in-memory token) moves the child; the
+		# file only ever gets the observation record.
+		host_owned = launcher.import_owned(launched.get("handoff", {})) or launcher.reclaim(host_launch)
 		_write_json(root_path.path_join("host-running.json"), launched.owned)
+		if not host_owned:
+			snapshot.host.error = "PROCESS_OWNERSHIP_LOST"
 	starting = false
 	if not launched.started.ok:
 		snapshot.host.state = "FAILED"
@@ -241,7 +244,7 @@ func _start_host() -> Dictionary:
 func _launch(descriptor: Dictionary, launch_id: String, path: String) -> Dictionary:
 	var child = Launcher.new()
 	var result: Dictionary = child.launch(descriptor, launch_id, ["--launch-id=" + launch_id, "--managed-config=" + path])
-	return {"started": result, "owned": child.record(launch_id)}
+	return {"started": result, "owned": child.record(launch_id), "handoff": child.handoff(launch_id)}
 
 func _host_event(peer_id: String, action: String, payload: Dictionary) -> void:
 	if action == "host.status":

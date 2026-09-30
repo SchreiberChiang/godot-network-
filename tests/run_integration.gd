@@ -136,13 +136,21 @@ func _run() -> void:
 	check(manager.active_count() == 0 and manager.ports.leases.is_empty(), "G08 no active records or leases")
 	var all_exited := true
 	for child_pid in child_pids:
-		if child_pid > 0 and OS.is_process_running(child_pid):
+		if child_pid > 0 and _still_our_child(child_pid):
 			all_exited = false
 	check(all_exited, "G08 all recorded children exited")
 	manager.stop_all()
 	await wait_for(func(): return manager.active_count() == 0, 15000)
 	check(manager.close(), "control listener closed after cleanup")
 	_finish()
+
+## Linux: read-only /proc check. Asking the engine (OS.is_process_running) would
+## reap a child behind the process owner's back, which the owner forbids.
+func _still_our_child(child_pid: int) -> bool:
+	if OS.get_name() == "Linux":
+		var seen: Dictionary = preload("res://host/platform/posix_process_owner.gd").PosixBackend.new().identity(child_pid)
+		return not seen.is_empty() and int(seen.ppid) == OS.get_process_id()
+	return OS.is_process_running(child_pid)
 
 func create() -> String:
 	var result: Dictionary = manager.create_room("minimal_room", options)

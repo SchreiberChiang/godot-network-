@@ -1,8 +1,15 @@
 extends RefCounted
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
+const Posix = preload("res://host/platform/posix_helper.gd")
 const OUTPUT_LIMIT := 4 * 1024 * 1024
 
+## Linux: both entry points start the helper script directly through
+## posix_helper.gd (owned child, pipes, watchdog deadline). There is no wrapper
+## script, no job file, and the Windows handle-release rule below is not used.
+
 static func execute(helper: String, arguments: Array, directory: String, timeout_ms: int = 10000) -> Dictionary:
+	if OS.get_name() == "Linux":
+		return Posix.run(helper, arguments, "", timeout_ms)
 	var path := directory.path_join("helper-" + Wire.uid() + ".json")
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
@@ -22,6 +29,8 @@ static func execute(helper: String, arguments: Array, directory: String, timeout
 ## nothing is left on disk if the host dies mid-call. Blocks like execute(); the
 ## script's own deadline ends the helper chain.
 static func execute_input(helper: String, arguments: Array, input: String, timeout_ms: int = 10000) -> Dictionary:
+	if OS.get_name() == "Linux":
+		return Posix.run(helper, arguments, Marshalls.utf8_to_base64(input), timeout_ms)
 	var failure := {"ok": false, "code": "HELPER_FAILED", "state": "unknown"}
 	var job := JSON.stringify({"helper": helper, "arguments": arguments, "input": Marshalls.utf8_to_base64(input)})
 	var launched := OS.execute_with_pipe("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://tools/bounded_helper.ps1"), "-TimeoutMs", str(timeout_ms)], true)

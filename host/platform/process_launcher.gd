@@ -1,12 +1,19 @@
 extends RefCounted
-## Windows process ownership boundary. No shell command construction or PID-only kills.
+## Process ownership boundary. No shell command construction or PID-only kills.
 ## Records exist only for children spawned by this launcher instance.
+## Windows: this file (process handles + process_identity.ps1). Linux: every call
+## is delegated to posix_process_owner.gd, which documents why its forced stop
+## cannot reach an unrelated process. Other platforms are refused.
 
 const HELPER_PATH := "res://tools/process_identity.ps1"
 const Helper = preload("res://host/platform/bounded_helper.gd")
+const PosixOwner = preload("res://host/platform/posix_process_owner.gd")
 var _records: Dictionary = {}
+var _posix = PosixOwner.new() if OS.get_name() == "Linux" else null
 
 func launch(descriptor: Dictionary, launch_id: String, extra_args: PackedStringArray) -> Dictionary:
+	if _posix != null:
+		return _launch_posix(descriptor, launch_id, extra_args)
 	if OS.get_name() != "Windows":
 		return _failure("UNSUPPORTED_PLATFORM")
 	if not _valid_launch_id(launch_id) or _records.has(launch_id):
@@ -57,6 +64,8 @@ func launch(descriptor: Dictionary, launch_id: String, extra_args: PackedStringA
 	return {"ok": false, "code": "PROCESS_IDENTITY_UNVERIFIED", "pid": child_pid}
 
 func probe(launch_id: String) -> String:
+	if _posix != null:
+		return _posix.probe(launch_id)
 	if not _records.has(launch_id):
 		return "unknown"
 	var owned: Dictionary = _records[launch_id]
@@ -68,6 +77,8 @@ func probe(launch_id: String) -> String:
 	return "running" if bool(owned["verified"]) else "unknown"
 
 func terminate(launch_id: String) -> bool:
+	if _posix != null:
+		return _posix.terminate(launch_id)
 	if not _records.has(launch_id):
 		return false
 	var state := probe(launch_id)
@@ -85,9 +96,32 @@ func terminate(launch_id: String) -> bool:
 
 func record(launch_id: String) -> Dictionary:
 	# Never contains argument vectors, bootstrap contents, or control credentials.
+	if _posix != null:
+		return _posix.record(launch_id)
 	return _records.get(launch_id, {}).duplicate(true)
 
+## What a worker passes to import_owned() of the launcher that takes over.
+## Windows: the record itself (the process handle is already held). Linux: a
+## single-use token; this launcher stays responsible until it is accepted.
+## record() is an observation on both platforms and is not a hand-over on Linux.
+func handoff(launch_id: String) -> Dictionary:
+	if _posix != null:
+		var token: String = _posix.offer(launch_id)
+		return {} if token == "" else {"launch_id": launch_id, "handoff": token}
+	return record(launch_id)
+
+## Linux: takes over the record of a child whose launcher object no longer
+## exists (for example a worker thread's launcher after a failed hand-over).
+## One winner; the identity is re-checked by the owner before any signal.
+## Windows keeps process handles per launcher and has nothing to reclaim.
+func reclaim(launch_id: String) -> bool:
+	if _posix != null:
+		return _posix.claim_unheld(launch_id)
+	return false
+
 func forget(launch_id: String) -> bool:
+	if _posix != null:
+		return _posix.forget(launch_id)
 	if probe(launch_id) != "exited":
 		return false
 	_reap_finished_handle(_records[launch_id])
@@ -129,10 +163,37 @@ func _inspect(mode: String, owned: Dictionary) -> Dictionary:
 
 func import_owned(record_value: Dictionary) -> bool:
 	# Internal transfer from an isolated worker that launched this exact child.
+	if _posix != null:
+		# Linux: only the single-use token from handoff() moves responsibility.
+		# A record() dictionary, a copy, or a changed launch id grants nothing.
+		var stated := str(record_value.get("launch_id", ""))
+		return stated != "" and _posix.accept(str(record_value.get("handoff", "")), stated) == stated
 	if record_value.is_empty() or _records.has(record_value.launch_id) or int(record_value.parent_pid) != OS.get_process_id():
 		return false
 	_records[record_value.launch_id] = record_value.duplicate(true)
 	return true
+
+## Linux: same argument rules as above, then the owner starts and verifies the
+## child. The executable comes from the host's game registry, never a client.
+func _launch_posix(descriptor: Dictionary, launch_id: String, extra_args: PackedStringArray) -> Dictionary:
+	var executable: String = str(descriptor.get("executable", ""))
+	if not _valid_launch_id(launch_id) or not executable.is_absolute_path():
+		return _failure("INVALID_OPTIONS" if executable.is_absolute_path() else "PROGRAM_NOT_FOUND")
+	var configured_args: Variant = descriptor.get("args", [])
+	if not configured_args is Array and not configured_args is PackedStringArray:
+		return _failure("INVALID_OPTIONS")
+	var arguments := PackedStringArray()
+	for argument in configured_args:
+		if not argument is String:
+			return _failure("INVALID_OPTIONS")
+		arguments.append(argument)
+	arguments.append_array(extra_args)
+	for argument in arguments:
+		if argument.begins_with("--launch-id") and argument != "--launch-id=" + launch_id:
+			return _failure("INVALID_OPTIONS")
+	_posix.trust(executable)
+	var started: Dictionary = _posix.launch(launch_id, executable, arguments, "--launch-id=" + launch_id)
+	return {"ok": started.ok, "code": started.code, "pid": started.pid}
 
 func _powershell_path() -> String:
 	return OS.get_environment("SystemRoot").path_join("System32/WindowsPowerShell/v1.0/powershell.exe")

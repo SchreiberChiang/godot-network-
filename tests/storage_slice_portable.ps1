@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory=$true)][string]$Source,
     [Parameter(Mandatory=$true)][string]$Work,
-    [string]$Foreign=''
+    [string]$Foreign='',
+    # Test only: pretend the copied foreign databases cannot be protected.
+    [switch]$InjectCopyPermissionFailure
 )
 # L1 storage slice: the production storage helpers of $Source (sqlite_store.ps1,
 # account_store.ps1, storage_worker.ps1) driven directly, without Godot, on a
@@ -24,6 +26,18 @@ function FromJson([string]$Text) { if($keepText) { return ConvertFrom-Json -Inpu
 $script:passed=0; $script:failed=0; $script:notRun=0
 function Check([bool]$Condition,[string]$Name) { if($Condition){ $script:passed++; Write-Output ('PASS '+$Name) } else { $script:failed++; Write-Output ('FAIL '+$Name) } }
 function Info([string]$Text) { Write-Output ('INFO '+$Text) }
+# Owner-only protection for every folder and database this script creates or
+# copies on POSIX systems. It does not rely on the caller's umask, and a copy
+# keeps the mode of its source, so the mode is set and read back each time.
+function Own([string]$Path) {
+    if($windows) { return $true }
+    if($InjectCopyPermissionFailure -and $Path.Contains('foreign')) { return $false }
+    $mode=if([IO.Directory]::Exists($Path)) { '700' } else { '600' }
+    & chmod $mode $Path 2>$null
+    return ((& stat -c '%a' $Path) -eq $mode)
+}
+$script:unprotected=New-Object Collections.ArrayList
+function Protect([string]$Path) { if(-not (Own $Path)) { [void]$script:unprotected.Add([IO.Path]::GetFileName($Path)); return $false }; return $true }
 function U([int[]]$Codes) { return -join ($Codes | ForEach-Object { [char]::ConvertFromUtf32($_) }) }
 
 # Test values. Non-ASCII text is built from code points so this file stays ASCII.
@@ -37,6 +51,7 @@ $fixedSalt='AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='
 $fixedHash='3uy/ydkNOuRRnl10Y7Sxi6J9sbgKDfOaYIka1YRc3bA='
 $data=[IO.Path]::Combine($Work,$dataName)
 [void][IO.Directory]::CreateDirectory($data)
+[void](Protect $Work); [void](Protect $data)
 $accountsDb=[IO.Path]::Combine($data,'accounts.sqlite')
 $assetsDb=[IO.Path]::Combine($data,'assets.sqlite')
 Info ('platform='+[Environment]::OSVersion.Platform+' ps='+$PSVersionTable.PSVersion+' runtime='+[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription)
@@ -103,6 +118,7 @@ try {
         $copy=[IO.Path]::Combine($data,'probe copy.sqlite')
         $probe.Backup($copy)
     } finally { $probe.Dispose() }
+    [void](Protect $probePath); [void](Protect $copy)
     Check ([IO.File]::Exists($probePath)) 'database opens at a path with Chinese characters and spaces'
     $reopened=New-Object RoomKitSqlite($copy)
     try { Check ($reopened.Query('SELECT body FROM t WHERE id=?',[string[]]@('1'))[0]['body'] -ceq $reasonText -and $reopened.Query('PRAGMA integrity_check',[string[]]@())[0]['integrity_check'] -eq 'ok') 'backup handle writes a copy that reopens with the same text and passes the integrity check' } finally { $reopened.Dispose() }
@@ -127,7 +143,7 @@ try {
 # ---- 3. accounts through the production helper ----
 $ip='192.0.2.10'
 $reply=Account @{op='init'} 'account init (first call)'
-Check ($reply.ok -eq $true) ('account database initializes ('+$reply.code+$reply.stderr+')')
+Check ($reply.ok -eq $true -and (Protect $accountsDb)) ('account database initializes ('+$reply.code+$reply.stderr+')')
 Check ((Account @{op='setup.status'}).initialized -eq $false) 'new database reports no administrator'
 $admin=Account @{op='setup.admin';username='slice_admin';password=$password;display_name=$adminName} 'setup.admin'
 Check ($admin.ok -eq $true -and $admin.identity.role -eq 'admin' -and $admin.identity.display_name -ceq $adminName) 'administrator is created with its Unicode display name'
@@ -161,7 +177,7 @@ function Commit([string]$RequestId,[string]$Fingerprint,[int]$Expected,[string]$
 }
 function Balance { $row=Asset @{op='asset.read';user_id=$userId;space_id='shooter'}; if([string]$row.body -eq '') { return $null }; return FromJson $row.body }
 $reply=Asset @{op='init'} 'asset init (first call)'
-Check ($reply.ok -eq $true) ('asset database initializes ('+$reply.code+$reply.stderr+')')
+Check ($reply.ok -eq $true -and (Protect $assetsDb)) ('asset database initializes ('+$reply.code+$reply.stderr+')')
 Info ('asset database sqlite_version='+$reply.sqlite_version)
 Check ((Asset @{op='asset.read';user_id=$userId;space_id='shooter'}).body -eq '') 'a new player has no stored assets'
 $grantCommand=ConvertTo-Json -Compress -InputObject ([ordered]@{kind='admin_adjust';credits=500;reason=$reasonText})
@@ -191,17 +207,18 @@ Check ((Asset @{op='inspect'}).integrity -eq 'ok') 'asset database passes the in
 
 # ---- 5. backup, restore, reopen ----
 $assetBackup=[IO.Path]::Combine($data,'assets backup.sqlite')
-Check ((Asset @{op='backup';destination=$assetBackup} 'asset backup').ok -eq $true -and [IO.File]::Exists($assetBackup)) 'asset backup is written next to the database (path with spaces)'
+Check ((Asset @{op='backup';destination=$assetBackup} 'asset backup').ok -eq $true -and [IO.File]::Exists($assetBackup) -and (Protect $assetBackup)) 'asset backup is written next to the database (path with spaces)'
 Check ((Asset @{op='backup';destination=$assetBackup}).ok -eq $false) 'backup refuses to overwrite an existing file'
 Check ((Asset @{op='backup';destination=[IO.Path]::Combine($Work,'outside.sqlite')}).ok -eq $false -and -not [IO.File]::Exists([IO.Path]::Combine($Work,'outside.sqlite'))) 'backup refuses a destination outside the database folder'
 $accountBackup=[IO.Path]::Combine($data,'accounts backup.sqlite')
 try { $handle=New-Object RoomKitSqlite($accountsDb); try { $handle.Backup($accountBackup) } finally { $handle.Dispose() } } catch {}
-Check ([IO.File]::Exists($accountBackup)) 'account backup is written through the shared binding'
+Check ([IO.File]::Exists($accountBackup) -and (Protect $accountBackup)) 'account backup is written through the shared binding'
 $spend=Commit 'req_spend' 'fp_spend' 3 (Body 4 0 @('rifle','smg') @{shooter=@{primary='smg'}}) '{"kind":"admin_adjust","credits":-380}'
 $logout=Account @{op='session.logout';token=$login.token}
 Check ($spend.ok -eq $true -and (Balance).credits -eq 0 -and $logout.ok -eq $true -and (Account @{op='session.authenticate';token=$login.token}).code -eq 'AUTH_FAILED') 'state changes after the backup (balance spent, session ended)'
 foreach($name in @('assets.sqlite','assets.sqlite-wal','assets.sqlite-shm','accounts.sqlite','accounts.sqlite-wal','accounts.sqlite-shm')) { $path=[IO.Path]::Combine($data,$name); if([IO.File]::Exists($path)) { [IO.File]::Delete($path) } }
 [IO.File]::Copy($assetBackup,$assetsDb); [IO.File]::Copy($accountBackup,$accountsDb)
+Check ((Protect $assetsDb) -and (Protect $accountsDb)) 'restored copies are set to owner-only before they are used'
 $restored=Balance
 Check ($restored.credits -eq 380 -and $restored.revision -eq 3 -and (Asset @{op='inspect'}).integrity -eq 'ok') 'restored asset database reopens with the balance from the backup'
 $resumed=Account @{op='session.authenticate';token=$login.token}
@@ -241,9 +258,9 @@ Check ($accountWorker.exited -and $accountWorker.code -eq 0) 'resident account w
 # ---- 7. file permissions ----
 if($windows) { $script:notRun++; Write-Output 'NOT RUN owner-only permissions (POSIX modes; Windows uses ACLs via protect_data.ps1)' }
 else {
-    $modes=@{}; foreach($path in @($data,$accountsDb,$assetsDb,$assetBackup)) { $modes[[IO.Path]::GetFileName($path)]=(& stat -c '%a' $path) }
-    Info ('modes: '+(($modes.GetEnumerator() | ForEach-Object { $_.Value }) -join ','))
-    Check ($modes[[IO.Path]::GetFileName($data)] -eq '700' -and $modes['accounts.sqlite'] -eq '600' -and $modes['assets.sqlite'] -eq '600' -and $modes['assets backup.sqlite'] -eq '600') 'test data folder is 700 and databases are 600 (owner only)'
+    $modes=@{}; foreach($path in @($data,$accountsDb,$assetsDb,$assetBackup,$accountBackup)) { $modes[[IO.Path]::GetFileName($path)]=(& stat -c '%a' $path) }
+    Info ('umask='+(& sh -c umask)+' modes: '+(($modes.GetEnumerator() | Sort-Object Name | ForEach-Object { $_.Value }) -join ','))
+    Check ($modes[[IO.Path]::GetFileName($data)] -eq '700' -and @($modes.GetEnumerator() | Where-Object { $_.Name -ne [IO.Path]::GetFileName($data) -and $_.Value -ne '600' }).Count -eq 0) 'test data folder is 700 and databases and backups are 600 (owner only), whatever the umask'
 }
 
 # ---- 8. export two fresh single-file databases for the other platform ----
@@ -253,6 +270,7 @@ $exportAssets=[IO.Path]::Combine($data,'assets export.sqlite')
 $exported=(Asset @{op='backup';destination=$exportAssets}).ok -eq $true
 try { $handle=New-Object RoomKitSqlite($accountsDb); try { $handle.Backup([IO.Path]::Combine($export,'accounts.sqlite')) } finally { $handle.Dispose() } } catch { $exported=$false }
 if($exported) { [IO.File]::Move($exportAssets,[IO.Path]::Combine($export,'assets.sqlite')) }
+$exported=$exported -and (Protect $export) -and (Protect ([IO.Path]::Combine($export,'accounts.sqlite'))) -and (Protect ([IO.Path]::Combine($export,'assets.sqlite')))
 Check ($exported -and [IO.File]::Exists([IO.Path]::Combine($export,'accounts.sqlite')) -and [IO.File]::Exists([IO.Path]::Combine($export,'assets.sqlite'))) 'exports single-file copies of both test databases'
 
 # ---- 9. databases produced on the other platform ----
@@ -261,6 +279,11 @@ if($Foreign) {
     $accountsDb=[IO.Path]::Combine($foreignData,'accounts.sqlite'); $assetsDb=[IO.Path]::Combine($foreignData,'assets.sqlite')
     [IO.File]::Copy([IO.Path]::Combine([IO.Path]::GetFullPath($Foreign),'accounts.sqlite'),$accountsDb)
     [IO.File]::Copy([IO.Path]::Combine([IO.Path]::GetFullPath($Foreign),'assets.sqlite'),$assetsDb)
+    # A copy keeps the mode of its source. Refuse to use the copies unless they
+    # are owner-only now.
+    $protected=(Protect $foreignData) -and (Protect $accountsDb) -and (Protect $assetsDb)
+    Check $protected 'copied foreign databases are set to owner-only before they are used'
+  if($protected) {
     Check ((Asset @{op='inspect'}).integrity -eq 'ok') 'foreign asset database passes the integrity check'
     $foreignLogin=Account @{op='account.login';username='slice_player';password=$password;client_ip=$ip}
     Check ($foreignLogin.ok -eq $true) ('foreign account database accepts the player login (password hash made on the other platform) ('+$foreignLogin.code+')')
@@ -273,8 +296,13 @@ if($Foreign) {
     Check ((FromJson (@($foreignAudit.rows) | Where-Object { $_.request_id -eq 'req_grant' }).command).reason -ceq $reasonText) 'foreign receipts keep the Unicode command text'
     Check ((Commit 'req_foreign' 'fp_foreign' 3 (Body 4 400 @('rifle','smg') @{shooter=@{primary='smg'}}) '{"kind":"admin_adjust","credits":20}').ok -eq $true -and (Balance).credits -eq 400) 'foreign asset database accepts a new commit on this platform'
     Check ((Commit 'req_buy' 'fp_buy' 1 $buyBody '{}').code -eq 'DUPLICATE') 'foreign receipts still make the old purchase request idempotent'
+  } else { $script:notRun++; Write-Output 'NOT RUN foreign database checks (copies could not be protected; refusing to use them)' }
 } else { $script:notRun++; Write-Output 'NOT RUN foreign databases (no -Foreign folder supplied)' }
 
+if(-not $windows) {
+    $loose=@(& find $Work -perm /077 2>$null)
+    Check ($loose.Count -eq 0 -and $script:unprotected.Count -eq 0) ('nothing under the work folder is readable by group or others ('+$loose.Count+' loose, '+$script:unprotected.Count+' unprotected)')
+}
 foreach($note in $script:notes) { Info $note }
 foreach($group in ($script:timings | Group-Object label)) { Info ('one-shot '+$group.Name+': ms='+(($group.Group | ForEach-Object { $_.ms }) -join ',')) }
 Write-Output ('STORAGE_SLICE_RESULT passed='+$script:passed+' failed='+$script:failed+' not_run='+$script:notRun)

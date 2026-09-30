@@ -35,14 +35,8 @@ rk_step runner_selftest 120 bash "$HERE/linux_test_lib_selftest.sh" "$HERE/linux
 cat "$RUN/runner_selftest.out"
 
 section "source snapshot"
-gotsrc="$(sha256sum "$HERE/roomkit-src.tar" | awk '{print $1}')"
-if [ "$gotsrc" != "$ROOMKIT_SRC_SHA256" ]; then rk_record source FAIL "archive hash mismatch"; rk_summary; exit 5; fi
-if [ -e "$SRC" ]; then
-  if [ "$(cat "$SRC.sha256" 2>/dev/null)" = "$gotsrc" ]; then echo "KEPT existing $SRC (same archive hash)"; else rk_record source FAIL "folder exists with a different archive: $SRC"; rk_summary; exit 5; fi
-else
-  mkdir -p "$SRC" && tar -xf "$HERE/roomkit-src.tar" -C "$SRC" && printf '%s\n' "$gotsrc" > "$SRC.sha256" && echo "INSTALLED $SRC"
-fi
-rk_record source PASS "sha256=$gotsrc files=$(find "$SRC" -type f | wc -l) crlf_text_files=$(grep -rlI $'\r$' --include='*.gd' --include='*.json' --include='*.ps1' "$SRC" 2>/dev/null | wc -l)"
+if ! rk_install_source "$HERE/roomkit-src.tar" "$SRC" "$ROOMKIT_SRC_SHA256"; then rk_summary; echo "ROOMKIT_LINUX_STORAGE_COMPLETE run=$ROOMKIT_RUN_ID failures=$rk_failures"; exit 5; fi
+printf 'text files containing CRLF: %s\n' "$(grep -rlI $'\r$' --include='*.gd' --include='*.json' --include='*.ps1' "$SRC" 2>/dev/null | wc -l)"
 printf 'pwsh: '; "$PWSH" -NoProfile -Command '"{0} {1}" -f $PSVersionTable.PSVersion, [Runtime.InteropServices.RuntimeInformation]::FrameworkDescription' 2>&1 | head -n 1
 printf 'system sqlite library: %s\n' "$(ldconfig -p 2>/dev/null | grep -m1 'libsqlite3.so.0' | awk '{print $NF}')"
 

@@ -1,6 +1,6 @@
 # RoomKit：独立的本地房间框架
 
-在 Windows 本机运行的多游戏房间框架，从零开发：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`（已整合原 `codex/shooter-framework` 成果）；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。目前只在同一台电脑上验证过，第二台设备、Linux 和公网都还没有验收。
+在 Windows 本机运行的多游戏房间框架，从零开发：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`（已整合原 `codex/shooter-framework` 成果）；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能已有验收；Linux 笔记本已完成部分基础与存储测试，完整服务端、跨设备联机和公网仍未验收。
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
@@ -29,7 +29,7 @@
 
 私有数据在 `data/framework/`（账号库、资产库、配置、私钥），不会进入 Git 或玩家分发包。源码更新后按这个顺序重启：先退出旧客户端，然后 `StopManagement.cmd` → `StartManagement.cmd` → 在网页启动服务器并建房 → 重新打开客户端。账号和资产会保留。
 
-管理后台的“玩家 → 详情 → 停用账号”会撤销玩家登录并保留账号与所有游戏资产；需要时用“恢复账号”。停用默认无限期，**不是删除数据**。这次界面更新尚未人工验收。
+管理后台的“玩家 → 详情 → 停用账号”会撤销玩家登录并保留账号与所有游戏资产；需要时用“恢复账号”。停用默认无限期，**不是删除数据**。用户已反馈新版后台登录、退出重登和建房正常；具体范围见 STATUS。
 
 测试阶段要永久删除某个玩家时，用同一页面单独的“删除测试账号”：它清除该玩家在当前账号库和资产库中的账号与全部游戏资产，不可恢复；旧备份不改写，后台会列出并标注可能仍含该账号的备份。源码版已通过隔离测试，用户从项目目录启动并试玩后反馈删除正常。新独立 ZIP 已包含此功能，但自动包测试没有单独执行删除流程。说明见 [规划第七节](docs/17_framework_shooter_plan.md#七测试阶段账号删除2026-09-27已实现)。
 
@@ -57,7 +57,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\new_game.ps1 -Manage
 
 ## 文档导航
 
-开发顺序：第一阶段项目分析、文档整理与项目地图（已交付，待复核）→ 第二阶段主线整理、独立射击客户端、后台 UI、基础音效 → 第三阶段 Linux 完整服务器。见 [已确认规划](docs/17_framework_shooter_plan.md#next-plan)、[清理候选表](docs/17_framework_shooter_plan.md#清理候选表) 和 [下一阶段建议](docs/17_framework_shooter_plan.md#下一阶段实施建议与验收门槛)。
+目前已完成项目地图、主线整理、独立客户端、后台 UI 和基础音效，正在推进 Linux；当前先收口存储接入复验与超时补修，分工见 [协作总览](docs/17_framework_shooter_plan.md#coordination-current)。见 [已确认规划](docs/17_framework_shooter_plan.md#next-plan)、[清理候选表](docs/17_framework_shooter_plan.md#清理候选表) 和 [下一阶段建议](docs/17_framework_shooter_plan.md#下一阶段实施建议与验收门槛)。
 
 | 需要了解 | 文档 |
 |---|---|

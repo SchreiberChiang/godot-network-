@@ -42,5 +42,37 @@ expect() { if [ "$1" = "$2" ]; then printf 'PASS %s\n' "$3"; else printf 'FAIL %
   [ "${#rk_names[@]}" -eq 2 ] && [ "${rk_states[1]}" = PASS ] || exit 9
   rk_summary >/dev/null ); expect "$?" 1 "later steps still run and are recorded after a failure"
 
-if [ "$bad" -eq 0 ]; then echo "LINUX_TEST_LIB_SELFTEST passed=6 failed=0"; else echo "LINUX_TEST_LIB_SELFTEST failed"; fi
+# Source install: a good archive installs; a wrong hash, a corrupt archive and a
+# clashing folder are failures and leave nothing half-installed.
+mkdir -p "$work/src-in/tools" && echo "x" > "$work/src-in/tools/a.txt" && tar -cf "$work/good.tar" -C "$work/src-in" .
+good_sha="$(sha256sum "$work/good.tar" | awk '{print $1}')"
+head -c 700 "$work/good.tar" > "$work/corrupt.tar"
+corrupt_sha="$(sha256sum "$work/corrupt.tar" | awk '{print $1}')"
+
+( RK_OUT="$work/g"; mkdir -p "$RK_OUT"; . "$lib"
+  rk_install_source "$work/good.tar" "$work/g/src" "$good_sha" >/dev/null || exit 9
+  [ -f "$work/g/src/tools/a.txt" ] || exit 9
+  rk_install_source "$work/good.tar" "$work/g/src" "$good_sha" >/dev/null || exit 9
+  rk_summary >/dev/null ); expect "$?" 0 "a good source archive installs and is kept on a second run"
+
+( RK_OUT="$work/h"; mkdir -p "$RK_OUT"; . "$lib"
+  rk_install_source "$work/good.tar" "$work/h/src" "0000" >/dev/null && exit 9
+  [ ! -e "$work/h/src" ] || exit 9
+  rk_summary >/dev/null ); expect "$?" 1 "a source archive with the wrong hash fails and installs nothing"
+
+( RK_OUT="$work/i"; mkdir -p "$RK_OUT"; . "$lib"
+  rk_install_source "$work/corrupt.tar" "$work/i/src" "$corrupt_sha" >/dev/null && exit 9
+  [ ! -e "$work/i/src" ] || exit 9
+  rk_summary >/dev/null ); expect "$?" 1 "a corrupt source archive fails to unpack and leaves no folder"
+
+( RK_OUT="$work/j"; mkdir -p "$RK_OUT" "$work/j/src"; . "$lib"
+  rk_install_source "$work/good.tar" "$work/j/src" "$good_sha" >/dev/null && exit 9
+  rk_summary >/dev/null ); expect "$?" 1 "an existing folder from another archive is refused"
+
+( RK_OUT="$work/k"; mkdir -p "$RK_OUT"; . "$lib"
+  rk_step digest 10 bash -c 'echo "FAIL shooter prepared tree gives the expected digest"; echo "CONTENT_DIGEST_PORTABLE passed=10 failed=1 not_run=0"; exit 1' >/dev/null
+  rk_step later 10 true >/dev/null
+  rk_summary >/dev/null ); expect "$?" 1 "a failed digest step fails the run even when later steps pass"
+
+if [ "$bad" -eq 0 ]; then echo "LINUX_TEST_LIB_SELFTEST passed=11 failed=0"; else echo "LINUX_TEST_LIB_SELFTEST failed"; fi
 exit "$bad"

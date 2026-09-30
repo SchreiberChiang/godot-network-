@@ -1,10 +1,24 @@
 extends RefCounted
 ## Local M1 API. No public lobby or client-supplied executable paths.
+##
+## Linux (L2-B2 first item): room children are owned by posix_process_owner.gd
+## through process_launcher.gd. The runtime folder is 700 and each private launch
+## file 600 (posix_private_path.gd); both are verified or the call fails. A child
+## started on a worker thread (async_start) is taken over with the single-use
+## handoff token, never with an observation record; when that fails the host
+## claims the now unheld record and stops the room, and a record it cannot claim
+## keeps the room and its port (nothing is released for a child that may still
+## run). Forced stops run on the calling thread (they are quick on Linux) and are
+## retried every stop_timeout_ms until the owner confirms the exit or quarantines
+## the record; resources stay allocated until then. Not yet on Linux: the process
+## journal (recovery_guard.gd) and the per-room memory limit, which both rely on
+## Windows helpers; they are refused at initialize instead of silently skipped.
 const Registry = preload("res://host/core/game_registry.gd")
 const Ports = preload("res://host/core/port_allocator.gd")
 const Launcher = preload("res://host/platform/process_launcher.gd")
 const Transport = preload("res://sdk/roomkit/shared/control_transport.gd")
 const Protocol = preload("res://sdk/roomkit/shared/protocol.gd")
+const PrivatePath = preload("res://host/platform/posix_private_path.gd")
 
 var registry = Registry.new()
 var ports
@@ -32,12 +46,20 @@ func initialize(settings: Dictionary, process_adapter = null) -> Dictionary:
 	launcher = process_adapter if process_adapter != null else Launcher.new()
 	ports = Ports.new(int(config.get("udp_first", 28100)), int(config.get("udp_last", 28131)))
 	runtime_root = preload("res://sdk/roomkit/shared/paths.gd").absolute("res://run")
-	if OS.get_name() != "Windows":
+	if OS.get_name() == "Linux":
+		if config.has("process_journal"):
+			return {"ok": false, "code": "RECOVERY_UNSUPPORTED"}
+		if int(config.get("max_room_memory_mb", 0)) > 0:
+			return {"ok": false, "code": "RESOURCE_LIMIT_UNSUPPORTED"}
+		if not _protect_runtime_posix():
+			return {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}
+	elif OS.get_name() != "Windows":
 		return {"ok": false, "code": "UNSUPPORTED_PLATFORM"}
-	var output: Array = []
-	var result := OS.execute("powershell.exe", PackedStringArray(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://tools/protect_runtime.ps1"), "-ProjectRoot", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://")]), output, false, false)
-	if result != 0:
-		return {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}
+	else:
+		var output: Array = []
+		var result := OS.execute("powershell.exe", PackedStringArray(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://tools/protect_runtime.ps1"), "-ProjectRoot", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://")]), output, false, false)
+		if result != 0:
+			return {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}
 	if config.has("process_journal") and int(config.get("control_port", 0)) == 0:
 		return {"ok": false, "code": "INVALID_OPTIONS"}
 	var err := server.listen(int(config.get("control_port", 0)), "127.0.0.1")
@@ -110,6 +132,10 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 		return {"ok": false, "code": row.code, "room_id": room_id}
 	file.store_string(JSON.stringify(private_config))
 	file.close()
+	if not _seal_private_file(row.config_path):
+		_fail(row, "PRIVATE_CONFIG_FAILED")
+		_cleanup(row)
+		return {"ok": false, "code": row.code, "room_id": room_id}
 	_transition(row, "STARTING")
 	var started: Dictionary = launcher.launch(resolved.descriptor, launch_id, PackedStringArray(["--launch-id=" + launch_id, "--launch-config=" + row.config_path]))
 	row.pid = maxi(int(started.get("pid", 0)), 0)
@@ -184,9 +210,19 @@ func poll() -> void:
 			elif now - int(row.last_progress) > int(config.get("heartbeat_timeout_ms", 8000)):
 				_fail(row, "LOGIC_STALLED")
 		if row.state in ["STOPPING", "FAILED"]:
-			if now >= int(row.cleanup_deadline) and not row.kill_attempted:
+			if OS.get_name() == "Linux" and now >= int(row.cleanup_deadline) and now >= int(row.get("next_kill_at", 0)):
+				# Retried until the owner confirms the exit or quarantines the record;
+				# the room keeps its resources meanwhile.
 				row.kill_attempted = true
-				if config.get("async_start", false):
+				row.kill_attempts = int(row.get("kill_attempts", 0)) + 1
+				row.next_kill_at = now + int(config.get("stop_timeout_ms", 3000))
+				if launcher.terminate(row.launch_id):
+					row.erase("cleanup_code")
+				else:
+					row["cleanup_code"] = "PROCESS_IDENTITY_UNVERIFIED"
+			elif OS.get_name() != "Linux" and now >= int(row.cleanup_deadline) and not row.kill_attempted:
+				row.kill_attempted = true
+				if config.get("async_start", false) and OS.get_name() != "Linux":
 					var task := Thread.new()
 					var owned: Dictionary = launcher.record(row.launch_id)
 					if task.start(_terminate_worker.bind(owned)) == OK:
@@ -413,6 +449,30 @@ func _begin_start(row: Dictionary, descriptor: Dictionary, private_config: Dicti
 	starts[row.room_id] = task
 	return {"ok": true, "code": "", "room_id": row.room_id}
 
+## Linux: runtime folder 700 (created if missing, links refused), with the same
+## .gdignore marker as on Windows.
+func _protect_runtime_posix() -> bool:
+	if not PrivatePath.protect_directory(runtime_root, runtime_root).ok:
+		return false
+	var marker := runtime_root.path_join(".gdignore")
+	if not FileAccess.file_exists(marker):
+		var file := FileAccess.open(marker, FileAccess.WRITE)
+		if file == null:
+			return false
+		file.close()
+	return PrivatePath.protect_file(marker, runtime_root).ok
+
+## A private launch file (it carries the room token): 600 and verified on Linux.
+## The runtime folder's ACL already covers it on Windows.
+static func _seal_private_file(path: String) -> bool:
+	if OS.get_name() != "Linux":
+		return true
+	var root := path.get_base_dir()
+	if PrivatePath.protect_file(path, root).ok:
+		return true
+	DirAccess.remove_absolute(path)
+	return false
+
 static func _start_worker(descriptor: Dictionary, bootstrap: Dictionary, path: String, grant: Dictionary, store: Dictionary) -> Dictionary:
 	if not grant.is_empty():
 		var written: Dictionary
@@ -433,9 +493,14 @@ static func _start_worker(descriptor: Dictionary, bootstrap: Dictionary, path: S
 		return {"started": {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}, "owned": {}, "grant": grant}
 	file.store_string(JSON.stringify(bootstrap))
 	file.close()
+	if not _seal_private_file(path):
+		return {"started": {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}, "owned": {}, "grant": grant}
 	var isolated = Launcher.new()
 	var started: Dictionary = isolated.launch(descriptor, bootstrap.launch_id, ["--launch-id=" + bootstrap.launch_id, "--launch-config=" + path])
-	return {"started": started, "owned": isolated.record(bootstrap.launch_id), "grant": grant}
+	# owned: an observation (journal, diagnostics). handoff: what moves the child
+	# to the main launcher (Windows: the same record; Linux: a single-use token that
+	# exists only in memory).
+	return {"started": started, "owned": isolated.record(bootstrap.launch_id), "handoff": isolated.handoff(bootstrap.launch_id), "grant": grant}
 
 static func _terminate_worker(owned: Dictionary) -> bool:
 	if owned.is_empty():
@@ -454,9 +519,16 @@ func _poll_workers() -> void:
 		var row: Dictionary = rooms[id]
 		if not completed.grant.is_empty():
 			result_service.grants[row.launch_id] = completed.grant
-		if not completed.owned.is_empty():
-			launcher.import_owned(completed.owned)
 		row.pid = maxi(0, int(completed.started.get("pid", 0)))
+		var handed: Dictionary = completed.get("handoff", {})
+		var taken: bool = not handed.is_empty() and launcher.import_owned(handed)
+		if not taken and row.pid > 0:
+			# The worker's launcher is gone; its child must not be left unmanaged.
+			var claimed: bool = OS.get_name() == "Linux" and launcher.reclaim(row.launch_id)
+			if not claimed:
+				row["cleanup_code"] = "PROCESS_OWNERSHIP_LOST"
+			if completed.started.ok:
+				_fail(row, "PROCESS_HANDOFF_FAILED")
 		if recovery_guard != null and not recovery_guard.confirm(row.launch_id, completed.owned):
 			_fail(row, "PRIVATE_CONFIG_FAILED")
 		row.created_at = Time.get_ticks_msec()
