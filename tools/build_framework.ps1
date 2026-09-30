@@ -20,7 +20,7 @@ foreach($item in @(@{id='shooter';source='shooter'},@{id='turns';source='turn_ba
     }
     Copy-Item -LiteralPath (Join-Path $projectRoot ('examples\'+$item.source+'\game_manifest.json')) -Destination $destination
     if(Test-Path -LiteralPath (Join-Path $projectRoot 'examples/framework')) {
-        foreach($name in @('client.gd','view.gd')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('examples\framework\'+$name)) -Destination $destination }
+        foreach($name in @('client.gd','view.gd','sound.gd')) { Copy-Item -LiteralPath (Join-Path $projectRoot ('examples\framework\'+$name)) -Destination $destination }
     }
     foreach($file in Get-ChildItem -LiteralPath (Join-Path $projectRoot 'schemas') -Filter '*.json' -File) { Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $destination 'schemas') }
     $settings=@'

@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RoomKit 后台预览</title>
+<meta name="description" content="RoomKit 管理后台改版预览：全部为演示数据，不连接真实服务。">
+<style>
+:root{
+  --bg:#f4f6f9;--panel:#ffffff;--raised:#f8fafc;--line:#e2e8f0;--line-strong:#cbd5e1;
+  --text:#0f172a;--muted:#5b6b80;--faint:#94a3b8;
+  --accent:#0f766e;--accent-soft:#e6f4f1;--accent-text:#ffffff;
+  --good:#15803d;--good-soft:#e8f5ec;--warn:#b45309;--warn-soft:#fdf3e2;--bad:#b91c1c;--bad-soft:#fdecec;--info:#1d4ed8;--info-soft:#e8effd;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 4px 16px rgba(15,23,42,.05);
+  --radius:12px;
+  font:14px/1.55 "Microsoft YaHei UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:var(--text);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1118;--panel:#131a24;--raised:#18212d;--line:#243042;--line-strong:#33425a;
+  --text:#e6edf5;--muted:#93a3b8;--faint:#64748b;
+  --accent:#2dd4bf;--accent-soft:#12322f;--accent-text:#04201c;
+  --good:#4ade80;--good-soft:#123021;--warn:#fbbf24;--warn-soft:#33270f;--bad:#f87171;--bad-soft:#3a1717;--info:#93b4ff;--info-soft:#172544;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}}
+:root[data-theme="dark"]{
+  --bg:#0c1118;--panel:#131a24;--raised:#18212d;--line:#243042;--line-strong:#33425a;
+  --text:#e6edf5;--muted:#93a3b8;--faint:#64748b;
+  --accent:#2dd4bf;--accent-soft:#12322f;--accent-text:#04201c;
+  --good:#4ade80;--good-soft:#123021;--warn:#fbbf24;--warn-soft:#33270f;--bad:#f87171;--bad-soft:#3a1717;--info:#93b4ff;--info-soft:#172544;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line-strong);background:var(--panel);border-radius:8px;padding:7px 14px;line-height:1.3}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:600}
+button.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+button.danger.solid{background:var(--bad);color:#fff;border-color:var(--bad)}
+button.ghost{border-color:transparent;background:transparent}
+button.small{padding:4px 10px;font-size:13px}
+input,select,textarea{width:100%;border:1px solid var(--line-strong);background:var(--panel);border-radius:8px;padding:7px 10px}
+label.field{display:block;margin:0 0 12px}
+label.field>span{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.hint{font-size:12px;color:var(--muted)}
+.mono{font-family:Consolas,"Cascadia Mono",monospace;font-size:12.5px}
+.muted{color:var(--muted)}
+
+/* preview banner + demo controls */
+.preview-bar{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:8px 20px;background:repeating-linear-gradient(135deg,var(--warn-soft) 0 14px,color-mix(in srgb,var(--warn-soft) 70%,var(--panel)) 14px 28px);border-bottom:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));font-size:13px}
+.preview-bar strong{color:var(--warn)}
+.preview-bar .demo{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:auto}
+.preview-bar .demo button{padding:3px 10px;font-size:12.5px}
+.preview-bar .demo button[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+.app{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:calc(100vh - 41px)}
+.sidebar{background:var(--panel);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:18px}
+.brand{font-weight:700;font-size:18px;padding:0 8px;letter-spacing:.2px}.brand span{color:var(--accent)}
+.brand small{display:block;font-size:11px;font-weight:400;color:var(--muted);letter-spacing:.5px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav .group{font-size:11.5px;color:var(--faint);padding:10px 10px 4px;letter-spacing:.4px}
+.nav button{display:flex;align-items:center;gap:10px;border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:8px;color:var(--muted)}
+.nav button:hover{background:var(--raised);color:var(--text)}
+.nav button[aria-current="page"]{background:var(--accent-soft);color:var(--text);font-weight:600}
+.nav .ico{width:18px;text-align:center;color:var(--accent)}
+.nav .tag{margin-left:auto;font-size:11px;color:var(--faint);border:1px dashed var(--line-strong);border-radius:6px;padding:0 5px}
+.side-foot{margin-top:auto;font-size:12px;color:var(--muted);padding:10px;border-top:1px solid var(--line)}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+.topsearch{position:relative;flex:1;max-width:420px}
+.topsearch input{padding-left:30px}
+.topsearch::before{content:"⌕";position:absolute;left:10px;top:50%;transform:translateY(-52%);color:var(--faint);font-size:16px}
+.results{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--line-strong);border-radius:10px;box-shadow:var(--shadow);padding:4px;z-index:20}
+.results button{display:flex;width:100%;justify-content:space-between;border:0;background:transparent;padding:7px 10px;text-align:left}
+.results button:hover,.results button.active{background:var(--raised)}
+.conn{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+.dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.dot.pulse{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.dot.pulse{animation:none}}
+
+.content{padding:22px 24px 40px;max-width:1280px;width:100%}
+.pagehead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+.pagehead h1{margin:0;font-size:22px}
+.pagehead p{margin:2px 0 0;color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+
+.notice{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-left-width:4px;background:var(--panel);border-radius:10px;padding:10px 14px;margin-bottom:14px}
+.notice.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.notice.bad{border-left-color:var(--bad);background:var(--bad-soft)}
+.notice.info{border-left-color:var(--info);background:var(--info-soft)}
+.notice.good{border-left-color:var(--good);background:var(--good-soft)}
+.notice p{margin:0}.notice .grow{flex:1}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.card h2{margin:0;font-size:15px}
+.cardhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.grid{display:grid;gap:14px}
+.g-hero{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+.g-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.stat .label{font-size:12.5px;color:var(--muted)}
+.stat .value{font-size:24px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.stat .value.na{font-size:15px;font-weight:600;color:var(--faint)}
+.stat .sub{font-size:12px;color:var(--muted)}
+
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;border-radius:999px;padding:1px 9px;border:1px solid var(--line-strong);color:var(--muted);white-space:nowrap}
+.badge.good{color:var(--good);background:var(--good-soft);border-color:transparent}
+.badge.warn{color:var(--warn);background:var(--warn-soft);border-color:transparent}
+.badge.bad{color:var(--bad);background:var(--bad-soft);border-color:transparent}
+.badge.info{color:var(--info);background:var(--info-soft);border-color:transparent}
+
+.service{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.svc{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--raised)}
+.svc .head{display:flex;align-items:center;gap:8px;font-weight:600}
+.svc .desc{font-size:12.5px;color:var(--muted);margin-top:2px}
+.steps{display:flex;gap:6px;align-items:center;margin:10px 0 2px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.steps span{padding:1px 8px;border-radius:999px;border:1px solid var(--line)}
+.steps span.on{border-color:var(--accent);color:var(--text);background:var(--accent-soft)}
+.steps span.done{color:var(--good);border-color:transparent;background:var(--good-soft)}
+.steps i{color:var(--faint);font-style:normal}
+
+details.danger{border:1px solid color-mix(in srgb,var(--bad) 30%,var(--line));border-radius:10px;padding:0 14px;margin-top:12px}
+details.danger summary{cursor:pointer;padding:10px 0;color:var(--bad);font-weight:600;list-style:none}
+details.danger summary::-webkit-details-marker{display:none}
+details.danger summary::before{content:"▸ ";}
+details.danger[open] summary::before{content:"▾ ";}
+details.danger .actions{padding-bottom:12px}
+
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;background:var(--raised)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--raised)}
+tbody tr[aria-selected="true"]{background:var(--accent-soft)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.toolbar input{max-width:260px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border-radius:999px;padding:3px 11px;font-size:12.5px}
+.chip[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.9fr);gap:14px;align-items:start}
+.detail .title{font-size:17px;font-weight:700}
+dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:13px}
+dl.facts dt{color:var(--muted)}dl.facts dd{margin:0}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:14px 0 12px}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:8px 12px;color:var(--muted)}
+.tabs button[aria-selected="true"]{border-bottom-color:var(--accent);color:var(--text);font-weight:600}
+.items{display:flex;flex-wrap:wrap;gap:6px}
+.item{border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:12.5px;background:var(--raised)}
+.item.off{color:var(--faint);border-style:dashed}
+.empty{text-align:center;color:var(--muted);padding:34px 10px}
+.empty .big{font-size:26px;color:var(--faint)}
+.skeleton{background:linear-gradient(90deg,var(--raised),var(--line),var(--raised));background-size:200% 100%;animation:sk 1.3s linear infinite;border-radius:6px;height:14px;margin:8px 0}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
+.stale .card{opacity:.72}
+.sketch{border:2px dashed var(--line-strong);border-radius:12px;padding:22px;background:var(--panel)}
+.sketch h2{margin:0 0 6px;font-size:16px}
+.sketch ul{margin:8px 0 0;padding-left:20px;color:var(--muted)}
+
+.toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:50;max-width:min(380px,calc(100vw - 36px))}
+.toast{background:var(--panel);border:1px solid var(--line-strong);border-left:4px solid var(--info);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;display:flex;gap:10px;align-items:flex-start}
+.toast.good{border-left-color:var(--good)}.toast.bad{border-left-color:var(--bad)}.toast.warn{border-left-color:var(--warn)}
+.toast .grow{flex:1}.toast strong{display:block;font-size:13px}.toast span{font-size:12.5px;color:var(--muted)}
+
+dialog{border:1px solid var(--line-strong);border-radius:14px;padding:0;background:var(--panel);color:var(--text);width:min(460px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(15,23,42,.45)}
+.dhead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+.dhead h2{margin:0;font-size:16px}
+.dbody{padding:16px 18px;max-height:min(70vh,560px);overflow:auto}
+.dfoot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line)}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 14px}
+.error{color:var(--bad);font-size:13px;min-height:1em;margin:4px 0 0}
+.codebox{display:flex;gap:8px;align-items:center}
+.codebox input{font-family:Consolas,monospace;font-size:16px;letter-spacing:1px}
+
+@media (max-width:1100px){.g-4{grid-template-columns:repeat(2,minmax(0,1fr))}.g-hero{grid-template-columns:1fr}.split{grid-template-columns:1fr}}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  .sidebar{flex-direction:row;align-items:center;overflow-x:auto;padding:8px 12px;gap:10px;border-right:0;border-bottom:1px solid var(--line)}
+  .sidebar .brand small,.side-foot,.nav .group,.nav .tag{display:none}
+  .nav{flex-direction:row}
+  .nav button{white-space:nowrap}
+  .content{padding:16px}
+  .topbar{padding:10px 16px;flex-wrap:wrap}
+  .service,.g-2,.g-4{grid-template-columns:1fr}
+  .preview-bar{position:static}
+}
+</style>
+</head>
+<body>
+<div class="preview-bar" role="note">
+  <strong>界面预览 · 全部为演示数据</strong>
+  <span>不连接管理服务，不读取真实账号或配置，也不保存任何登录凭据。按钮只在本页模拟效果。</span>
+  <div class="demo" role="group" aria-label="演示状态">
+    <span class="muted">演示状态：</span>
+    <button type="button" data-demo="normal" aria-pressed="true">正常</button>
+    <button type="button" data-demo="loading" aria-pressed="false">加载中</button>
+    <button type="button" data-demo="empty" aria-pressed="false">空数据</button>
+    <button type="button" data-demo="offline" aria-pressed="false">离线 / 旧快照</button>
+    <button type="button" data-demo="fail" aria-pressed="false">下次操作失败</button>
+    <button type="button" id="themeToggle" aria-pressed="false" title="切换深色 / 浅色">◐ 主题</button>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">Room<span>Kit</span><small>本机服务器管理</small></div>
+    <nav class="nav" aria-label="管理导航">
+      <div class="group">日常</div>
+      <button type="button" data-page="overview"><span class="ico">◈</span>总览</button>
+      <button type="button" data-page="rooms"><span class="ico">▦</span>房间</button>
+      <button type="button" data-page="players"><span class="ico">♙</span>玩家与资产</button>
+      <div class="group">其他（草图）</div>
+      <button type="button" data-page="invites"><span class="ico">◇</span>邀请码<span class="tag">草图</span></button>
+      <button type="button" data-page="backups"><span class="ico">▤</span>备份恢复<span class="tag">草图</span></button>
+      <button type="button" data-page="logs"><span class="ico">≡</span>日志审计<span class="tag">草图</span></button>
+      <button type="button" data-page="settings"><span class="ico">⚙</span>配置<span class="tag">草图</span></button>
+    </nav>
+    <div class="side-foot">管理服务独立运行：停止游戏服务器后，本后台仍然在线。</div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="topsearch">
+        <input id="globalSearch" type="search" placeholder="搜索玩家（用户名、昵称或 ID）" autocomplete="off" aria-label="搜索玩家" aria-controls="globalResults" aria-expanded="false">
+        <div class="results" id="globalResults" role="listbox" hidden></div>
+      </div>
+      <div class="conn" id="connState"><span class="dot good"></span><span>管理服务在线 · 刚刚更新</span></div>
+      <span class="muted">admin（演示）</span>
+    </header>
+    <div class="content" id="content" tabindex="-1"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <form id="dlgForm" method="dialog" novalidate>
+    <div class="dhead"><h2 id="dlgTitle"></h2><button type="button" class="ghost" id="dlgX" aria-label="关闭对话框">✕</button></div>
+    <div class="dbody" id="dlgBody"></div>
+    <div class="dfoot" id="dlgFoot"></div>
+  </form>
+</dialog>
+
+<script>
+'use strict';
+/* ===== Demo data (all fictional). Nothing here is read from a server. ===== */
+const GAMES=[
+  {id:'shooter',name:'横版射击示例',space:'shooter',modes:{ffa:{label:'自由混战',maps:['depot'],min:1,max:16}},
+   catalog:[{id:'rifle',name:'基础步枪',price:0},{id:'smg',name:'冲锋枪',price:100},{id:'shotgun',name:'霰弹枪',price:200}],slots:['primary']},
+  {id:'turns',name:'取石子',space:'turns',modes:{classic:{label:'经典',maps:['table'],min:2,max:2}},
+   catalog:[{id:'stones_basic',name:'普通石子',price:0},{id:'stones_jade',name:'玉石主题',price:50}],slots:['theme']}
+];
+function seedRooms(){return [
+  {id:'r_7f3a91c2',game:'shooter',mode:'ffa',map:'depot',state:'READY',players:['小林','阿杰'],cap:8,owner:'小林',age:742},
+  {id:'r_2b40e6d8',game:'shooter',mode:'ffa',map:'depot',state:'READY',players:[],cap:8,owner:'admin',age:95},
+  {id:'r_c19d0a55',game:'turns',mode:'classic',map:'table',state:'STARTING',players:[],cap:2,owner:'豆豆',age:4}
+];}
+function seedPlayers(){return [
+  {id:'u_3f1c8a20',user:'lin',name:'小林',state:'ACTIVE',online:'r_7f3a91c2',created:'2026-09-24 20:11',assets:{shooter:{coins:145,xp:620,owned:['rifle','smg'],select:{primary:'smg'}},turns:{coins:10,xp:40,owned:['stones_basic'],select:{theme:'stones_basic'}}}},
+  {id:'u_9a02d6e1',user:'ajie',name:'阿杰',state:'ACTIVE',online:'r_7f3a91c2',created:'2026-09-25 09:43',assets:{shooter:{coins:20,xp:180,owned:['rifle'],select:{primary:'rifle'}},turns:{coins:0,xp:0,owned:['stones_basic'],select:{theme:'stones_basic'}}}},
+  {id:'u_51be7730',user:'doudou',name:'豆豆',state:'ACTIVE',online:'lobby',created:'2026-09-26 18:02',assets:{shooter:{coins:0,xp:0,owned:['rifle'],select:{primary:'rifle'}},turns:{coins:65,xp:210,owned:['stones_basic','stones_jade'],select:{theme:'stones_jade'}}}},
+  {id:'u_0c77f4b9',user:'tester01',name:'测试员一号',state:'ACTIVE',online:'',created:'2026-09-27 14:30',assets:{shooter:{coins:500,xp:1200,owned:['rifle','smg','shotgun'],select:{primary:'shotgun'}},turns:{coins:0,xp:0,owned:['stones_basic'],select:{theme:'stones_basic'}}}},
+  {id:'u_e4a19b02',user:'mika',name:'米卡',state:'BANNED',online:'',created:'2026-09-23 11:05',assets:{shooter:{coins:35,xp:90,owned:['rifle'],select:{primary:'rifle'}},turns:{coins:0,xp:0,owned:['stones_basic'],select:{theme:'stones_basic'}}}},
+  {id:'u_7d3e60aa',user:'sunny',name:'晴天',state:'ACTIVE',online:'',created:'2026-09-28 21:47',assets:{shooter:{coins:5,xp:30,owned:['rifle'],select:{primary:'rifle'}},turns:{coins:0,xp:0,owned:['stones_basic'],select:{theme:'stones_basic'}}}}
+];}
+const STATE_TEXT={STOPPED:'已停止',STARTING:'启动中',RUNNING:'运行中',DRAINING:'停服倒计时',STOPPING:'正在停止',FAILED:'出错',READY:'已就绪',ACTIVE:'正常',BANNED:'已停用'};
+const STATE_TONE={RUNNING:'good',READY:'good',ACTIVE:'good',STARTING:'warn',DRAINING:'warn',STOPPING:'warn',FAILED:'bad',BANNED:'bad',STOPPED:''};
+const ERR={CONTROL_UNAVAILABLE:'游戏服务器没有响应（CONTROL_UNAVAILABLE）。操作未执行，可以稍后重试。'};
+
+let S={demo:'normal',page:'overview',host:'RUNNING',hostSince:3620,rooms:seedRooms(),players:seedPlayers(),
+  roomFilter:'all',roomQuery:'',selRoom:'r_7f3a91c2',playerQuery:'',selPlayer:'u_3f1c8a20',selGame:'shooter',
+  failNext:false,lastRoom:{game:'shooter',mode:'ffa',map:'depot',cap:8},staleSince:0};
+const $=id=>document.getElementById(id);
+function h(tag,attrs={},...kids){const el=document.createElement(tag);for(const [k,v]of Object.entries(attrs||{})){if(v===false||v==null)continue;if(k==='class')el.className=v;else if(k.startsWith('on'))el.addEventListener(k.slice(2),v);else if(k==='html')el.innerHTML=v;else el.setAttribute(k,v===true?'':v);}for(const k of kids.flat()){if(k==null||k===false)continue;el.append(k instanceof Node?k:document.createTextNode(String(k)));}return el;}
+function appendAll(el,...kids){el.append(...kids.flat().filter(k=>k!=null&&k!==false));}
+function badge(state,text){return h('span',{class:'badge '+(STATE_TONE[state]||'')},text||STATE_TEXT[state]||state);}
+function game(id){return GAMES.find(g=>g.id===id);}
+function mins(s){s=Math.max(0,Math.round(s));return s>=3600?`${Math.floor(s/3600)} 小时 ${Math.floor(s%3600/60)} 分`:s>=60?`${Math.floor(s/60)} 分`:`${s} 秒`;}
+const offline=()=>S.demo==='offline', loading=()=>S.demo==='loading', empty=()=>S.demo==='empty';
+const rooms=()=>empty()?[]:S.rooms, players=()=>empty()?[]:S.players;
+const onlineCount=()=>players().filter(p=>p.online).length;
+
+/* ===== Toasts: "accepted" and "completed" are separate messages ===== */
+function toast(title,text,tone='info',ms=4200){const t=h('div',{class:'toast '+tone,role:tone==='bad'?'alert':'status'},h('div',{class:'grow'},h('strong',{},title),text?h('span',{},text):null),h('button',{type:'button',class:'ghost small','aria-label':'关闭提示',onclick:()=>t.remove()},'✕'));$('toasts').append(t);if(ms)setTimeout(()=>t.remove(),ms);return t;}
+/* Simulated request: resolves "accepted" quickly; failure demo rejects once. */
+function request(label){return new Promise((ok,no)=>setTimeout(()=>{if(S.failNext){S.failNext=false;syncDemoButtons();no({code:'CONTROL_UNAVAILABLE'});}else ok();},450));}
+
+/* ===== Dialog with keyboard close and focus return ===== */
+let returnFocus=null,dlgSubmit=null;
+function openDialog({title,body,submit='确认',danger=false,onSubmit,cancel='取消',secondary}){
+  returnFocus=document.activeElement;returnKey=focusKey(returnFocus);
+  $('dlgTitle').textContent=title;$('dlgBody').replaceChildren(...[].concat(body));
+  const err=h('p',{class:'error',role:'alert',id:'dlgErr'});$('dlgBody').append(err);
+  const foot=$('dlgFoot');foot.replaceChildren();
+  foot.append(h('button',{type:'button',onclick:closeDialog},cancel));
+  if(secondary)foot.append(secondary);
+  if(onSubmit){const b=h('button',{type:'submit',class:danger?'danger solid':'primary',id:'dlgOk'},submit);foot.append(b);}
+  dlgSubmit=onSubmit;$('dlg').showModal();
+  const first=$('dlgBody').querySelector('input,select,textarea,button');(first||$('dlgX')).focus();
+}
+function closeDialog(){if($('dlg').open)$('dlg').close();restoreFocus();}
+let returnKey=null;
+function restoreFocus(){if(!returnFocus&&!returnKey)return;let el=returnFocus&&document.contains(returnFocus)?returnFocus:null;if(!el&&returnKey)el=returnKey.startsWith('#')?$(returnKey.slice(1)):[...$('content').querySelectorAll('button,input,select,tr,summary')].find(x=>focusKey(x)===returnKey);if(el)el.focus();returnFocus=null;returnKey=null;}
+/* Esc closes the dialog natively; restore focus there too (idempotent). */
+$('dlg').addEventListener('close',restoreFocus);
+$('dlgX').addEventListener('click',closeDialog);
+$('dlgForm').addEventListener('submit',async e=>{e.preventDefault();if(!dlgSubmit)return closeDialog();const ok=$('dlgOk');const err=$('dlgErr');err.textContent='';
+  const form=$('dlgForm');for(const el of form.querySelectorAll('[required]')){if(!String(el.value).trim()){err.textContent='请填写“'+(el.dataset.label||'必填项')+'”。';el.focus();return;}}
+  ok.disabled=true;const old=ok.textContent;ok.textContent='正在提交…';
+  try{const keep=await dlgSubmit(form);if(keep!==true)closeDialog();}
+  catch(x){err.textContent=ERR[x.code]||'操作失败：'+(x.code||x);}
+  finally{ok.disabled=false;ok.textContent=old;}
+});
+function field(label,input,hint){if(input.required)input.dataset.label=label;return h('label',{class:'field'},h('span',{},label),input,hint?h('span',{class:'hint'},hint):null);}
+function reasonField(placeholder='例如：测试发放 / 玩家申诉'){return field('原因（写入审计记录）',h('input',{name:'reason',required:true,maxlength:120,placeholder}),null);}
+
+/* ===== Actions (simulated) ===== */
+function guard(){if(offline()){toast('管理服务离线','显示的是旧快照，操作暂不可用。','warn');return false;}return true;}
+async function startHost(){if(!guard())return;
+  try{await request();}catch(x){toast('启动失败',ERR[x.code],'bad',7000);return;}
+  S.host='STARTING';render();toast('请求已接受','游戏服务器正在启动，就绪后会再提示。','info');
+  setTimeout(()=>{S.host='RUNNING';S.hostSince=0;render();toast('已完成','游戏服务器运行中，现在可以创建房间。','good');},2200);}
+function stopHost(immediate){if(!guard())return;
+  openDialog({title:immediate?'立即停止游戏服务器':'停止游戏服务器（60 秒公告）',danger:true,submit:immediate?'立即停止':'开始 60 秒倒计时',
+    body:[h('p',{},immediate?'所有房间会立刻关闭，未结束的对局不会发放完局奖励。管理后台保持在线。':'玩家会看到停服公告，60 秒内不接受新入房，之后保存数据并关闭房间。管理后台保持在线。'),reasonField('例如：更新版本')],
+    onSubmit:async()=>{await request();S.host=immediate?'STOPPING':'DRAINING';render();toast('请求已接受',immediate?'正在停止房间和游戏服务器。':'停服倒计时已开始。','info');
+      setTimeout(()=>{S.host='STOPPED';S.rooms=S.rooms.map(r=>({...r,state:'STOPPED'})).filter(()=>false);render();toast('已完成','游戏服务器已停止，房间已回收。','good');},immediate?1600:3000);}});}
+function createRoom(){if(!guard())return;
+  if(S.host!=='RUNNING'){toast('先启动游戏服务器','服务器运行后才能创建房间。','warn');return;}
+  const l=S.lastRoom;const gSel=h('select',{name:'game'},GAMES.map(g=>h('option',{value:g.id,selected:g.id===l.game},g.name)));
+  const mSel=h('select',{name:'mode'}),mapSel=h('select',{name:'map'}),cap=h('input',{name:'cap',type:'number',min:1,max:16,value:l.cap});
+  const fill=()=>{const g=game(gSel.value);mSel.replaceChildren(...Object.entries(g.modes).map(([k,m])=>h('option',{value:k},m.label)));const m=g.modes[mSel.value];mapSel.replaceChildren(...m.maps.map(x=>h('option',{value:x},x)));cap.min=m.min;cap.max=m.max;cap.value=Math.min(Math.max(Number(cap.value)||m.max,m.min),m.max);};
+  gSel.addEventListener('change',fill);fill();
+  openDialog({title:'创建房间',submit:'创建房间',body:[h('p',{class:'hint'},'已按上次的设置预填；服务器只启动已注册的游戏程序。'),field('游戏',gSel),h('div',{class:'grid g-2'},field('模式',mSel),field('地图',mapSel)),field('最多玩家',cap,'房间规则（每局时长等）沿用游戏默认值，可在房间详情里查看。')],
+    onSubmit:async f=>{await request();const r={id:'r_'+Math.random().toString(16).slice(2,10),game:f.game.value,mode:f.mode.value,map:f.map.value,state:'STARTING',players:[],cap:Number(f.cap.value),owner:'admin',age:0};
+      S.lastRoom={game:r.game,mode:r.mode,map:r.map,cap:r.cap};S.rooms.unshift(r);S.selRoom=r.id;render();toast('请求已接受','房间进程启动中，绑定端口后才会显示“已就绪”。','info');
+      setTimeout(()=>{r.state='READY';render();toast('已完成',`房间 ${r.id} 已就绪，玩家可以进入。`,'good');},2500);}});}
+function stopRoom(r){if(!guard())return;openDialog({title:'关闭房间 '+r.id,danger:true,submit:'关闭房间',body:[h('p',{},r.players.length?`房间里还有 ${r.players.length} 名玩家，他们会回到大厅。`:'房间里没有玩家。'),reasonField('例如：测试结束')],
+  onSubmit:async()=>{await request();r.state='STOPPING';render();toast('请求已接受','正在关闭房间进程。','info');setTimeout(()=>{S.rooms=S.rooms.filter(x=>x!==r);render();toast('已完成','房间已关闭并回收。','good');},1400);}});}
+function inviteDialog(){if(!guard())return;const uses=h('input',{name:'uses',type:'number',min:1,max:1000,value:5}),hours=h('input',{name:'hours',type:'number',min:1,max:8760,value:168});
+  openDialog({title:'生成邀请码',submit:'生成',body:[h('div',{class:'grid g-2'},field('可注册次数',uses),field('有效期（小时）',hours)),reasonField('例如：发给周末测试的朋友')],
+    onSubmit:async f=>{await request();const code=Array.from({length:3},()=>Math.random().toString(36).slice(2,6).toUpperCase()).join('-');
+      const box=h('input',{readonly:true,value:code,'aria-label':'邀请码'});
+      const copy=h('button',{type:'button',class:'primary',onclick:async()=>{try{await navigator.clipboard.writeText(code);copy.textContent='已复制';}catch{box.select();copy.textContent='已选中，按 Ctrl+C';}}},'复制');
+      $('dlgTitle').textContent='邀请码已生成';$('dlgBody').replaceChildren(h('p',{},`可注册 ${f.uses.value} 次，${f.hours.value} 小时内有效。关闭后仍可在“邀请码”页查看和撤销。`),h('div',{class:'codebox'},box,copy),h('p',{class:'hint'},'演示代码，不能用于真实注册。'));
+      $('dlgFoot').replaceChildren(h('button',{type:'button',onclick:closeDialog},'完成'));dlgSubmit=null;copy.focus();toast('已完成','邀请码已生成。','good');return true;}});}
+function coinsDialog(p){if(!guard())return;const g=game(S.selGame);const amt=h('input',{name:'amount',type:'number',min:-1000000,max:1000000,value:100,required:true});
+  const presets=h('div',{class:'presets'},[100,500,1000].map(v=>h('button',{type:'button',class:'small',onclick:()=>{amt.value=v;amt.focus();}},'+'+v)));
+  openDialog({title:`调整金币 · ${p.name} · ${g.name}`,submit:'确认调整',body:[h('p',{class:'hint'},`资产空间：${g.space}。只影响永久钱包，比赛内临时金钱不受影响。负数表示扣除。`),field('金币变化量',amt),presets,reasonField('例如：测试金币')],
+    onSubmit:async f=>{await request();const a=p.assets[S.selGame];const d=Number(f.amount.value)||0;if(a.coins+d<0)throw{code:'余额不能为负'};a.coins+=d;render();toast('已完成',`${p.name} 在“${g.name}”的金币 ${d>=0?'+':''}${d}，当前 ${a.coins}。已写入资产流水。`,'good',5000);}});}
+function simpleAction(title,text,{danger=false,done}){if(!guard())return;openDialog({title,danger,submit:danger?'确认执行':'确认',body:[h('p',{},text),reasonField()],onSubmit:async()=>{await request();done&&done();render();toast('已完成',title+'。','good');}});}
+
+/* ===== Rendering ===== */
+function connBar(){const c=$('connState');c.replaceChildren();
+  if(offline()){c.append(h('span',{class:'dot bad pulse'}),h('span',{},'管理服务离线 · 显示 2 分 14 秒前的快照'));}
+  else if(loading()){c.append(h('span',{class:'dot warn pulse'}),h('span',{},'正在获取状态…'));}
+  else c.append(h('span',{class:'dot good'}),h('span',{},'管理服务在线 · 刚刚更新'));}
+function sk(n=3){return Array.from({length:n},(_,i)=>h('div',{class:'skeleton',style:`width:${90-i*15}%`}));}
+function staleNotice(){return offline()?h('div',{class:'notice bad',role:'alert'},h('p',{class:'grow'},h('strong',{},'无法连接管理服务。'),' 下方是 2 分 14 秒前收到的数据，可能已经过时；所有操作暂停，页面会自动重连。若一直离线，请在服务器电脑上重新运行 StartManagement.cmd。'),h('button',{type:'button',class:'small',onclick:()=>{setDemo('normal');toast('已重新连接','数据已刷新。','good');}},'立即重试')):null;}
+function hostSteps(){const order=['STOPPED','STARTING','RUNNING'];const cur=S.host==='DRAINING'||S.host==='STOPPING'?'RUNNING':S.host;const idx=order.indexOf(cur);
+  return h('div',{class:'steps','aria-label':'游戏服务器进度'},...order.flatMap((st,i)=>[i?h('i',{},'→'):null,h('span',{class:i<idx?'done':i===idx?'on':''},STATE_TEXT[st])]));}
+
+function pageOverview(){
+  const R=rooms(),ready=R.filter(r=>r.state==='READY').length,starting=R.filter(r=>r.state==='STARTING').length;
+  const out=[h('div',{class:'pagehead'},h('div',{},h('h1',{},'总览'),h('p',{},'服务器状态、常用操作和需要注意的事项。')))];
+  const st=staleNotice();if(st)out.push(st);
+  if(!loading()&&!offline()&&S.host==='RUNNING'&&!empty())out.push(h('div',{class:'notice warn'},h('p',{class:'grow'},h('strong',{},'需要注意：'),' 最近一次自动备份已是 47 分钟前（计划每 30 分钟一次）。'),h('button',{type:'button',class:'small',onclick:()=>go('backups')},'查看备份')));
+  const hostTone={RUNNING:'good',STARTING:'warn pulse',DRAINING:'warn pulse',STOPPING:'warn pulse',STOPPED:'',FAILED:'bad'}[S.host]||'';
+  const hostCard=h('div',{class:'card'},
+    h('div',{class:'cardhead'},h('h2',{},'服务器'),offline()?h('span',{class:'badge'},'旧快照'):null),
+    h('div',{class:'service'},
+      h('div',{class:'svc'},h('div',{class:'head'},h('span',{class:'dot '+(offline()?'bad':'good')}),'管理服务',h('span',{class:'badge '+(offline()?'bad':'good')},offline()?'连接中断':'在线')),h('div',{class:'desc'},'本后台、账号与资产数据。常驻运行，停止游戏服务器不会关闭它。')),
+      h('div',{class:'svc'},h('div',{class:'head'},h('span',{class:'dot '+hostTone}),'游戏服务器',loading()?h('span',{class:'badge'},'读取中'):badge(S.host)),h('div',{class:'desc'},'大厅与房间进程。'+(S.host==='RUNNING'?'已运行 '+mins(S.hostSince)+'。':S.host==='STOPPED'?'启动后玩家才能登录和进房。':'')),loading()?null:hostSteps())),
+    loading()?h('div',{},...sk(2)):h('div',{class:'actions'},
+      S.host==='STOPPED'?h('button',{type:'button',class:'primary',onclick:startHost,disabled:offline()},'启动游戏服务器'):null,
+      h('button',{type:'button',class:S.host==='RUNNING'?'primary':'',onclick:createRoom,disabled:offline()||S.host!=='RUNNING'},'＋ 创建房间'),
+      h('button',{type:'button',onclick:inviteDialog,disabled:offline()},'生成邀请码'),
+      h('button',{type:'button',onclick:()=>toast('演示','备份请求会在正式后台接入；这里不执行。','info'),disabled:offline()},'立即备份')),
+    S.host==='RUNNING'||S.host==='DRAINING'?h('details',{class:'danger'},h('summary',{},'危险操作'),h('div',{class:'actions'},
+      h('button',{type:'button',class:'danger',onclick:()=>stopHost(false),disabled:offline()||S.host!=='RUNNING'},'停止服务器（60 秒公告）'),
+      h('button',{type:'button',class:'danger',onclick:()=>stopHost(true),disabled:offline()},'立即停止'),
+      h('button',{type:'button',class:'danger',onclick:()=>simpleAction('开启维护模式','开启后不接受新入房，已在房间的玩家不受影响。',{}),disabled:offline()},'维护模式'))):null);
+  const stats=h('div',{class:'grid g-2'},
+    statCard('活动房间',loading()?null:R.length,loading()?'':`${ready} 已就绪 · ${starting} 启动中`),
+    statCard('在线玩家',loading()?null:onlineCount(),'含大厅中的玩家'),
+    statCard('CPU / 内存',loading()?null:'不可用','当前环境未提供该指标',true),
+    statCard('数据盘可用',loading()?null:offline()?'不可用':'182 GB','F: 盘',offline()));
+  out.push(h('div',{class:'grid g-hero'},hostCard,stats));
+  const list=h('div',{class:'card',style:'margin-top:14px'},h('div',{class:'cardhead'},h('h2',{},'房间'),h('button',{type:'button',class:'small ghost',onclick:()=>go('rooms')},'全部房间 →')));
+  if(loading())list.append(...sk(3));else if(!R.length)list.append(emptyBox('还没有房间',S.host==='RUNNING'?'点“创建房间”，或等玩家在客户端里自己创建。':'先启动游戏服务器。'));
+  else list.append(roomTable(R.slice(0,4),false));
+  out.push(list);
+  return out;}
+function statCard(label,value,sub,na){return h('div',{class:'card stat'},h('div',{class:'label'},label),value==null?h('div',{},...sk(1)):h('div',{class:'value'+(na||value==='不可用'?' na':'')},value),h('div',{class:'sub'},sub));}
+function emptyBox(title,text){return h('div',{class:'empty'},h('div',{class:'big'},'∅'),h('div',{},h('strong',{},title)),h('div',{class:'hint'},text));}
+function roomTable(list,selectable){
+  const body=h('tbody',{},list.map(r=>{const g=game(r.game);const tr=h('tr',{tabindex:0,'aria-selected':selectable&&r.id===S.selRoom?'true':'false',onclick:()=>{S.selRoom=r.id;if(S.page!=='rooms')go('rooms');else render();},onkeydown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click();}}},
+    h('td',{class:'mono'},r.id),h('td',{},g.name),h('td',{},badge(r.state)),h('td',{},`${r.players.length} / ${r.cap}`),h('td',{class:'muted'},r.owner));return tr;}));
+  return h('div',{class:'tablewrap'},h('table',{},h('thead',{},h('tr',{},['房间','游戏','状态','人数','创建者'].map(t=>h('th',{scope:'col'},t)))),body));}
+
+function pageRooms(){
+  const out=[h('div',{class:'pagehead'},h('div',{},h('h1',{},'房间'),h('p',{},'每个房间是一个独立的游戏进程。绑定端口并注册后才显示“已就绪”。')),h('div',{class:'actions'},h('button',{type:'button',class:'primary',onclick:createRoom,disabled:offline()||S.host!=='RUNNING'},'＋ 创建房间')))];
+  const st=staleNotice();if(st)out.push(st);
+  if(S.host!=='RUNNING'&&!offline())out.push(h('div',{class:'notice info'},h('p',{class:'grow'},'游戏服务器'+(STATE_TEXT[S.host]||'')+'，暂时不能创建房间。'),S.host==='STOPPED'?h('button',{type:'button',class:'small primary',onclick:startHost},'启动游戏服务器'):null));
+  const q=h('input',{type:'search',placeholder:'搜索房间 ID、游戏或创建者',value:S.roomQuery,'aria-label':'搜索房间',oninput:e=>{S.roomQuery=e.target.value;renderKeep('roomSearch');},id:'roomSearch'});
+  const filters=[['all','全部'],['READY','已就绪'],['STARTING','启动中'],['problem','异常']];
+  const chips=h('div',{class:'chips',role:'group','aria-label':'按状态筛选'},filters.map(([k,t])=>h('button',{type:'button',class:'chip','aria-pressed':String(S.roomFilter===k),onclick:()=>{S.roomFilter=k;render();}},t)));
+  const R=rooms().filter(r=>(S.roomFilter==='all'||(S.roomFilter==='problem'?['FAILED','STOPPING'].includes(r.state):r.state===S.roomFilter))&&(`${r.id} ${game(r.game).name} ${r.owner}`.toLowerCase().includes(S.roomQuery.trim().toLowerCase())));
+  const left=h('div',{class:'card'},h('div',{class:'toolbar'},q,chips));
+  if(loading())left.append(...sk(4));else if(!rooms().length)left.append(emptyBox('还没有房间','创建一个房间，或等玩家在客户端里自己创建。'));
+  else if(!R.length)left.append(emptyBox('没有符合条件的房间',h('button',{type:'button',class:'small',onclick:()=>{S.roomFilter='all';S.roomQuery='';render();}},'清除筛选')));
+  else left.append(roomTable(R,true));
+  const r=rooms().find(x=>x.id===S.selRoom);
+  const right=h('div',{class:'card detail'});
+  if(loading())right.append(...sk(5));
+  else if(!r)right.append(emptyBox('选择一个房间','在左侧列表中点击房间查看详情。'));
+  else{const g=game(r.game);appendAll(right,h('div',{class:'cardhead'},h('div',{},h('div',{class:'title mono'},r.id),h('div',{class:'muted'},g.name+' · '+g.modes[r.mode].label+' · '+r.map)),badge(r.state)),
+    r.state==='STARTING'?h('div',{class:'notice info'},h('p',{},'房间进程已启动，正在绑定端口。完成后状态变为“已就绪”，玩家才能进入。')):null,
+    h('dl',{class:'facts'},h('dt',{},'人数'),h('dd',{},`${r.players.length} / ${r.cap}`),h('dt',{},'成员'),h('dd',{},r.players.length?r.players.join('、'):'暂无'),h('dt',{},'创建者'),h('dd',{},r.owner),h('dt',{},'运行时长'),h('dd',{},mins(r.age)),h('dt',{},'房间规则'),h('dd',{},r.game==='shooter'?'每局 300 秒 · 不限击杀 · 复活等待 3 秒':'游戏默认')),
+    h('div',{class:'actions'},h('button',{type:'button',onclick:()=>simpleAction('暂停接受新玩家','已在房间的玩家不受影响；可随时恢复。',{}),disabled:offline()||r.state!=='READY'},'暂停新玩家加入')),
+    h('details',{class:'danger'},h('summary',{},'危险操作'),h('div',{class:'actions'},h('button',{type:'button',class:'danger',onclick:()=>stopRoom(r),disabled:offline()},'关闭房间'),h('button',{type:'button',class:'danger',onclick:()=>simpleAction('重新创建房间','关闭当前进程后，用相同设置启动新房间。成员需要重新进入。',{danger:true}),disabled:offline()},'重新创建'))));}
+  out.push(h('div',{class:'split'},left,right));
+  return out;}
+
+function pagePlayers(){
+  const out=[h('div',{class:'pagehead'},h('div',{},h('h1',{},'玩家与资产'),h('p',{},'账号、在线状态，以及每个游戏分开保存的金币、经验和物品。')))];
+  const st=staleNotice();if(st)out.push(st);
+  const q=h('input',{type:'search',id:'playerSearch',placeholder:'用户名、昵称或 ID',value:S.playerQuery,'aria-label':'搜索玩家',oninput:e=>{S.playerQuery=e.target.value;renderKeep('playerSearch');}});
+  const P=players().filter(p=>`${p.user} ${p.name} ${p.id}`.toLowerCase().includes(S.playerQuery.trim().toLowerCase()));
+  const left=h('div',{class:'card'},h('div',{class:'toolbar'},q,h('span',{class:'hint'},loading()?'':`${P.length} 个账号`)));
+  if(loading())left.append(...sk(5));
+  else if(!players().length)left.append(emptyBox('还没有玩家账号','生成邀请码交给玩家，玩家在客户端里注册后会出现在这里。'),h('div',{style:'text-align:center'},h('button',{type:'button',class:'primary',onclick:inviteDialog,disabled:offline()},'生成邀请码')));
+  else if(!P.length)left.append(emptyBox('没有找到玩家','换个关键词试试。'));
+  else left.append(h('div',{class:'tablewrap'},h('table',{},h('thead',{},h('tr',{},['昵称','用户名','状态','在线'].map(t=>h('th',{scope:'col'},t)))),h('tbody',{},P.map(p=>{const tr=h('tr',{tabindex:0,'aria-selected':p.id===S.selPlayer?'true':'false',onclick:()=>{S.selPlayer=p.id;render();},onkeydown:e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click();}}},h('td',{},p.name),h('td',{class:'mono'},p.user),h('td',{},badge(p.state)),h('td',{},p.online?h('span',{class:'badge good'},p.online==='lobby'?'大厅':'房间中'):h('span',{class:'muted'},'离线')));return tr;})))));
+  const p=players().find(x=>x.id===S.selPlayer);
+  const right=h('div',{class:'card detail'});
+  if(loading())right.append(...sk(6));
+  else if(!p)right.append(emptyBox('选择一个玩家','在左侧列表或顶部搜索框中找到玩家。'));
+  else{
+    const tabs=h('div',{class:'tabs',role:'tablist','aria-label':'按游戏查看资产'},GAMES.map(g=>h('button',{type:'button',role:'tab','aria-selected':String(g.id===S.selGame),onclick:()=>{S.selGame=g.id;render();}},g.name)));
+    const g=game(S.selGame),a=p.assets[S.selGame];
+    const owned=new Set(a.owned);
+    right.append(h('div',{class:'cardhead'},h('div',{},h('div',{class:'title'},p.name),h('div',{class:'mono muted'},p.user+' · '+p.id)),badge(p.state)),
+      h('dl',{class:'facts'},h('dt',{},'注册时间'),h('dd',{},p.created),h('dt',{},'当前'),h('dd',{},p.online?(p.online==='lobby'?'在大厅':'在房间 '+p.online):'离线')),
+      h('div',{class:'actions'},h('button',{type:'button',onclick:()=>simpleAction('修改昵称 · '+p.name,'新昵称在玩家下次进房时生效。',{}),disabled:offline()},'修改昵称'),h('button',{type:'button',onclick:()=>simpleAction('重置密码 · '+p.name,'会生成临时密码，并让该玩家当前的登录失效。',{}),disabled:offline()},'重置密码')),
+      tabs,
+      h('div',{class:'hint',style:'margin-bottom:8px'},'资产空间 ',h('span',{class:'mono'},g.space),'：各游戏默认互相独立，这里的修改不影响其他游戏。'),
+      h('div',{class:'grid g-2',style:'margin-bottom:12px'},h('div',{class:'stat'},h('div',{class:'label'},'金币'),h('div',{class:'value'},a.coins)),h('div',{class:'stat'},h('div',{class:'label'},'经验 / 等级'),h('div',{class:'value'},a.xp,h('span',{class:'hint'},' · Lv.'+(1+Math.floor(a.xp/250)))))),
+      h('div',{class:'actions',style:'margin-bottom:14px'},h('button',{type:'button',class:'primary',onclick:()=>coinsDialog(p),disabled:offline()||p.state!=='ACTIVE'},'调整金币'),h('button',{type:'button',onclick:()=>simpleAction('调整经验 · '+p.name,'经验变化会重新计算等级，并写入资产流水。',{}),disabled:offline()||p.state!=='ACTIVE'},'调整经验')),
+      h('div',{class:'label hint'},'物品（来自该游戏的商品目录）'),
+      h('div',{class:'items',style:'margin:6px 0 10px'},g.catalog.map(it=>h('span',{class:'item'+(owned.has(it.id)?'':' off'),title:owned.has(it.id)?'已拥有':'未拥有'},(owned.has(it.id)?'✓ ':'')+it.name))),
+      h('div',{class:'hint'},'默认配置：',Object.entries(a.select).map(([slot,id])=>`${slot} → ${(g.catalog.find(c=>c.id===id)||{}).name||id}`).join('；')),
+      h('details',{class:'danger'},h('summary',{},'危险操作'),h('div',{class:'actions'},
+        h('button',{type:'button',class:'danger',onclick:()=>simpleAction('踢下线 · '+p.name,'玩家会被断开，需要重新登录。',{danger:true}),disabled:offline()||!p.online},'踢下线'),
+        h('button',{type:'button',class:'danger',onclick:()=>simpleAction((p.state==='BANNED'?'恢复账号 · ':'停用账号 · ')+p.name,p.state==='BANNED'?'恢复后玩家可以重新登录。':'停用后玩家无法登录，当前登录立即失效。',{danger:p.state!=='BANNED',done:()=>{p.state=p.state==='BANNED'?'ACTIVE':'BANNED';}}),disabled:offline()},p.state==='BANNED'?'恢复账号':'停用账号'),
+        h('button',{type:'button',class:'danger',onclick:()=>toast('演示','永久删除账号沿用现有流程：输入用户名确认、分步执行、列出旧备份。本预览不模拟。','info',6000),disabled:offline()},'永久删除账号…'))));}
+  out.push(h('div',{class:'split'},left,right));
+  return out;}
+
+function sketch(title,purpose,lines){return [h('div',{class:'pagehead'},h('div',{},h('h1',{},title),h('p',{},purpose))),h('div',{class:'sketch'},h('span',{class:'badge warn'},'草图 · 本预览未实现'),h('h2',{style:'margin-top:10px'},'计划保留的内容'),h('ul',{},lines.map(t=>h('li',{},t))),h('p',{class:'hint',style:'margin-top:12px'},'这些功能在现有后台已经可用；改版时沿用原有接口和确认步骤，只调整布局。'))];}
+const PAGES={overview:pageOverview,rooms:pageRooms,players:pagePlayers,
+  invites:()=>sketch('邀请码','玩家用邀请码在客户端注册。',['列表：邀请码、剩余次数、到期时间、创建原因、状态','生成（总览和玩家页也有入口，生成后可直接复制）','撤销：单独确认，填写原因']),
+  backups:()=>sketch('备份与恢复','自动备份每 30 分钟一次，保留 48 份；手动备份另存。',['备份列表：时间、类型（自动 / 手动）、大小','立即备份','恢复：必须先停止游戏服务器；恢复前自动再备份一次；完成后所有登录失效']),
+  logs:()=>sketch('日志与审计','本项目的运行日志和管理员 / 资产操作记录。',['运行日志：按类别选择，只读','审计：谁在什么时间做了什么、原因、前后值','不提供任意文件浏览、SQL 或命令行']),
+  settings:()=>sketch('配置','监听地址、对外连接地址、容量和资产空间。',['修改前必须先停止游戏服务器','对外地址填本机局域网 IP，不填 0.0.0.0','房间上限 1–16；每个游戏选独立资产空间或 shared'])};
+
+/* Re-rendering replaces the page; keep keyboard focus on the "same" control
+   (by id, otherwise tag + text) so status updates never throw the user out. */
+function focusKey(el){if(!el||!$('content').contains(el))return null;return el.id?'#'+el.id:el.tagName+'|'+el.textContent.trim();}
+function render(){const key=focusKey(document.activeElement);connBar();document.body.classList.toggle('stale',offline());
+  for(const b of document.querySelectorAll('.nav button'))b.setAttribute('aria-current',b.dataset.page===S.page?'page':'false');
+  $('content').replaceChildren(...PAGES[S.page]());
+  if(key&&!$('dlg').open){const el=key.startsWith('#')?$(key.slice(1)):[...$('content').querySelectorAll('button,input,select,tr,summary')].find(x=>focusKey(x)===key);if(el)el.focus({preventScroll:true});}}
+function renderKeep(id){const el=$(id),pos=el?el.selectionStart:null;render();const n=$(id);if(n){n.focus();if(pos!=null)n.setSelectionRange(pos,pos);}}
+function go(page){S.page=page;render();$('content').focus({preventScroll:true});window.scrollTo(0,0);}
+for(const b of document.querySelectorAll('.nav button'))b.addEventListener('click',()=>go(b.dataset.page));
+
+/* ===== Demo state switcher ===== */
+function syncDemoButtons(){for(const b of document.querySelectorAll('[data-demo]')){b.setAttribute('aria-pressed',String(b.dataset.demo==='fail'?S.failNext:b.dataset.demo===S.demo));}}
+function setDemo(k){if(k==='fail'){S.failNext=!S.failNext;syncDemoButtons();toast(S.failNext?'已开启失败演示':'已取消失败演示',S.failNext?'下一次提交会返回“游戏服务器没有响应”。':'','warn');return;}
+  S.demo=k;syncDemoButtons();render();}
+for(const b of document.querySelectorAll('[data-demo]'))b.addEventListener('click',()=>setDemo(b.dataset.demo));
+$('themeToggle').addEventListener('click',()=>{const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark';$('themeToggle').setAttribute('aria-pressed',String(!dark));});
+
+/* ===== Global player search (top bar) ===== */
+const gs=$('globalSearch'),gr=$('globalResults');let gsIndex=0;
+function gsRender(){const q=gs.value.trim().toLowerCase();if(!q||loading()){gr.hidden=true;gs.setAttribute('aria-expanded','false');return;}
+  const hits=players().filter(p=>`${p.user} ${p.name} ${p.id}`.toLowerCase().includes(q)).slice(0,6);
+  gr.replaceChildren(...(hits.length?hits.map((p,i)=>h('button',{type:'button',role:'option',class:i===gsIndex?'active':'',onclick:()=>gsPick(p)},h('span',{},p.name+' ',h('span',{class:'mono muted'},p.user)),p.online?h('span',{class:'badge good'},'在线'):h('span',{class:'hint'},'离线'))):[h('div',{class:'hint',style:'padding:8px 10px'},'没有匹配的玩家')]));
+  gr.hidden=false;gs.setAttribute('aria-expanded','true');}
+function gsPick(p){S.selPlayer=p.id;S.playerQuery='';gs.value='';gr.hidden=true;gs.setAttribute('aria-expanded','false');go('players');}
+gs.addEventListener('input',()=>{gsIndex=0;gsRender();});
+gs.addEventListener('keydown',e=>{const items=[...gr.querySelectorAll('button')];
+  if(e.key==='ArrowDown'){e.preventDefault();gsIndex=Math.min(gsIndex+1,items.length-1);gsRender();}
+  else if(e.key==='ArrowUp'){e.preventDefault();gsIndex=Math.max(gsIndex-1,0);gsRender();}
+  else if(e.key==='Enter'){e.preventDefault();items[gsIndex]?.click();}
+  else if(e.key==='Escape'){gs.value='';gsRender();}});
+document.addEventListener('click',e=>{if(!e.target.closest('.topsearch')){gr.hidden=true;gs.setAttribute('aria-expanded','false');}});
+document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!$('dlg').open){e.preventDefault();gs.focus();}});
+
+render();
+</script>
+</body>
+</html>

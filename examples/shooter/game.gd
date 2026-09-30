@@ -11,6 +11,8 @@ const SOLIDS := [Rect2(0, 500, 960, 40), Rect2(145, 380, 195, 18), Rect2(620, 38
 const SPAWNS := [Vector2(95, 478), Vector2(865, 478), Vector2(190, 358), Vector2(770, 358), Vector2(420, 243), Vector2(540, 243)]
 signal round_finished(match_key: String, players: Array)
 signal respawn_requested(user_id: String)
+## Client presentation only (sound): derived from accepted server snapshots.
+signal presentation_cue(cue: String, detail: Dictionary)
 var server := false
 var players: Dictionary = {}
 var peers: Dictionary = {}
@@ -387,6 +389,7 @@ func respawn_command(value: int) -> void:
 @rpc("authority", "call_remote", "unreliable_ordered", 1)
 func world_state(value: Dictionary) -> void:
 	if not server and Validator.validate_file(value, "res://schemas/shooter_state.schema.json") == "" and int(value.tick) >= int(latest.get("tick", -1)):
+		var cues: Array = [] if latest.is_empty() else presentation_cues(latest, value, last_visual_shot)
 		if latest.is_empty():
 			render_tracks.clear()
 			visual_shots.clear()
@@ -394,6 +397,38 @@ func world_state(value: Dictionary) -> void:
 		_update_visual_targets(value)
 		latest = value
 		snapshot_age = 0.0
+		for cue in cues:
+			presentation_cue.emit(cue.cue, cue)
+
+## Sound cues between two accepted snapshots. Shots are server-confirmed and
+## new by id (one cue per trigger pull, so a shotgun's pellets play once); a hit
+## is a confirmed hp drop of a living player; a death is the transition into dead
+## or a raised death count, so a repeated or equal snapshot yields nothing. The
+## snapshot carries no attacker, so "hit" means any confirmed damage, not only
+## damage dealt by the local player.
+static func presentation_cues(old: Dictionary, value: Dictionary, seen_shot: int) -> Array:
+	var cues: Array = []
+	var pulls: Dictionary = {}
+	for shot in value.get("shots", []):
+		if int(shot.id) > seen_shot:
+			var key := "%d:%.1f:%.1f" % [int(shot.at), float(shot.x), float(shot.y)]
+			if not pulls.has(key):
+				pulls[key] = true
+				cues.append({"cue": "fire", "weapon": str(shot.weapon), "x": float(shot.x), "y": float(shot.y)})
+	var before: Dictionary = {}
+	for player in old.get("players", []):
+		before[str(player.user_id)] = player
+	for player in value.get("players", []):
+		var user := str(player.user_id)
+		if not before.has(user):
+			continue
+		var previous: Dictionary = before[user]
+		var died: bool = (previous.life_state == "alive" and player.life_state == "dead") or int(player.deaths) > int(previous.deaths)
+		if died:
+			cues.append({"cue": "death", "user_id": user})
+		elif previous.life_state == "alive" and player.life_state == "alive" and int(player.hp) < int(previous.hp):
+			cues.append({"cue": "hit", "user_id": user})
+	return cues
 
 func _update_visual_targets(value: Dictionary) -> void:
 	var present: Dictionary = {}

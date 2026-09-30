@@ -108,14 +108,14 @@ func _process(_delta: float) -> bool:
 					var tls := Secure.server_options(context.security)
 					context.erase("security")
 					if tls == null or enet.host.dtls_server_setup(tls) != OK:
-						_shutdown("CONTROL_UNAVAILABLE")
+						_shutdown("CONTROL_UNAVAILABLE", "DTLS_SETUP_FAILED")
 						return false
 				network.multiplayer_peer = enet
 				ready = true
 				_send("room.ready", {"udp_port": int(context.udp_port)})
 		for message in transport.pump(control):
 			if not Protocol.validate(message).is_empty() or message.room_id != context.room_id or message.launch_id != context.launch_id or message.game_id != context.game_id or message.build_id != context.build_id:
-				_shutdown("CONTROL_UNAVAILABLE")
+				_shutdown("CONTROL_UNAVAILABLE", "CONTROL_SCHEMA" if not Protocol.validate(message).is_empty() else "CONTROL_IDENTITY", str(message.get("type", "")))
 				break
 			last_host = now
 			_handle_control(message)
@@ -131,7 +131,7 @@ func _process(_delta: float) -> bool:
 				if members[peer_id].state != "IN_ROOM" and now > int(members[peer_id].deadline):
 					_disconnect(peer_id)
 		if not transport.flush(control) or transport.error != "":
-			_shutdown("CONTROL_UNAVAILABLE")
+			_shutdown("CONTROL_UNAVAILABLE", "CONTROL_TRANSPORT", "", transport.error)
 		if registered and result_outbox != null and now - last_result_send >= 1000:
 			last_result_send = now
 			var pending: Array = result_outbox.pending()
@@ -140,11 +140,11 @@ func _process(_delta: float) -> bool:
 				if not item.is_empty():
 					_send("result.submit", item)
 	elif registered:
-		_shutdown("CONTROL_UNAVAILABLE")
+		_shutdown("CONTROL_UNAVAILABLE", "CONTROL_CLOSED", "", "status_%d" % control.get_status())
 	if not registered and now - started > int(context.startup_timeout_ms):
-		_shutdown("START_TIMEOUT")
+		_shutdown("START_TIMEOUT", "STARTUP_TIMEOUT")
 	if now - last_host > int(context.host_timeout_ms):
-		_shutdown("CONTROL_UNAVAILABLE")
+		_shutdown("CONTROL_UNAVAILABLE", "HOST_SILENT")
 	if stopping and now >= stop_at:
 		enet.close()
 		quit(0)
@@ -188,7 +188,7 @@ func _handle_control(message: Dictionary) -> void:
 					printerr("RESULT_REJECTED code=", payload.code)
 		"room.heartbeat": pass
 		"room.drain": network.refuse_new_connections = true
-		"room.stop": _shutdown(payload.reason)
+		"room.stop": _shutdown(payload.reason, "HOST_STOP")
 		"admission.revoke":
 			if attempts.has(payload.attempt_id):
 				_disconnect(attempts[payload.attempt_id])
@@ -224,7 +224,7 @@ func _handle_control(message: Dictionary) -> void:
 			adapter.on_player_admitted(_identity(member))
 			net_node.confirm.rpc_id(peer_id, _snapshot())
 			_broadcast()
-		_: _shutdown("CONTROL_UNAVAILABLE")
+		_: _shutdown("CONTROL_UNAVAILABLE", "UNKNOWN_CONTROL_TYPE", str(message.type))
 
 func _peer_connected(peer_id: int) -> void:
 	if not members.has(peer_id) or members[peer_id].state != "AUTHENTICATED":
@@ -358,9 +358,10 @@ func _broadcast() -> void:
 		if members[peer_id].state == "IN_ROOM":
 			net_node.roster.rpc_id(peer_id, _snapshot())
 
-func _shutdown(reason: String) -> void:
+func _shutdown(reason: String, detail := "", message_type := "", transport_code := "") -> void:
 	if stopping:
 		return
+	_log_shutdown(reason, detail, message_type, transport_code)
 	stopping = true
 	stop_at = Time.get_ticks_msec() + 150
 	adapter.on_shutdown_requested(reason)
@@ -370,6 +371,23 @@ func _shutdown(reason: String) -> void:
 		_disconnect(peer_id)
 	enet.close()
 	_send("room.stopped", {})
+
+## Redacted room-side stop diagnostics (room log only; the wire protocol is
+## unchanged): fixed detail names, plain protocol words, transport codes and
+## timing. Never message payloads, tokens, tickets or keys.
+func _log_shutdown(reason: String, detail: String, message_type: String, transport_code: String) -> void:
+	var now := Time.get_ticks_msec()
+	var fields := ["ROOM_SHUTDOWN t=%d" % int(Time.get_unix_time_from_system() * 1000.0), "reason=" + _plain(reason), "detail=" + (detail if detail != "" else "-"), "type=" + (_plain(message_type) if message_type != "" else "-"), "transport=" + (_plain(transport_code) if transport_code != "" else "-")]
+	fields.append_array(["room=" + _plain(str(context.get("room_id", ""))), "launch=" + str(context.get("launch_id", "")).left(8), "ready=" + str(ready), "since_host_ms=%d" % (now - last_host), "heartbeat_ms=%d" % int(context.get("heartbeat_ms", 0)), "sent_heartbeats=%d" % sequence, "members=%d" % members.size(), "age_ms=%d" % (now - started)])
+	print(" ".join(fields))
+
+static func _plain(value: String) -> String:
+	if value.length() > 64:
+		return "invalid"
+	for character in value:
+		if not character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-":
+			return "invalid"
+	return value
 
 func _send(type: String, payload: Dictionary) -> void:
 	transport.queue(Protocol.event(type, context.room_id, context.launch_id, payload, context.game_id, context.build_id))

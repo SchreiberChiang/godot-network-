@@ -25,6 +25,7 @@ var _admission: Dictionary = {}
 var _attempt := ""
 var _disconnect_pending := false
 var _load_generation := 0
+var _lobby_close_logged := false
 var request_schema := "res://schemas/lobby_request.schema.json"
 var response_schema := "res://schemas/lobby_response.schema.json"
 
@@ -142,6 +143,7 @@ func _connect_reserved(admission: Dictionary) -> Dictionary:
 	if state == "IN_ROOM":
 		return {"ok": true, "payload": snapshot.duplicate(true)}
 	var code := last_error if last_error != "" else "LOAD_TIMEOUT"
+	print("CLIENT_ROOM_JOIN_FAILED code=", code, " phase=", state, " lobby_open=", socket.get_ready_state() == WebSocketPeer.STATE_OPEN)
 	_clear_game()
 	state = "LOBBY"
 	request_failed.emit(code)
@@ -160,6 +162,7 @@ func close() -> void:
 	_clear_game()
 	socket.close()
 	socket = WebSocketPeer.new()
+	_lobby_close_logged = false
 	identity.clear()
 	_pending.clear()
 	_answers.clear()
@@ -198,9 +201,16 @@ func _process(_delta: float) -> void:
 		var bytes := socket.get_packet()
 		var message := Wire.decode(bytes, response_schema) if socket.was_string_packet() else {}
 		if message.is_empty() or _pending.get(message.get("request_id", ""), "") != message.get("type", ""):
+			# Redacted: which check failed and the reply type only, never the body.
+			var raw: Variant = JSON.parse_string(bytes.get_string_from_utf8()) if socket.was_string_packet() else null
+			var raw_type := str(raw.get("type", "")) if raw is Dictionary else ""
+			print("CLIENT_LOBBY_CLOSING reason=", "schema" if message.is_empty() else "unexpected_reply", " type=", _word(raw_type, 32), " pending=", _pending.size(), " state=", state)
 			socket.close(1008, "invalid response")
 			break
 		_answers[message.request_id] = message
+	if socket.get_ready_state() == WebSocketPeer.STATE_CLOSED and not _lobby_close_logged and not identity.is_empty():
+		_lobby_close_logged = true
+		print("CLIENT_LOBBY_CLOSED code=", socket.get_close_code(), " reason=", _word(socket.get_close_reason().replace(" ", "_"), 60), " state=", state)
 	if enet != null:
 		network.poll()
 	if _disconnect_pending:
@@ -264,6 +274,17 @@ func _roster(value: Dictionary) -> void:
 
 func _valid_snapshot(value: Dictionary) -> bool:
 	return Validator.validate_file(value, "res://schemas/room_snapshot.schema.json") == "" and value.room_id == _admission.room_id
+
+## Diagnostics print only short protocol words; anything else becomes "other".
+static func _word(value: String, limit: int) -> String:
+	if value == "":
+		return "-"
+	if value.length() > limit:
+		return "other"
+	for character in value:
+		if not character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-":
+			return "other"
+	return value
 
 func _connection_lost(code: String) -> void:
 	last_error = code

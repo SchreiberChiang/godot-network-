@@ -45,6 +45,9 @@ var help_text: Label
 var own_notice: Label
 var pending_label: Label
 var asset_hint: Label
+var mute_button: Button
+var volume_slider := HSlider.new()
+var volume_dragging := false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -68,8 +71,23 @@ func _ready() -> void:
 	style.set_color("font_color", "ItemList", Color("dce9f1"))
 	style.set_constant("v_separation", "ItemList", 16)
 	theme = style
-	active_game = _label(self, "ROOMKIT", Vector2(28, 19), Vector2(760, 45), 30)
-	header_name = _label(self, "玩家入口", Vector2(804, 29), Vector2(402, 35), 17, Color("9fb3c2"))
+	active_game = _label(self, "ROOMKIT", Vector2(28, 19), Vector2(600, 45), 30)
+	header_name = _label(self, "玩家入口", Vector2(930, 29), Vector2(276, 35), 17, Color("9fb3c2"))
+	mute_button = _button(self, "音效 开", Vector2(640, 24), Vector2(118, 40), func(): app.sound.set_muted(not app.sound.muted))
+	mute_button.tooltip_text = "静音 / 取消静音  [M]"
+	volume_slider.position = Vector2(772, 36)
+	volume_slider.size = Vector2(140, 20)
+	volume_slider.min_value = 0
+	volume_slider.max_value = 100
+	volume_slider.step = 5
+	volume_slider.focus_mode = Control.FOCUS_NONE
+	volume_slider.tooltip_text = "音效音量"
+	volume_slider.value = roundf(app.sound.volume * 100.0) if app.sound != null else 70.0
+	# Dragging only changes the level; the file is written once when released.
+	volume_slider.value_changed.connect(func(value): app.sound.set_volume(value / 100.0, not volume_dragging))
+	volume_slider.drag_started.connect(func(): volume_dragging = true)
+	volume_slider.drag_ended.connect(_volume_released)
+	add_child(volume_slider)
 	header_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	server_notice = _label(self, "", Vector2(28, 88), Vector2(1184, 45), 16, Color("ffd293"))
 	permanent_message = _label(self, "", Vector2(44, 752), Vector2(1148, 54), 16, Color("c2d5df"))
@@ -113,6 +131,8 @@ func _button(parent: Node, text: String, position: Vector2, dimensions: Vector2,
 	node.text = text
 	node.position = position
 	node.size = dimensions
+	# One pressed signal, one click: the sound board also rate-limits repeats.
+	node.pressed.connect(func(): app.play_click())
 	node.pressed.connect(action)
 	parent.add_child(node)
 	return node
@@ -147,6 +167,10 @@ func _build_login() -> void:
 	login_button.add_theme_stylebox_override("normal", _box(Color("246958")))
 	toggle_auth = _button(form, "没有账号？使用邀请码注册", Vector2(44, 347), Vector2(432, 43), func(): register_mode = not register_mode)
 	login_password.text_submitted.connect(func(_text): _submit_login())
+
+func _volume_released(_changed: bool) -> void:
+	volume_dragging = false
+	app.sound.set_volume(volume_slider.value / 100.0)
 
 func _submit_login() -> void:
 	if register_mode:
@@ -264,6 +288,9 @@ func _process(delta: float) -> void:
 	active_game.text = "ROOMKIT  /  " + ("零号仓库" if app.game_id == "shooter" else "十二颗石子")
 	header_name.text = str(app.client.identity.get("display_name", "")) + "  ·  " + ("房间内" if in_room else "大厅") if authenticated else "玩家账号入口"
 	server_notice.text = app.notice
+	if app.sound != null:
+		mute_button.text = "已静音" if app.sound.muted else "音效 开"
+		volume_slider.editable = not app.sound.muted
 	permanent_message.text = ("处理中 · " if app.busy else "") + app.message
 	login_panel.visible = not authenticated
 	lobby_panel.visible = authenticated and not in_room and not app.inventory_open and not app.account_open
@@ -389,6 +416,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if event.physical_keycode == KEY_B:
 		app.toggle_inventory()
+		get_viewport().set_input_as_handled()
+	elif event.physical_keycode == KEY_M and app.sound != null:
+		app.sound.set_muted(not app.sound.muted)
 		get_viewport().set_input_as_handled()
 	elif event.physical_keycode == KEY_R and not app.account_open:
 		app.respawn()

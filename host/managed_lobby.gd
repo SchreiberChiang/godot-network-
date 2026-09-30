@@ -184,20 +184,27 @@ func _refresh(row: Dictionary, payload: Dictionary) -> void:
 func kick(user_id: String, reason: String) -> void:
 	for seat in admissions.seats.values().duplicate(true):
 		if seat.user_id == user_id:
-			manager.send_control(seat.room_id, "admission.revoke", {"attempt_id": seat.attempt_id})
-			admissions.leave(seat.room_id, user_id, seat.attempt_id)
+			_revoke_seat(seat)
 	for connection in peers.duplicate():
 		if connection.user.get("user_id", "") == user_id:
 			connection.ws.close(1008, reason.left(60))
 			_drop(connection)
+
+## A RESERVED seat has no attempt yet (the room learns it only when the ticket is
+## consumed), so there is nothing to revoke in the room: release the seat, and
+## its unused ticket expires on its own. Sending admission.revoke with an empty
+## attempt_id violated the control schema and made the room shut down.
+func _revoke_seat(seat: Dictionary) -> void:
+	if str(seat.attempt_id) != "":
+		manager.send_control(seat.room_id, "admission.revoke", {"attempt_id": seat.attempt_id})
+	admissions.leave(seat.room_id, seat.user_id, seat.attempt_id)
 
 func _drop(connection: Dictionary) -> void:
 	var user_id: String = connection.user.get("user_id", "")
 	if user_id != "":
 		for seat in admissions.seats.values().duplicate(true):
 			if seat.user_id == user_id:
-				manager.send_control(seat.room_id, "admission.revoke", {"attempt_id": seat.attempt_id})
-				admissions.leave(seat.room_id, user_id, seat.attempt_id)
+				_revoke_seat(seat)
 		var token: String = account_tokens.get(user_id, "")
 		account_tokens.erase(user_id)
 		if token != "" and bus != null and bus.ready():

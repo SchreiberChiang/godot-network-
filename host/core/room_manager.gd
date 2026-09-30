@@ -143,14 +143,14 @@ func poll() -> void:
 		var peer: StreamPeerTCP = connection.peer
 		peer.poll()
 		if peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
-			_drop(connection)
+			_drop(connection, "TRANSPORT_CLOSED", "", str(peer.get_status()))
 			continue
 		# Child identity must be captured before consuming registration bytes.
 		if connection.room_id == "" and not starts.is_empty():
 			continue
 		var messages: Array = connection.transport.pump(peer)
 		if not connection.transport.error.is_empty():
-			_reject(connection)
+			_reject(connection, "TRANSPORT_ERROR", "", connection.transport.error)
 			continue
 		for message in messages:
 			if not connections.has(connection):
@@ -159,10 +159,10 @@ func poll() -> void:
 		if not connections.has(connection):
 			continue
 		if not connection.transport.flush(peer):
-			_drop(connection)
+			_drop(connection, "WRITE_FAILED", "", connection.transport.error)
 			continue
 		if connection.room_id == "" and Time.get_ticks_msec() - int(connection.accepted_at) > 3000:
-			_reject(connection)
+			_reject(connection, "REGISTER_TIMEOUT")
 	var now := Time.get_ticks_msec()
 	for row in rooms.values():
 		if row.cleaned:
@@ -238,22 +238,22 @@ func close() -> bool:
 	if active_count() != 0:
 		return false
 	for connection in connections.duplicate():
-		_drop(connection)
+		_drop(connection, "HOST_CLOSED")
 	server.stop()
 	closed = true
 	return true
 
 func _receive(connection: Dictionary, message: Dictionary) -> void:
 	if not Protocol.validate(message).is_empty():
-		_reject(connection)
+		_reject(connection, "SCHEMA_REJECTED", str(message.get("type", "")))
 		return
 	var row: Dictionary = rooms.get(message.room_id, {})
 	if row.is_empty() or row.cleaned or message.launch_id != row.launch_id or message.game_id != row.game_id or message.build_id != row.build_id:
-		_reject(connection)
+		_reject(connection, "IDENTITY_MISMATCH", message.type)
 		return
 	if connection.room_id == "":
 		if message.type != "room.register" or row.state != "STARTING" or row.registered or message.payload.token != row.token or int(message.payload.pid) != int(row.pid):
-			_reject(connection)
+			_reject(connection, "REGISTER_REJECTED", message.type)
 			return
 		connection.room_id = row.room_id
 		row.registered = true
@@ -261,12 +261,12 @@ func _receive(connection: Dictionary, message: Dictionary) -> void:
 		row.token = ""
 		return
 	if connection.room_id != row.room_id:
-		_reject(connection)
+		_reject(connection, "ROOM_MISMATCH", message.type)
 		return
 	match message.type:
 		"room.ready":
 			if row.state != "STARTING" or int(message.payload.udp_port) != int(row.port):
-				_reject(connection)
+				_reject(connection, "READY_REJECTED", message.type)
 				return
 			_transition(row, "READY")
 			row.last_heartbeat = Time.get_ticks_msec()
@@ -278,7 +278,7 @@ func _receive(connection: Dictionary, message: Dictionary) -> void:
 			var sequence := int(message.payload.sequence)
 			var step := int(message.payload.step)
 			if row.state != "READY" or sequence <= int(row.last_sequence) or step < int(row.last_step):
-				_reject(connection)
+				_reject(connection, "HEARTBEAT_SEQUENCE", message.type)
 				return
 			row.last_heartbeat = Time.get_ticks_msec()
 			if step > int(row.last_step):
@@ -290,17 +290,17 @@ func _receive(connection: Dictionary, message: Dictionary) -> void:
 			_send(row, "room.heartbeat", message.payload)
 		"room.stopped":
 			if row.state not in ["STOPPING", "FAILED"]:
-				_reject(connection)
+				_reject(connection, "UNEXPECTED_STOPPED", message.type)
 				return
 			row.stop_notice = true
 		"room.failed":
 			_fail(row, message.payload.code)
 		"result.submit":
 			if result_service == null or not result_service.handle(row, message):
-				_reject(connection)
+				_reject(connection, "RESULT_REJECTED", message.type)
 		_:
 			if not control_handler.is_valid() or not control_handler.call(row, message):
-				_reject(connection)
+				_reject(connection, "HANDLER_REJECTED", message.type)
 
 func send_control(room_id: String, type: String, payload: Dictionary) -> void:
 	if rooms.has(room_id):
@@ -341,7 +341,7 @@ func _cleanup(row: Dictionary) -> void:
 		launcher.forget(row.launch_id)
 	for connection in connections.duplicate():
 		if connection.room_id == row.room_id:
-			_drop(connection)
+			_drop(connection, "ROOM_CLEANED")
 	if row.state != "FAILED":
 		_transition(row, "STOPPED")
 
@@ -349,22 +349,44 @@ func _remove_config(row: Dictionary) -> void:
 	if FileAccess.file_exists(row.config_path):
 		DirAccess.remove_absolute(row.config_path)
 
-func _drop(connection: Dictionary) -> void:
+func _drop(connection: Dictionary, reason := "UNSPECIFIED", message_type := "", transport_code := "") -> void:
 	connection.peer.disconnect_from_host()
 	connections.erase(connection)
 	var row: Dictionary = rooms.get(connection.room_id, {})
 	if not row.is_empty() and not row.cleaned and row.state in ["STARTING", "READY"]:
+		_log_control_closed(connection, row, reason, message_type, transport_code)
 		var code := "PROCESS_EXITED" if launcher.probe(row.launch_id) == "exited" else "CONTROL_UNAVAILABLE"
 		_fail(row, code)
+	elif row.is_empty() and reason not in ["HOST_CLOSED"]:
+		_log_control_closed(connection, {}, reason, message_type, transport_code)
 
-func _reject(connection: Dictionary) -> void:
+func _reject(connection: Dictionary, reason := "UNSPECIFIED", message_type := "", transport_code := "") -> void:
 	rejected_connections += 1
-	_drop(connection)
+	_drop(connection, reason, message_type, transport_code)
+
+## Redacted control diagnostics: fixed reason names, identifiers already shown in
+## the admin panel, a message type only if it is a plain protocol word, transport
+## codes from control_transport.gd, and timing. Never payloads, tokens or keys.
+func _log_control_closed(connection: Dictionary, row: Dictionary, reason: String, message_type: String, transport_code: String) -> void:
+	var now := Time.get_ticks_msec()
+	var safe_type := message_type if message_type.length() <= 32 and _plain_word(message_type) else "invalid"
+	var fields := ["ROOM_CONTROL_CLOSED t=%d" % int(Time.get_unix_time_from_system() * 1000.0), "reason=" + reason, "type=" + (safe_type if safe_type != "" else "-"), "transport=" + ("-" if transport_code == "" else (transport_code if _plain_word(transport_code) else "invalid"))]
+	if row.is_empty():
+		fields.append("room=unregistered age_ms=%d" % (now - int(connection.get("accepted_at", now))))
+	else:
+		fields.append_array(["room=" + str(row.room_id), "launch=" + str(row.launch_id).left(8), "state=" + str(row.state), "heartbeats=%d" % int(row.heartbeats), "since_heartbeat_ms=%d" % (now - int(row.last_heartbeat) if int(row.last_heartbeat) > 0 else -1), "age_ms=%d" % (now - int(row.created_at))])
+	print(" ".join(fields))
+
+static func _plain_word(value: String) -> bool:
+	for character in value:
+		if not character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-":
+			return false
+	return true
 
 func _transition(row: Dictionary, state: String) -> void:
 	row.state = state
 	row.history.append(state)
-	print("ROOM_STATE room=", row.room_id, " state=", state, " code=", row.code)
+	print("ROOM_STATE t=", int(Time.get_unix_time_from_system() * 1000.0), " room=", row.room_id, " state=", state, " code=", row.code)
 
 static func _random_id() -> String:
 	return Crypto.new().generate_random_bytes(16).hex_encode()

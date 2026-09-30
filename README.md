@@ -21,7 +21,7 @@
 
 1. 双击 **`StartManagement.cmd`**，浏览器会打开 <http://127.0.0.1:28291/>。首次运行时设置管理员账号；管理员只能管理后台，不能作为玩家入房。
 2. 在网页点“启动服务器”，然后在邀请码页创建邀请码。
-3. 双击 **`StartShooterClient.cmd`**，用邀请码注册玩家账号并登录。再开第二个客户端，用另一个账号登录（同一账号不能同时在线）。在大厅或后台创建射击房间，两人加入后开始自由混战：左右移动/跳跃，鼠标瞄准射击；死亡后可打开背包选枪，再手动复活。
+3. 双击 **`StartShooterClient.cmd`**，用邀请码注册玩家账号并登录。再开第二个客户端，用另一个账号登录（同一账号不能同时在线）。在大厅或后台创建射击房间，两人加入后开始自由混战：左右移动/跳跃，鼠标瞄准射击；死亡后可打开背包选枪，再手动复活。客户端右上角可以静音、调节音效音量（`M` 键切换静音），设置会保存在本机。
 
    给朋友的独立客户端（无需安装 Godot）：服务器运行时双击 **`PreparePlayerClient.cmd`**，把生成的 `PlayerClient` 整个目录发给朋友，朋友双击 `StartGame.cmd`。给局域网朋友用之前，先在后台把对外 IP 设为本机局域网地址。GitHub 获取方式见 [docs/17](docs/17_framework_shooter_plan.md#独立射击客户端实施2026-09-28)（未发布）。
 4. 取石子客户端用 **`StartManagedTurns.cmd`**，与射击共用同一套账号和资产服务。
@@ -68,6 +68,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\new_game.ps1 -Manage
 | 分支范围与阶段规格 | [17 框架与射击计划](docs/17_framework_shooter_plan.md) |
 | 跨游戏术语与后续方向 | [CONTEXT](CONTEXT.md)、[17 后续方向（第五节）](docs/17_framework_shooter_plan.md) |
 | 管理后台与 HTTP 接口 | [19 管理后台](docs/19_admin_ui.md) |
+| 后台改版界面预览（演示数据，不连接服务；正式后台已接入该布局） | `ADMIN_PREVIEW.html`（双击打开） |
 | 射击玩法与房间规则 | [20 射击示例](docs/20_shooter.md)、[25 房间规则](docs/25_shooter_room_rules.md) |
 | 账号/资产/管理协议与错误码 | [21 托管协议](docs/21_managed_protocol.md)（契约唯一来源为 `schemas/`） |
 | 资产基础 | [18 资产基础](docs/18_asset_foundation.md) |

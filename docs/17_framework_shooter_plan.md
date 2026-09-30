@@ -1,11 +1,496 @@
 # 通用框架与横版射击分支实施计划
 
 <a id="next-plan"></a>
+## 已授权下一步：Claude 安装 Linux 测试依赖并隔离验证（2026-09-30）
+
+用户已明确同意：Codex 整理本地提交、不推送；Claude 在 `zhao@192.168.10.105` 的 `~/roomkit/` 内安装官方 Godot、PowerShell 7、放入该本地提交的源码并运行隔离测试。SSH 保留密码登录，需要时由用户输入；不配置 authorized_keys、不使用 sudo、不改防火墙、不复制真实数据库。本节替代前面“只读/等待安装同意”的当前执行限制，历史记录保留。
+
+Claude 接手执行：
+
+1. 核实交接的本地 HEAD、工作区及已完成的设备检查。不重做已知调查；仅补查 Node 是否已有、系统 SQLite 版本等必要缺项。严格保留 SSH 主机校验，不输出密码，不扫旧项目。
+2. 从官方发布页核实 Godot 4.7.2 stable Linux x86_64 与 PowerShell 7 当前 LTS 的准确版本、文件名、大小和校验材料，下载后校验。若指定 Godot 发布或匹配校验材料不可取得，记录阻塞，不能悄悄换版本；PowerShell 不使用预览版。只写 `~/roomkit/tools/` 下独立版本目录，不覆盖现有同名内容；不改全局 PATH/登录配置、不安装导出模板或 Node。若系统依赖实际缺失，报告而非使用 sudo。
+3. 源码必须来自本次本地提交：远端尚未推送，不能 clone 远端后假称拿到最新版。使用该提交的 git archive 或等效明确文件清单，传入 `~/roomkit/src/<完整提交号>/`，记录提交号及传输包 SHA256；排除真实运行数据、私钥、凭据、旧 artifacts、logs、PlayerClient。输出及测试库写独立测试目录，不覆盖历史结果。
+4. 先验证引擎/pwsh 版本，然后实跑 PowerShell 摘要的便携合成夹具，复现 `05f794ef76f0`。原测试脚本依赖 Windows 构建时，只做必要的便携测试驱动，不删断言、不修改生产算法以迎合结果。有 Node 才做独立参考对照，不为参考测试另装 Node。真实 prepared game 摘要需比较相同输入，不拿仓库根目录冒充。
+5. 按兼容范围运行纯 GDScript 测试，按测试实际参数设置独立目录；Windows 专用测试不能假装在 Linux 通过。记录命令、版本、退出码、断言计数、错误输出与未运行项。出现缺少 Windows 助手等预期平台阻塞时定位到边界并停止该项，不扩大成全量存储/进程重构。
+6. 本次仅依赖安装、源码复制、摘要及纯逻辑验证。账号存储最小切片、进程管理实现、常驻服务、自启动、防火墙和跨机联机留到下一任务。不重启 Windows 真实服务，不重新生成任何正式客户端，不推送或发布。
+7. 交付依赖位置、源码提交、摘要对照、测试报告和下一次最小实现任务；更新现有环境记录、STATUS 和本节。需要密码时给用户一组清晰命令或让用户接手，避免每条检查单独要求输入。Codex 复核后再推进 L1 存储切片。
+
+## 当前交接：Claude 执行 Linux 只读设备检查（2026-09-30）
+
+Codex 已阅读摘要实现和独立 Node 参考，独立执行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_content_digest.ps1`，55/0、not_run=0、退出 0，基准值 `05f794ef76f0`；证据 `logs/content-digest-73efe55342f347f8adc1c2b1f33b34b5/`。本机复核未发现阻塞问题，但 Linux 实机一致性仍未验证。用户明确 Linux 检查与测试交 Claude。
+
+### 现在执行的范围
+
+1. 先核实本仓库分支、HEAD 和未提交文件，读 AGENTS、STATUS、本节与 `tools/linux_device_check.sh`。保留所有现有成果，不提交推送、不改真实服务和客户端。
+2. 仅对已指定设备 `zhao@192.168.10.105` 执行只读检查脚本，使用 SSH 标准主机身份校验，不关闭校验、不打印或保存密码。能用现有认证就继续；若需用户输入密码或确认未知主机身份，提供准确命令让用户接手，不尝试猜密码。不扫描设备上的旧项目。
+3. 将脱敏输出保存在本仓库 logs 的独立文件；在现有环境文档和 STATUS 摘要记录系统架构、资源、现有 Godot/pwsh/SQLite 及缺项。完成标记不等于所有检查通过；逐项区分不可用、权限不足和成功。
+4. 本次不下载、不安装、不复制项目或数据库、不改防火墙。按实机结果给下一次最小依赖安装清单：具体版本、官方来源、校验方法、用户目录和磁盘预算；不要未看架构就预定 x64。无需再泛泛讨论全框架换语言。
+5. 若已有 Node/pwsh，也先报告可用性。摘要实际对照还需传入同一份干净构建输入；不能直接以仓库根目录摘要对比 prepared game 摘要。后续用隔离合成夹具和明确源文件清单验证，生产 PowerShell 摘要必须实跑，Node 参考单独通过不能替代它。当前完整测试脚本含 Windows 路径及构建调用，不能原样在 Linux 失败后删除断言；另做最小便携驱动或先适配测试入口。
+
+交付只需设备事实、缺项和下一次具体任务。随后由 Codex 复核依赖与进程安全方案，再让 Claude 做 L1。此前“本轮不连接设备”的 L0 限制仅属于已完成的准备阶段，本次可做上述只读检查；安装和远程写入仍不在本任务内。
+
+### 设备检查结果（Claude，2026-09-30，未提交，待 Codex 复核）
+
+**过程**：
+- 这台 Windows 电脑原先没有保存该设备的主机身份。我用批处理模式连接，被主机校验拒绝；没有关闭校验，也没有替用户接受指纹。
+- 用户本人确认指纹、输入密码后运行了脚本，输出末尾有完成标记。
+- 原始输出在 `logs/linux-device-check/check-20260930.txt`。里面只有局域网地址，没有密码、MAC 地址或主目录内容。
+- 没有安装、写入或复制任何东西，也没有读取防火墙规则（需要 root）。
+
+**设备事实**（逐项状态见 [环境记录](10_environment.md#linux-测试机只读检查2026-09-30claude)）：
+- 系统：Linux Mint 22.3（基于 Ubuntu），内核 7.0.0-34，glibc 2.39，**x86_64**。
+- 资源：i5-5200U，2 核 4 线程；内存 7.7 GB，可用约 5.3 GB；磁盘可用 378 GB。
+- 已有：`libsqlite3.so.0`、libicu 74、libssl 3、git、curl、wget、tar、unzip、python3、sha256sum；内核支持 pidfd，`/proc` 可读。
+- 没有：Godot、导出模板、PowerShell 7、dotnet（不需要）。
+- 未知：Node（脚本没有检查）、SQLite 的具体版本、ufw 的规则。
+- 需要留意：
+  - ufw 在运行，跨机联调时要放行端口，这一步需要 sudo；
+  - 网络是无线网卡；
+  - Linger 为 no，用户退出登录后用户级服务会停止；
+  - 打开文件数上限是 1024；
+  - 检查时负载约 1.9、交换分区已用约 0.9 GB，说明设备上有其他程序在运行，测量内存和延迟时要先记录基线。
+
+**下一次最小安装清单**（都需要用户同意；全部放在用户目录，不需要 sudo，不装系统包）：
+
+| 依赖 | 版本与文件 | 官方来源 | 校验方法 | 位置 | 磁盘预算 |
+|---|---|---|---|---|---|
+| Godot 编辑器二进制 | 4.7.2 stable，linux x86_64 | godotengine/godot 的 GitHub Release `4.7.2-stable` | 用该 Release 附带的 SHA512 校验文件核对；`--version` 应显示 `4.7.2.stable.official.ed1daf0bf` | `~/roomkit/tools/godot/` | 约 0.2 GB（估计） |
+| PowerShell 7 | 当前 LTS 的 `linux-x64.tar.gz`；具体版本号以官方发布页为准，我没有联网核实 | PowerShell/PowerShell 的 GitHub Release | 用 Release 页公布的 SHA256 核对；`pwsh --version` | `~/roomkit/tools/pwsh/` | 约 0.2 GB（估计） |
+| 项目源码 | 一个已提交的版本 | 本仓库（`git archive` 或克隆） | 与 Windows 端对比提交号 | `~/roomkit/src/` | 小于 0.1 GB |
+
+- 合计预算小于 1 GB，设备可用 378 GB。
+- 系统已有 `libsqlite3.so.0`、libicu 和 libssl，所以不需要 sudo。
+- 导出模板到 L4 才需要；防火墙放行到跨机联调时才需要。
+- 两个文件名、大小和哈希要在下载时对照官方页面；上表的磁盘预算是估计值。
+
+**下一次具体任务**（建议顺序）：
+1. **先提交**：Codex 把现有成果提交。源码副本必须来自一个确定的提交，否则设备上的摘要无法与 Windows 对照。
+2. **补一条只读检查**：确认 Node 是否存在。
+   ```
+   ssh zhao@192.168.10.105 "command -v node && node --version"
+   ```
+3. **安装**（需用户同意）：把 Godot 和 pwsh 下载到上表的目录，校验哈希后解压，不改 PATH，不改系统。
+4. **摘要实机对照**：写一个最小的便携驱动，不复用含 Windows 路径的完整测试脚本。
+   - 驱动在设备上生成与 Windows 相同的合成夹具，用 `pwsh` 实际运行生产用的 `tools/content_digest.ps1`，结果要等于基准值 `05f794ef76f0`；
+   - 再对同一份干净的构建输入（明确的源文件清单）比较两个平台的摘要；
+   - Node 参考实现只作旁证，不能代替 PowerShell 的实跑。
+5. **Godot headless**：在设备上跑纯 GDScript 测试（`run_shooter`、`run_client_sound`、`run_room_disappear_regression`）；`run_unit` 中依赖 PowerShell 的部分逐项记录。
+6. 之后按 L1.2 及以后的小任务推进。
+
+## 当前交接：先修跨平台构建身份（Codex 复核 L0，2026-09-30）
+
+L0 文件与脚本已复核。只读检查脚本去掉了对整个 HOME 的 find，改为只查 PATH 和约定 RoomKit 工具目录；`bash -n` 退出 0，仅为语法验证，未连接 Linux。完成标记只说明脚本跑到末尾，不代表每项检测成功。进程安全方案仍有条件：锁必须覆盖所有回收路径，包括引擎内部；不能仅锁住项目自己的检查/kill 调用就断言 PID 不会复用，实施前须验证完整生命周期或采用稳定句柄机制。
+
+下一项交 Claude：仅修构建摘要的跨平台确定性，先不安装 Linux 依赖。读取 `tools/content_digest.ps1`、`tools/build_framework.ps1`、`.gitattributes` 和已有客户端测试，保留当前未提交成果。当前摘要按原始字节算哈希，且 `.godot` 排除模式只匹配反斜杠，`Sort-Object -CaseSensitive` 也不能直接当作跨平台序数排序保证。
+
+- 定义并记录规范化规则：相对路径统一 `/`，目录排除在两种分隔符下等价，使用明确序数排序；文本与二进制分别处理。可通过明确文本文件规则规范化换行，或先生成规范化构建树再哈希；禁止把二进制当文本处理、忽略真实代码或 Schema 的改变。不要为消除差异跳过版本校验。
+- 独立夹具覆盖 LF/CRLF、相同文本不同检出形式、路径与枚举顺序、`.godot` 缓存、实际代码修改、二进制修改；相同逻辑输入摘要一致，实际内容变化必须改变摘要。Linux 实机还没跑时，不能把本机模拟称为跨平台验证通过。
+- 修改只限摘要/构建相关、必要 Git 文本属性、针对性测试及文档。不重写整个工作区换行、不覆盖 PlayerClient/仓库客户端/旧附件、不操作真实服务。新摘要可能改变 build_id，交付新版重启重导步骤，保留旧产物与清晰版本状态。
+- 完成后交 Codex 复核，暂不提交推送；届时再一起整理前序 UI/音效/入房修复与本次摘要成果的提交。设备只读检查可随后执行，安装与平台实现独立安排。
+
+### 构建身份修复结果（Claude，2026-09-30，未提交，待 Codex 复核）
+
+只改了 `tools/content_digest.ps1`，新增 `tests/test_content_digest.ps1` 和独立参考实现 `tests/content_digest_reference.cjs`。没有重写工作区换行，没有再改 `.gitattributes`（上一轮的 `*.sh` 一行保留），没有动真实服务、共享游戏索引、PlayerClient、仓库客户端副本和旧附件。版本校验没有放宽。
+
+**规范化规则**（版本标记 `roomkit-content-digest-v2`，写在摘要文件头部，由测试固定）：
+1. **范围**：根目录下所有文件都参与，只排除两类：接收结果的两份清单（`game_manifest.json`、`game/game_manifest.json`），以及名字恰好是 `.godot` 的目录里的内容（引擎缓存）。目录排除按路径段判断，`\` 和 `/` 两种分隔符等价；`project.godot`、`a.godot/`、`.godotx/` 不会被误排除。
+2. **路径**：相对路径一律用 `/`，文件名大小写保持原样。
+3. **文本**：只有扩展名在固定列表里、且不含 NUL 字节的文件算文本。列表是 `.gd .json .godot .tscn .tres .cfg .md .txt .gdshader .csv .svg`。只对文本把 CR LF 替换成 LF，按字节处理，不解码。单独的 CR、行尾空格、BOM、文件末尾有没有换行，都算内容。
+4. **二进制**：其余文件都按原始字节计算哈希，包括未知扩展名和含 NUL 的“文本名”文件。
+5. **排序与输出**：条目格式是 `路径=SHA256`，按序数排序（UTF-16 码元，`StringComparer.Ordinal`，不受区域设置影响）；版本行加各条目用 LF 连接，以 UTF-8 编码计算 SHA256，取前 12 位小写十六进制。
+
+**验证**（`tests/test_content_digest.ps1`，55/0，退出 0，证据在 `logs/content-digest-6bc91f4c342f4b748c144d7fe63ac34f/`）：
+- **相同输入，摘要一致**：
+  - 合成夹具的 LF、CRLF、逐文件混合、反序创建四种形式摘要相同，固定的基准值是 `05f794ef76f0`；
+  - 条目枚举顺序打乱后结果不变；
+  - 反斜杠路径和正斜杠路径得到相同的条目；
+  - 排序结果是 `B.gd,Z.gd,a-b.gd,a.gd,a_b.gd,sub.gd,sub/z.gd`，确认是序数排序；
+  - 摘要与按文档公式手工计算的结果相同。
+- **独立实现**：Node 参考实现按规则另写，不是从 PowerShell 翻译的。它在 LF 和 CRLF 夹具上都得到相同摘要。
+- **缓存和清单**：根目录和嵌套的 `.godot` 目录被忽略；两份清单被忽略；其他位置的同名清单文件算内容。
+- **真实变化必须改变摘要**：游戏代码改一个字符、SDK、Schema、游戏配置、`project.godot`、行尾空格、单独的 CR、末尾换行、BOM、新增文件、删除文件、改名、只改大小写，全部改变摘要。
+- **二进制不规范化**：二进制改一个字节会改变摘要；已知二进制和未知类型文件里的 CR LF 都算数据；文本名但含 NUL 的文件按二进制处理。
+- **真实工程**：
+  - 用当前工作区构建到私有索引，射击为 `shooter-dev-002-src-de37edca7f1d`，取石子为 `turns-managed-dev-001-src-772421bf94d2`；
+  - 把准备好的工程分别转成纯 LF 和纯 CRLF 的副本（射击 65 个、取石子 63 个文本文件），摘要都不变，Node 参考实现结果一致；
+  - 两个工程里目前没有按二进制处理的文件；
+  - 共享游戏索引前后的哈希相同。
+- **回归**：`tests/test_player_client.ps1` 28/0（`logs/player-client-eb36031d26794a1c85c6408cbde6dc80/`）。
+  - build_id 与工程内容绑定，重复构建结果相同；
+  - 双客户端入房、退房正常；
+  - 改过代码的客户端得到不同的 build_id，仍被 BUILD_MISMATCH 拒绝；
+  - 共享的公开配置和索引没有改动。
+
+**边界和未验证项**：
+- 以上都在这台 Windows 电脑上完成，属于对检出形式的模拟，**不是 Linux 实机验证**。
+- 下一步要在 Linux 上跑：同一个提交检出后，摘要要与 Windows 相同；合成夹具要复现基准值 `05f794ef76f0`。可以用 `pwsh` 跑测试脚本，也可以只用 Node 参考实现。
+- `tools/build_framework.ps1` 本身还用着反斜杠路径，Linux 上的构建入口属于后续平台实现，本轮没有改。
+- 摘要只保证身份一致。导出的 `Client.pck` 字节仍会随换行和导出过程变化，配对依据是 build_id。
+
+**版本状态**：
+
+| 对象 | build_id | 说明 |
+|---|---|---|
+| 当前源码（新摘要规则） | `shooter-dev-002-src-de37edca7f1d` | 重启管理服务后生效 |
+| 正在运行的服务、共享索引、用户的 `PlayerClient/` | `675fa4d8063e` | 旧规则算出的值，三者互相匹配，仍然可用，本轮未动 |
+| 仓库副本 `clients/shooter-windows/`、Release 附件 | `0f559378dddc` | 早已过期，未动 |
+
+**用户上线步骤**（任选时间；不做的话，现有服务和客户端照常工作）：
+1. 在后台停止游戏服务器，运行 `StopManagement.cmd`，再运行 `StartManagement.cmd` 并启动游戏服务器。服务端的 build_id 会变成 `…de37edca7f1d`。
+2. 运行 `PreparePlayerClient.cmd` 重新生成 PlayerClient。旧目录会自动移到 `artifacts/player-clients/previous/` 保留。发给朋友的客户端也要换成新版，旧版会被提示版本不匹配。
+3. 进一次房间，确认正常。
+
+## 后续开发安排（2026-09-30，以本节为当前顺序）
+
+目标：Linux 跑完整后台与服务器，Windows 保留一键开发与玩家客户端；近期先服务 2–8 人熟人试玩，不新增玩法，不解决 Windows TUN 共存。Claude 负责主要实现和测试，Codex 负责方案与差异复核、验收整合。每阶段独立交付，上一阶段通过再推进；未实际运行的平台不能标为通过。
+
+| 阶段 | 交付 | 通过条件 |
+|---|---|---|
+| L0 当前成果收尾与设备准备 | 明确 UI、音效、非回环入房修复的差异与证据，整理提交候选；Linux 只读检查命令与依赖清单 | 未提交文件归属明确，功能/真人反馈/未验证分开，设备未知项有准确检查方法 |
+| L1 跨平台存储最小切片 | 优先验证 PowerShell 7 + 系统 SQLite 候选，仍维护一套存储语义 | 隔离库注册、登录、资产幂等、备份恢复通过；密码哈希及两平台库互读一致；实测延迟与内存 |
+| L2 Linux 进程与运维适配 | 安全启动/停止、端口回收、权限、指标和启动脚本 | 正常退出、异常退出、超时回收、宿主重启均有证据；解决 PID 复用竞态，不能先检查再 kill 就宣称安全；Windows 回归不退化 |
+| L3 完整服务器与一键入口 | Linux 启动后台、账号/资产服务、大厅、房间；Windows 客户端接入 | 隔离环境完成登录、建房、双客户端入房、结算到账、重启后数据保留；Windows 本机入口仍可用 |
+| L4 用户验收与交付 | 一个服务端入口、匹配的 Windows 玩家目录、简短说明 | 先 Windows → Linux 局域网，再按需要公网外部设备验收；届时重新核对转发目标与证书，不沿用 Windows 已通过结论 |
+
+### Claude 当前任务单：只完成 L0
+
+- 目录本仓库，预期 `main` / `bf21fe0`，接手核实，保留全部未提交 UI、音效、入房修复及文档。先读 AGENTS、README、STATUS、本节和已有 Linux 调查；同目录单方写入，不覆盖他人工作。
+- 检查现有差异，重点复核合法地址契约与保留席位撤销修复、日志是否泄密、客户端版本与已导出物的关系。复用有效测试证据，不再次全量跑数小时回归；发现具体问题再做对应验证。本任务不改功能。
+- 在现有 STATUS/docs/17 内整理提交候选分组与最小剩余验收项：后台、音效、入房修复；明确源码、PlayerClient、仓库副本及 Release 状态不同。不提交或推送，不清理旧包/日志，不把用户暂停公网排查记为未修好房间生命周期。
+- 准备 Linux 只读检查命令，目标仅 `zhao@192.168.10.105`：系统/架构、内存/磁盘、Godot、pwsh、libsqlite3、用户权限与防火墙概况；列出需要下载/安装的准确依赖、来源和预期用户目录。本轮先交检查脚本与清单，不连接设备、不安装、不复制真实数据库。
+- 将 L1 写成可执行的小任务：优先验证方案 P，保留方案 G 为门槛不满足时的备选，不先重写存储。进程安全需单独明确可靠机制及验证方式，不把 Windows 句柄语义照搬 Linux。
+- 交付简短汇报：当前可冻结哪些成果、具体缺项、下一次设备验证怎么运行。更新 STATUS，保留失败/未运行项；不继续扩充历史叙事。本轮不做 TUN、路由器、真实服务操作、Linux 功能实现或新玩法。
+
+L0 交付后由 Codex 复核并整理现有成果的提交，再进入设备检查与 L1。依赖安装和真实数据迁移仍按实际方案确定，不把本路线表当作已完成或全量变更授权。
+
+### L0 交付（Claude，2026-09-30，未提交，待 Codex 复核）
+
+本轮没有改功能、没有连接设备、没有安装、没有提交推送，也没有动真实服务和数据。新增的只有只读检查脚本 `tools/linux_device_check.sh`、`.gitattributes` 里的一行（`*.sh text eol=lf`）和文档。
+
+**1. 差异复核结论**
+- **地址契约**：`room.reserve` 回复中的 `host` 现在是严格的 IPv4（每段 0–255，最长 15 个字符），与后台配置“只接受 IPv4 字面量”一致；域名、IPv6、越界地址仍被拒绝。它只是连接地址，票据、DTLS 证书和 build 校验都没有变。
+- **保留席位撤销**：只对已有 attempt 的座位发送 `admission.revoke`；`RESERVED` 座位只在本地释放，释放后票据无法再被消费（`TICKET_EXPIRED`）。
+- **日志**：三侧诊断只输出固定枚举、普通协议词、计数和计时。已有证据中出现的长十六进制串只有 room id。
+- **本轮重跑的专项**：入房回归 16/0、音效 41/0、后台页面 Node 44/0（`logs/l0-review-83cd609de75e4d4ca54264c90d4f3f6e/`）。其余结果沿用各节已有证据，没有重跑全量。
+- **版本关系**（本轮实测）：
+
+| 对象 | build_id | 状态 |
+|---|---|---|
+| 当前工作区源码（构建到私有索引） | `shooter-dev-002-src-675fa4d8063e` | 基准 |
+| 真实服务使用的共享索引 `artifacts/framework-games.json` | `675fa4d8063e` | 与源码一致 |
+| 用户的 `PlayerClient/`（2026-09-30 生成） | `675fa4d8063e` | 与源码一致 |
+| 仓库副本 `clients/shooter-windows/`（已提交） | `0f559378dddc` | 过期，连不上当前服务 |
+| Release 附件目录（两份，未发布） | `0f559378dddc` | 过期；Release 仍未创建 |
+| 独立 ZIP 包 | 未重新构建 | 不含新后台、音效和入房修复 |
+
+**2. 复核中发现的问题：build_id 依赖换行符**
+- `content_digest.ps1` 按原始字节计算摘要。当前工作区的构建输入里，56 个文件是 CRLF，16 个是 LF，还有 1 个混合（`examples/framework/sound.gd`）；Git 索引里全部是 LF，本机 `core.autocrlf=true`。
+- 后果：同一个提交在另一台机器上检出，或者在本机重新检出，文件字节都可能不同，build_id 随之改变。Linux 检出是 LF，所以 Linux 服务端从源码构建的 build_id 会与 Windows 导出的客户端不同，结果是 BUILD_MISMATCH。
+- 本轮没有改：改动任何字节都会让正在运行的服务和用户的 PlayerClient 失配。
+- 建议在 L3 之前单独处理，二选一：计算摘要时把文本文件的换行统一成 LF；或者用 `.gitattributes` 固定换行。两种做法都会让 build_id 变一次，需要重启服务并重新生成客户端。这一项必须在“Linux 服务端 + Windows 客户端”联调之前完成。
+
+**3. 提交候选分组**（由 Codex 整理提交；`README.md`、`STATUS.md`、本文件含多组内容，需要按块拆分或放进文档提交）
+
+| 组 | 文件 | 作者 | 证据 | 最小剩余验收 |
+|---|---|---|---|---|
+| A 后台 UI | `host/admin.html`、`tests/test_admin_auth_errors.cjs`、`ADMIN_PREVIEW.html`、`tests/run_admin_ui_fixture.ps1`、`docs/19_admin_ui.md`、README 的预览入口一行 | Claude；`[hidden]` 登录修复和对应检查行是 Codex | 浏览器验收 28/0、Node 44/0、`admin_http` 143/0（在最后一处 CSS 调整之前）；用户真人确认建房、退出、重新登录 | 深色和窄窗口截图；独立包重新导出 |
+| B 基础音效 | `examples/framework/sound.gd`、`client.gd`、`view.gd`、`examples/shooter/game.gd`、`tools/build_framework.ps1`、`tests/run_client_sound.gd`、README 的静音说明一句 | Claude | 专项 41/0（Codex 重跑一致）、规则 83/0、玩家客户端 28/0；用户转交的三步试听标注已人工验收 | hit 是场景受击声，不是个人命中确认（已记录）；`test_framework_clients.ps1` 未跑 |
+| C 入房修复与诊断 | `schemas/lobby_response.schema.json`、`host/managed_lobby.gd`、`host/core/room_manager.gd`、`sdk/roomkit/server/room_runtime.gd`、`sdk/roomkit/client/room_client.gd`、`tests/run_room_disappear_regression.gd`、`tests/run_room_disappear_probe.ps1`、`tests/run_room_udp_probe.gd` | Claude | 修复前 3 次复现，修复后同配置通过；专项 16/0、unit 320/0、契约 286/0、停机 55/0、玩家客户端 28/0。真实服务：Codex 记录房间不再因控制故障停机；用户反馈关闭 TUN 后本人和朋友都能入房 | 公网外部设备的独立证据（已暂停，待 Linux 后再测）；TUN 共存未解决，它属于网络环境问题，不算房间生命周期未修好；客户端 `AUTH_FAILED` 同时表示 ENet 连接失败和认证失败，日志还不能区分；同一构建的房间共用 `server.log` |
+| D 文档与 L0 | `STATUS.md`、`docs/17`、`tools/linux_device_check.sh`、`.gitattributes` | Claude、Codex | 链接检查 0 失效 | — |
+
+说明：
+- `tests/run_admin_ui_fixture.ps1` 在 C 组加了 `-Bind`、`-AdvertisedHost` 参数，C 组的复现脚本依赖它，所以 A 必须先于 C 提交，或者两组一起提交。
+- 提交后仓库副本 `clients/shooter-windows/` 会与源码不符。要不要用 `PreparePlayerClient.cmd -RepositoryCopy` 重新生成（会产生新的 Release 附件目录），由 Codex 和用户决定；建议等第 2 点的换行问题处理之后再生成，避免连续变两次。
+
+**4. Linux 只读检查**
+- **脚本**：`tools/linux_device_check.sh`。
+  - 只读：不安装，不写文件，不使用 sudo，只输出到标准输出；不打印环境变量、MAC 地址或主目录里的文件内容。
+  - 纯 ASCII、LF 换行。已在本机 Git Bash 里试跑到结束；很多 Linux 命令在那里不存在，正好走到了脚本的兜底分支。
+- **检查内容**：系统与 glibc、CPU 和内存、磁盘与 inode、用户与组、是否有 sudo 程序（不调用）、内核版本与 `/proc` 可读性（进程安全的前提）、Godot 与导出模板、`pwsh` 和 `dotnet`、libicu 和 libssl、`libsqlite3`、IPv4 地址与默认路由、防火墙服务是否在运行（规则需要 root，不读取）、RoomKit 默认端口是否被占用、常用工具。
+- **运行方式**（在 Windows 项目根目录用 cmd 执行；脚本通过管道送过去，不复制任何文件；只连接 `zhao@192.168.10.105`）：
+  ```
+  ssh zhao@192.168.10.105 "bash -s" < tools\linux_device_check.sh > logs\linux-device-check.txt
+  ```
+  PowerShell 5.1 不支持 `<` 重定向，请用 cmd。需要输入密码时由用户本人执行。输出末尾应出现 `ROOMKIT_LINUX_CHECK_COMPLETE`。
+- **依赖清单**（都未下载；版本和文件名以官方发布页为准，下载后校验哈希；下面的目录是建议值，全部在用户目录内，不需要 sudo）：
+
+| 依赖 | 用途 | 来源 | 建议位置 | 备注 |
+|---|---|---|---|---|
+| Godot 4.7.2 stable Linux x86_64 编辑器二进制 | 运行 Operator、宿主、房间和测试（`--headless`） | godotengine/godot 官方 Release `4.7.2-stable` | `~/roomkit/tools/godot/` | 提交哈希应为 `ed1daf0bf`，与 Windows 相同 |
+| Godot 4.7.2 导出模板 | 只在 L4 导出独立包时需要 | 同上 | `~/.local/share/godot/export_templates/4.7.2.stable/` | L1–L3 不需要 |
+| PowerShell 7 LTS `linux-x64.tar.gz` | 方案 P 的存储助手 | PowerShell/PowerShell 官方 Release | `~/roomkit/tools/pwsh/` | 需要系统的 libssl；没有 libicu 时设置 `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` |
+| `libsqlite3.so.0` | 存储 | 发行版自带（Debian/Ubuntu 的包是 `libsqlite3-0`） | 系统库 | 通常已安装；缺失时才需要 sudo，届时单独征求同意 |
+| 项目源码 | 运行 | 本仓库的某个提交（`git clone` 或 `git archive`） | `~/roomkit/src/` | 不含 `data/`、`logs/`、`artifacts/`；不复制真实数据库 |
+| 防火墙放行 | 仅 L4 跨机时需要 | — | — | 需要 sudo，届时单独确认 |
+
+**5. L1 小任务**（方案 P；方案 G 只在门槛不满足时评估；不先重写存储）
+1. **L1.0 设备检查**：运行上面的脚本，把结果写进 [环境记录](10_environment.md)。通过标准：系统、内存、`libsqlite3.so.0` 和内核版本都已知。
+2. **L1.1 Godot headless**：在设备上用干净的源码副本跑 `run_unit.gd`、`run_shooter.gd`、`run_client_sound.gd`、`run_room_disappear_regression.gd`。通过标准：结果与 Windows 相同（320、83、41、16）。`run_unit` 里依赖 PowerShell 的套件如果在 Linux 上失败，逐项记录，不算通过。
+3. **L1.2 SQLite 绑定抽象**：`sqlite_store.ps1` 的库名和路径分隔符改为按平台选择，Windows 分支的字节级行为不变。通过标准：Windows 上的存储专项（`run_assets.gd`、`run_accounts.gd`、`run_asset_snapshot.gd`、常驻探针）全部不退化。
+4. **L1.3 Linux 存储切片**：在隔离测试库上用 `pwsh` 跑账号（注册、登录、会话校验）、资产（读取、快照、同一操作编号重复提交）和备份恢复。通过标准：与 Windows 的逐项结果一致。
+5. **L1.4 跨平台一致性**：通过标准有三条。
+   - 固定密码和盐，PBKDF2-SHA256 做 60 万次，结果在两个平台逐字节相同；
+   - Windows 生成的测试库在 Linux 上通过完整性检查并能读取，反方向也一样；
+   - 备份在另一个平台上能恢复。
+6. **L1.5 测量**：常驻工作进程的内存、首次应答时间、请求 p50/p95、一次性助手耗时。门槛沿用“调查结果与推荐”第 6 节，达不到时申请评估方案 G。
+7. 每个小任务单独交付，证据分平台记录。Linux 上没有运行的项目不写通过。
+
+**6. 进程安全机制**（L2 实施；这里只确定方向和验证方式，不照搬 Windows 的句柄语义）
+- **已读到的引擎事实**（Godot 4.7.2 `os_unix.cpp`，由摘要工具阅读，需要在设备上验证）：
+  - 不忽略 `SIGCHLD`，也不调用 `waitpid(-1)`，子进程只会被针对它自己 PID 的 `is_process_running`、`get_process_exit_code`、`kill` 回收；
+  - 子进程启动时调用 `setsid()`，所以宿主退出不会连带结束房间。
+- **方向**，按优先级：
+  1. **协作退出优先**：房间通过控制通道收到 `room.stop`，或者因为宿主失联而自行退出；存储工作进程在标准输入关闭时退出。强制结束只是兜底。
+  2. **只结束自己的直接子进程**：同一个 PID 的“检查是否在运行”和“结束”放在同一把锁里，任何其他代码路径都不对这个 PID 调用会回收的函数。原因是未回收的子进程即使已经退出也仍占着 PID（僵尸状态），在这个前提下信号只会到达原进程或它的僵尸。它依赖上面的引擎事实，不能只靠“先检查再结束”就宣称安全。
+  3. **不结束非子进程**：宿主重启后留下的旧房间沿用现有策略，只核对身份、隔离端口、等待它自行退出（房间在宿主失联约 15 秒后会自己退出）。如果以后确实需要结束非子进程，再评估 pidfd（`pidfd_open` + `pidfd_send_signal`，需要内核 5.3 及以上，检查脚本会报告内核版本）。
+- **验证方式**：
+  - 在设备上确认：子进程退出后、我方调用回收函数之前，`/proc/<pid>/stat` 显示状态为 `Z`，证明 PID 仍被占用；
+  - 用假的进程适配器做单元测试，断言“已回收之后不再调用 kill”，以及所有调用都经过同一把锁；
+  - 反复启动和退出的压力测试，加上超时回收和宿主异常退出场景。
+  - 以上全部要有证据之后才能标为通过。
+
+## 当前顺序调整（2026-09-30）
+
+用户暂停 Windows 公网联机与 TUN 共存排查，待 Linux 服务端实现后再测。关闭 TUN 后本人和朋友均可入房是用户反馈；开启 TUN 加 DIRECT 仍失败，共存方案未解决。保留排查证据，不继续要求关闭 TUN、改规则或测试路由排除。下一步回到 Linux 最小切片的设计复核和准备，具体依赖安装、远程设备变更及真实数据迁移不因本条自动获批。后续由 Claude 主要实施，Codex 复核，Windows 本机运行能力继续保留。
+
+## 历史任务：空房间就绪后消失（已交付修复，TUN 排查暂缓）
+
+用户真实问题：配置公网地址后大厅可连，但无人加入的房间也在几秒至十几秒内消失；尝试入房会回登录。工作目录本仓库、main，接手核实基准及已有 UI/音效未提交改动，保留他人改动，同目录单方写入。Linux 调查暂缓，不安装依赖、不连接笔记本、不发布或提交推送。
+
+Codex 已核实真实 managed-host.log 四次 STARTING → READY → FAILED / CONTROL_UNAVAILABLE，房间日志只有引擎启动信息。控制连接代码固定回环地址，不能直接归咎于公网 UDP。当前 artifacts/framework-games.json 对应工程的 room_runtime、control/envelope Schema 和 protocol 与源码哈希相同。独立夹具使用同一公网 advertised_host、独立端口/库，空房间观察约 40 秒正常；证据与诊断脚本失败记录见 STATUS。隔离测试仍使用不同端口及 loopback game_bind，未覆盖真实环境全部差异，也未验证公网游戏流量。
+
+1. 先读真实日志和相关源码，不读取密码、私钥、token 内容，不改 data/framework、不停止真实服务。核对实际生成工程与正在运行的宿主是否同源、进程启动方式、心跳和控制超时、共享文件/结果队列及真实与隔离配置差异。不要通过放宽认证、延长全部超时或吞掉错误来掩盖问题。
+2. 在宿主控制连接拒绝/断开，以及 room_runtime 主动关闭各分支补充最小脱敏诊断：时间、room/launch 标识、固定原因枚举、消息类型、传输错误码、心跳间隔。禁止记录控制消息全文、凭据、签名密钥、玩家私密载荷。区分传输关闭、Schema 拒绝、身份不匹配、序列错误、房间自身超时；不改线上协议。测试诊断不泄露秘密。先在隔离实例覆盖相关失败分支。
+3. 用独立目录、端口、游戏索引和假账号复现空房间；先覆盖绑定地址差异，再查具体断开路径。调查客户端为何回登录，区分房间连接失败与大厅/账号会话失效。未复现就明确报告，不宣称已修复；若需要用户重启获取新日志，交付准确的停止、重建/启动、创建空房间步骤，说明 SDK 修改会影响 build_id，需重导客户端。不得偷偷重启真实服务。
+4. 找到根因后修复并做针对性回归，至少验证空房间持续就绪、两个真实客户端进出房间、错误版本仍被拒绝。公网验证须另有实际外部设备证据。更新 STATUS，交 Codex 复核，给用户最多三条操作。
+
+### 诊断与修复（Claude，2026-09-30，未提交，待 Codex 复核）
+
+**结论**：已在隔离环境复现并修复。两个现象来自同一条链；公网 UDP 和版本不匹配都不是原因。
+1. 大厅回复 `room.reserve` 时，Schema 要求 `host` 必须等于常量 `127.0.0.1`（`schemas/lobby_response.schema.json`，托管大厅的 Schema 引用它）。只要 `advertised_host` 设成局域网或公网地址，客户端就会把这条入房回复判为非法，自己关闭大厅连接，然后回到登录页。这就是“入房回登录”。
+2. 大厅在连接断开的清理中，对该玩家的所有座位发送 `admission.revoke`，包括刚预留、还没有 attempt 的 `RESERVED` 座位，此时 `attempt_id` 为空字符串。房间收到后，控制 Schema 校验失败（要求 `minLength: 1`），于是主动停机，并发出 `room.stopped`。
+3. 宿主当时仍认为房间处于 READY，把 `room.stopped` 当成协议违规，拒绝后记为 `FAILED / CONTROL_UNAVAILABLE`。这就是“房间就绪后消失”，与真实日志中的四次记录一致。
+4. 之前的隔离实验都用回环地址，或者没有人点入房，所以一直没有触发。真实日志中那几个“无人加入的房间”，推测是有人点了入房，尝试失败后房间随之消失（推测，真实环境没有对应的入房时间戳）。
+
+**诊断（已脱敏，线上协议不变）**：
+- **宿主**：`room_manager.gd` 的每条断开和拒绝路径都带上固定原因，输出一行 `ROOM_CONTROL_CLOSED`，写入 `managed-host.log`。
+  - 字段：时间、room、launch 前 8 位、原因枚举、消息类型（只收录普通协议词）、传输错误码、状态、心跳计数、距上次心跳的毫秒数、房间存活时间。
+  - 原因枚举：`TRANSPORT_CLOSED`、`TRANSPORT_ERROR`、`WRITE_FAILED`、`SCHEMA_REJECTED`、`IDENTITY_MISMATCH`、`REGISTER_REJECTED`、`READY_REJECTED`、`HEARTBEAT_SEQUENCE`、`UNEXPECTED_STOPPED`、`RESULT_REJECTED`、`HANDLER_REJECTED` 等。
+  - `ROOM_STATE` 行增加了时间戳。
+- **房间**：`room_runtime.gd` 的每条主动停机路径输出一行 `ROOM_SHUTDOWN`，写入房间日志。
+  - detail 枚举：`CONTROL_SCHEMA`、`CONTROL_IDENTITY`、`CONTROL_TRANSPORT`、`CONTROL_CLOSED`、`HOST_SILENT`、`HOST_STOP`、`UNKNOWN_CONTROL_TYPE`、`STARTUP_TIMEOUT`、`DTLS_SETUP_FAILED`。
+  - 附带：心跳间隔、已发心跳数、成员数、距上次收到宿主消息的毫秒数。
+- **客户端**：`room_client.gd` 输出三类行。
+  - `CLIENT_LOBBY_CLOSING`：客户端主动关闭，并说明是 Schema 不符还是意外回复，以及回复类型；
+  - `CLIENT_LOBBY_CLOSED`：关闭码和原因；
+  - `CLIENT_ROOM_JOIN_FAILED`：失败码、阶段，以及大厅连接是否仍然打开。这样“房间连接失败”和“大厅或会话失效”可以区分开。
+- **不记录**：消息全文、token、票据、签名密钥和玩家载荷。扫描了所有证据，长十六进制串只有 room id（后台本来就显示）。
+- **限制**：同一构建的所有房间共用 `server.log`，新房间会覆盖旧房间的日志。宿主那一行会长期留在 `managed-host.log`，单靠它就能区分断开原因。
+
+**修复**（没有放宽认证，没有延长超时）：
+- **Schema**：`host` 从常量 `127.0.0.1` 改为严格的 IPv4 字面量（最长 15 个字符，每段 0–255），与后台配置只接受 IPv4 的规则一致。域名、IPv6 和越界地址仍然被拒绝。`host` 只是连接地址，票据校验、DTLS 证书和 build 校验都没有变。示例 `m2_messages.example.json` 中的 `127.0.0.1` 仍然有效。
+- **大厅**：`managed_lobby.gd` 新增 `_revoke_seat`，只对已有 attempt 的座位发送 `admission.revoke`；`RESERVED` 座位只在本地释放。释放后，这张票据无法再被消费（返回 `TICKET_EXPIRED`），已验证。
+- **没有改的**：宿主把房间主动发出的 `room.stopped` 记为 `CONTROL_UNAVAILABLE`，这个行为保留；现在可以从 `UNEXPECTED_STOPPED` 加上房间那一行看出真实原因。
+
+**隔离证据**（都是独立数据、端口和游戏索引，`game_bind`/`lobby_bind` 为 `0.0.0.0`，通告本机局域网地址；复现脚本 `tests/run_room_disappear_probe.ps1`，夹具新增 `-Bind`、`-AdvertisedHost` 参数，默认值不变）：
+- **修复前**（连续 3 次复现）：
+  - 空房间闲置 45 秒、已登录客户端在大厅轮询 40 秒、随机 UDP、无 DTLS 的 ENet、错误主机名或不受信任的 DTLS 握手，房间都保持 READY（`logs/admin-ui-c8fcb10bed8348ae95615dff4dee06ec/`）。
+  - 真实客户端按局域网地址入房后，客户端显示“连接已关闭或登录已失效，请重新登录”，房间变为 `FAILED/CONTROL_UNAVAILABLE`（`logs/admin-ui-6a83ecf6fd214247bb72f5d1fe48009c/`、`logs/admin-ui-1430e2d3f20f4885b6203f8edc088a6c/`）。
+  - 房间日志：`ROOM_SHUTDOWN detail=CONTROL_SCHEMA type=admission.revoke`；宿主日志：`ROOM_CONTROL_CLOSED reason=UNEXPECTED_STOPPED type=room.stopped`；客户端日志：`CLIENT_LOBBY_CLOSING reason=schema type=room.reserve`（`logs/admin-ui-ec037fee6cb645e0ab031a1691cf7f64/`）。
+- **修复后**：同样的配置下，真实客户端入房（`已进入房间`）后正常退房（`left_room`）。房间在入房、退房、之后的观察期和四类 UDP 流量期间一直保持 READY（`logs/admin-ui-e7ddf5901da542c6a350d7beaab7351e/disappear/`）。
+- **回归**：
+  - 新增 `tests/run_room_disappear_regression.gd` 16/0：局域网和公网 IPv4 通过、非法地址被拒、`RESERVED` 座位不发送 revoke、释放后票据失效、`ADMITTING` 座位仍然 revoke 且通过房间 Schema、空 attempt 会被房间拒绝。
+  - `run_unit` 320/0；`run_managed_contracts` 286/0。
+  - `test_managed_shutdown.ps1` 55/0。它从共享索引只读复制当前房间工程，所以测的是新宿主配旧房间代码。
+  - `run_shooter` 83/0；`run_client_sound` 41/0。
+  - `test_player_client.ps1` 28/0：双客户端互见、进出房间、错误版本仍被拒绝；新 build_id 为 `shooter-dev-002-src-675fa4d8063e`（`logs/player-client-c852204b442a4ffbab29088591ed6db1/`）。
+  - 所有隔离 Operator 的 stderr 中 ERROR/WARNING 均为 0 条。
+
+**未验证**：
+- 公网：没有外部设备，公网入房仍需实测；
+- 真实服务：没有重启，也没有取新日志；
+- `test_framework_clients.ps1`：会读取真实服务正在用的索引，没有跑；
+- 独立包、仓库客户端副本、Release 附件和用户的 PlayerClient 都没有重新生成。
+
+**用户操作**：
+1. 后台停止游戏服务器 → `StopManagement.cmd` → `StartManagement.cmd` → 启动游戏服务器。重新构建后 build_id 会变化。
+2. 运行 `PreparePlayerClient.cmd` 重新生成 PlayerClient，发给朋友的也必须是新版。旧客户端会被版本检查拒绝，而且它自带的旧 Schema 仍会拒绝非回环地址。
+3. 创建房间，从外部设备按公网地址入房。如果还有问题，把 `data/framework/logs/managed-host.log` 里的 `ROOM_` 行发来。
+
+Linux 调查复核提醒：先检查进程存活、再按 PID kill 仍存在 TOCTOU 竞态，不能作为不误杀的证明；后续需稳定进程句柄（如 pidfd）或等效受控生命周期设计及实测。PowerShell 7 方案暂为候选，尚未选定或安装。
+
 ## 2026-09-28 已确认的下一阶段规划
 
-### 下一次任务：GitHub 获取验收
+### 2026-09-29 顺序调整（用户已同意）
+
+GitHub Release 暂不发布，获取验收保持待办，不再作为后台 UI 的前置条件。接下来依次：① Claude 制作独立离线后台预览，任务见 [docs/19](19_admin_ui.md)，用户看布局；② 预览确认后接入现有后台并完成隔离操作验收；③ 基础音效小阶段；④ Linux 完整服务端选型与兼容性调查。每阶段单独交付，不同时启动多个实现任务。GitHub 发布可在用户需要分发时插入；Linux 仍是后续主要技术目标，不提前增加新游戏玩法。
+
+进展（2026-09-29）：①② 已由 Claude 完成，正式后台已接入新布局，目前在收尾复核阶段，见 [docs/19 当前任务](19_admin_ui.md#当前任务后台改版收尾2026-09-29交-claude)。Codex 复核通过后进入③音效。原来“本次只安排第①步、任务单尚未发送”的说明已经过时。③ 基础音效已由 Claude 实现，待 Codex 复核（见下方“基础音效实施”）。
+
+### 当前任务：基础音效（2026-09-29，交 Claude）
+
+交付复核：基础音效已实现，Codex 隔离重跑专项 41/0。hit 当前定义为场景受击声，不是个人命中确认；两人时也可能由自己受伤触发，不能宣传为“我打中了对方”。需要个人命中反馈时单独设计权威伤害事件及去重，不在当前收尾中扩协议。
+
+### 下一任务：Linux 完整服务端可行性调查（交 Claude，先调查后实施）
+
+先读 AGENTS、STATUS、docs/01 与本计划，核实当前 main 和未提交 UI/音效改动；同目录仅 Claude 写文档，保留其他改动。先在本仓库只读梳理存储助手、进程启动与身份校验、目录权限、证书、构建/安装脚本的 Windows 依赖。给出维持现有 Godot/协议/账号资产语义的跨平台方案比较、推荐方案及最小验证切片，尤其说明常驻存储的替代技术、部署内存成本、Windows 一键启动如何保留、备份与重建测试库边界。不要未经测量承诺性能提升，不先做全框架换语言。
+
+本任务只更新本计划及 STATUS，不改功能、不安装新运行时、不重建库、不连接 Linux、不提交推送。Linux 测试机已有记录为 `ssh zhao@192.168.10.105`；设备检查列为下一步，不把已知 SSH 地址当作连通或兼容通过。交付一个推荐方案、主要风险和下一次可执行验证清单，供 Codex 复核后安排远程验证。GitHub 发布继续暂缓。
+
+#### 调查结果与推荐（Claude，2026-09-29，未提交，待 Codex 复核）
+
+**范围**：只读了源码与脚本，读了 Godot 4.7.2 的 `drivers/unix/os_unix.cpp`（公开源码），并在本机隔离环境做了一次内存测量。没有改功能，没有安装任何东西，没有连接 Linux 笔记本；数据库没有重建，真实服务也没有碰。本机没有 PowerShell 7（`pwsh`），只有 Windows PowerShell 5.1；系统 `winsqlite3.dll` 的版本是 3.51.1。本节补充 [docs/01 的跨平台边界](01_scope_architecture.md#跨平台需要替换的边界) 和上面第六节的存储方案 A/B/C，不重复其中内容。
+
+**1. Windows 依赖清单**（Godot 侧有 8 个调用文件，共 18 处直接依赖 Windows 或 `powershell`）
+
+| 领域 | 现在的实现 | Linux 上的问题 | 可移植的替代 |
+|---|---|---|---|
+| 存储（资产、账号、结果、删除） | `sqlite_store.ps1`（299 行）、`account_store.ps1`（517 行）内嵌 C#，用 `DllImport("winsqlite3.dll")` 调 SQLite；常驻工作进程 `storage_worker.ps1`，另有一次性助手 | 没有 `powershell.exe` 和 `winsqlite3.dll` | 见第 2 节 |
+| 密码 | .NET `Rfc2898DeriveBytes`（PBKDF2-SHA256，60 万次） | 在 PowerShell 7 / .NET 8 上可用 | 已有 GDScript 探针，结果与 .NET 逐字节一致（约 1.7 秒，Windows） |
+| 备份、恢复、指标 | `operator_maintenance.ps1`（308 行）：SQLite backup API、完整性检查、`File.Replace`；CPU 和内存读 CIM `Win32_*` | CIM 不存在 | 备份部分跟随存储方案；指标读 `/proc/meminfo`、`/proc/stat`，磁盘用 Godot `DirAccess.get_space_left()` |
+| 进程身份（房间、宿主） | `process_launcher.gd` 在非 Windows 上直接返回 UNSUPPORTED；`process_identity.ps1` 用 CIM 核对父进程、可执行文件、命令行标记和创建时间，再按持有的句柄 TerminateProcess | CIM 和句柄都不存在 | GDScript 直接读 `/proc/<pid>/stat`（ppid、starttime）、`/proc/<pid>/cmdline`（`--launch-id` 标记）和 `/proc/<pid>/exe`，不用再启动外部进程 |
+| 私有目录 | `protect_data.ps1`、`protect_runtime.ps1`：ACL 只留当前用户、拒绝重解析点 | 没有 Windows ACL | `FileAccess.set_unix_permissions` 设为 0700 或 0600，用 `DirAccess.is_link` 拒绝符号链接，再核对属主 |
+| 路径 | 各脚本约 90 处用 `+'\'` 前缀判断和不区分大小写的比较 | 分隔符是 `/`，文件系统区分大小写 | 改用 `DirectorySeparatorChar`；Linux 上按区分大小写比较 |
+| 启动、构建、导出 | `.cmd` + PowerShell，Windows 导出模板，`Start-Detached` | 全部需要对应的 Linux 版本 | 写 `.sh` 入口，之后可选 systemd 用户服务；Windows 的 `.cmd` 不动 |
+| 可以直接移植 | 证书（Godot `Crypto` 生成）、WSS、ENet/DTLS、Schema、SDK、游戏、停机请求文件 | 理论上可以移植（09-21 在 WSL 上跑过 215 项检查，但那不是宿主验证） | Linux 上需要实测 |
+
+**2. 常驻存储的替代方案**（前提：不改数据库文件格式、SQL、事务和幂等语义）
+
+| 方案 | 做法 | 优点 | 缺点和风险 |
+|---|---|---|---|
+| **P：Linux 用 PowerShell 7 复用现有助手（推荐的第一步）** | 同一套 `.ps1` 和内嵌 C#，只把平台相关部分抽出来：SQLite 库名（Linux 用 `libsqlite3.so.0`）、路径分隔符、ACL、CIM。Windows 继续用 5.1，不用安装 | 存储语义只有一份实现，现有语义测试可以直接在两边对照；改动量最小 | Linux 需要装 `pwsh`（可以不用 sudo，解压到用户目录），这是一个额外运行时，要用户同意；5.1 和 7 两种方言必须同时兼容；Linux 上的内存、冷启动和一次性助手耗时都还没测 |
+| G：GDExtension SQLite 放进 Godot 进程，存储逻辑改写成 GDScript（即第六节的方案 C） | 去掉所有 PowerShell 存储进程 | 常驻进程最少，两个平台用同一条路径 | 要下载并分发第三方原生库，每个平台一份（之前已暂缓，需用户同意）；约 1100 行存储、账号、删除、备份逻辑要重写，资产幂等和删除语义的迁移风险最大；密码派生慢约 1 秒以上（1.7 秒对比 .NET）；与 4.7.2 的兼容性也要验证 |
+| 不推荐 | Linux 上改用 Python 再写一份（两份实现，语义容易分叉）；Go 或 Rust 助手（AGENTS 禁止擅自引入）；调用 `sqlite3` 命令行（没法安全绑定参数） | — | — |
+
+**推荐**：
+- 平台层（进程身份、目录保护、指标）在 Linux 上直接用 GDScript 读 `/proc` 和文件权限，不再为这些启动外部进程。
+- 存储层先走方案 P，得到一个能运行、语义不变的 Linux 服务端，再用第 5 节的门槛实测。只有 P 在 Linux 上的内存或耗时达不到门槛，才启动方案 G 的评估。
+
+我倾向 P，理由是：在现有语义不变的前提下，P 是唯一能让资产、账号、删除和备份只维护一套实现的路线；G 的收益（省下常驻进程的内存）只有等 P 的实测出来之后才能量化。这里不承诺任何性能提升。
+
+**3. 调查中发现的风险：Linux 上结束进程**
+- Godot 4.7.2 在 Unix 上的行为：`is_process_running` 内部调用 `waitpid(WNOHANG)`，子进程一旦退出就会被回收，退出码缓存在 `process_map` 里；`OS.kill` 直接对这个 PID 发 SIGKILL。
+- 现有代码在 Linux 上是安全的，但功能不全：`bounded_helper.gd` 和 `resident_store.gd` 的结束路径都受 `_handle_release_verified()` 限制，它要求 Windows 加 4.7.2 的特定构建。所以在 Linux 上，常驻工作进程会自动关闭，退回一次性模式；一次性助手超时后也不会被结束，也就是超时并没有真正执行。
+- 移植时的陷阱：Windows 规则是“正在运行，或者已经有退出码，就调用 `OS.kill`”，依赖的是“持有句柄，PID 就不会被复用”。照搬到 Linux，子进程被回收后 PID 可以复用，就可能 SIGKILL 到一个无关进程。
+- Linux 版应该这样做：只在同一把锁下、刚确认进程还在运行时才发信号。尚未回收的子进程不会让出 PID，所以这样是安全的；已经退出的进程不再调用 kill，也不需要，因为已经被回收了。
+- 这条规则要写进 Linux 平台层的测试，并且作为启用 Linux 常驻存储和超时的前提。
+
+**4. 内存基线（Windows 实测，隔离环境，1 次采样，单位是工作集 / 私有内存）**
+- 只有 Operator（管理服务）：287 / 202 MB。其中 Godot 管理服务 97 / 50 MB，两个常驻存储 PowerShell 各约 90–100 / 71–84 MB。
+- 游戏服务器运行：557 / 389 MB。多出的是托管宿主（94 / 47 MB）和两个短时 PowerShell（约 81–91 MB，来自进程身份核对的一次性助手）。
+- 再加一个就绪的射击房间：548 / 350 MB，房间进程约 94 / 46 MB。每多一个房间预计再加一个同样大小的 Godot 进程（推算，未测多房）。
+- 证据：`logs/admin-ui-2d98e12ebc1049c48474fbc965245b48/memory/`（`memory.csv` 和测量脚本 `measure_memory.ps1`）。测的是 Godot 编辑器二进制；导出模板和 Linux 上的数值都没测。
+- 结论：PowerShell 进程占到基线的约三分之一到一半。Linux 上改用 `/proc` 做进程核对，就能去掉那对短时进程；常驻存储的两个进程只有方案 G 才能去掉。以后换 1 GB 小云服务器之前，必须先在 Linux 上实测。
+
+**5. Windows 一键运行、备份和测试库边界**
+- **Windows 不退化**：所有新代码按 `OS.get_name()` 分派，Windows 分支保持现有代码和测试不变。`StartManagement.cmd` 等入口不动；每个阶段都要重跑 Windows 回归（admin_http、玩家客户端、存储专项）。
+- **数据库**：SQLite 文件和 WAL 格式跨平台通用，备份继续用 SQLite backup API 加完整性检查。验收要求：两个平台之间能互相恢复备份，但只能用测试生成的合成库。
+- **测试库**：Linux 上所有测试都在项目内的 `data/test-*` 隔离目录重建。验证阶段不把用户的 `data/framework/` 复制到 Linux。真实数据库迁移到 Linux 要作为单独步骤，由用户授权，并且先备份。
+
+**6. 下一次可执行的验证清单**（每一步都要事先得到用户同意；第 0 步只读）
+0. **设备检查**（只读）：确认 SSH 连得上，记录发行版和 glibc 版本、CPU 和内存、磁盘空间，确认 `libsqlite3.so.0` 是否存在、有没有 `pwsh` 或 Godot，确认防火墙状态。结果写进 [环境记录](10_environment.md)。
+1. **Godot 4.7.2 Linux headless**：需要下载官方 Linux 二进制，要同意。把当前提交的干净副本（不含 `data/`、`logs/`）放到笔记本上，跑 `run_shooter.gd`、`run_unit.gd`、`run_client_sound.gd` 等纯 GDScript 测试。
+2. **方案 P 最小切片**：`pwsh` 装在用户目录，要同意。用一个小测试入口，在全新测试库上跑注册、登录、`asset.commit` 同一操作编号重复提交、备份和恢复，并做对照：
+   - 同一组固定密码和盐，PBKDF2 结果与 Windows 相同；
+   - 两个平台生成的库可以互相打开，完整性检查通过；
+   - 常驻工作进程能按预期复用，有超时和回退；
+   - 这一步只动存储助手的平台抽象，需要另开实施任务。
+3. **测量**：`pwsh` 常驻工作进程的内存、首次应答时间、单次请求 p50/p95、一次性助手耗时，以及 GDScript PBKDF2 在 Linux 上的耗时。建议的门槛（验收用，不是承诺）：
+   - 常驻请求 p50 不超过 50 ms；
+   - 一次性助手不超过 2 秒，也就是不比 Windows 慢；
+   - 管理服务、宿主加一个房间，总内存不超过 Windows 基线加 20%。
+   - 达不到时，申请评估方案 G。
+4. **平台层实施**：Linux 进程身份（`/proc`，遵守第 3 节的结束规则）、目录保护、指标，以及 `.sh` 启动入口；Windows 回归不退化。
+5. **跨机闭环**：Windows 客户端连 Linux 服务端，完成注册、登录、开房、对战、购买、退房和重启后数据保留，要有截图和日志；局域网 UDP 端口和防火墙规则写进文档。
+
+**主要风险**：
+- 5.1 和 7 两种 PowerShell 方言的兼容维护；
+- Linux 上 PID 复用（第 3 节）；
+- 笔记本上的 Godot 4.7.2 和导出模板，以及 `libsqlite3.so.0` 的可用性；
+- DTLS -30464 可能在跨机时出现；
+- 引入 `pwsh` 或 GDExtension 都需要用户决定；
+- 独立 ZIP 包的 Linux 版本还没有规划，要排在源码运行验证之后。
+
+### 基础音效原任务范围（已交付，保留记录）
+
+后台已由用户真人确认建房等操作、退出和重新登录正常；Codex 抽查房间截图与隐藏样式，重跑四项页面测试 44/0。以下为音效实施时的范围。工作目录为本仓库，`main` 基准 `bf21fe0`；接手重新核实 Git，保留尚未提交的后台、预览、夹具和文档。同目录由 Claude 单方写入，Codex 等交付复核。
+
+- 先读 AGENTS、README、STATUS、本节及客户端事件链。实现开枪、命中、死亡、购买成功、按钮反馈五类音效，以及可保存的音量和静音设置。只改客户端/具体游戏展示层、必要的资源打包、测试和文档；不改 host/core、通用 SDK、玩法、认证、协议或数据库。
+- 优先自制简短合成音效或许可明确的免费素材；保留生成源或来源与许可说明。控制音量和连射叠加，限制同时播放数量；headless 服务端不创建音频播放节点。不做背景音乐。
+- 基于真实事件触发：购买失败不能播放成功声音，重复响应不能重复播放；命中使用服务器确认，死亡每次只触发一次；同一点击避免重复按钮音。缺少可靠事件时先报告最小方案，不擅自扩协议。
+- 隔离验证设置持久化、静音、失败与重复事件、连射资源上限，运行受影响的射击及完整客户端测试。无窗口测试不等于听感验收，无法实际监听时明确记录未验收。
+- 音效改变源码摘要及客户端版本。用独立游戏索引、连接目录和输出目录生成匹配测试端；不覆盖当前 PlayerClient、仓库客户端、既有 Release 附件，不操作真实服务或 data/framework。交付准确的停服、重启、重新生成 PlayerClient 步骤，不放宽版本检查。
+- 更新 STATUS 和本节；提供一个入口及最多三条听音试玩步骤，报告文件、命令、退出码、失败和未运行项。不做 Linux、发布、提交或推送。交 Codex 复核。
+
+#### 基础音效实施（Claude，2026-09-29，未提交，待 Codex 复核）
+
+**结构**：没有改 host/core、SDK、玩法规则、认证、协议或数据库。
+- **`examples/framework/sound.gd`**（新增，示例客户端外壳）：
+  - 五种音效在启动时由代码合成（频率、噪声比例、衰减都写在文件里），不用任何音频文件，也就没有外部素材的来源或许可要记录；
+  - 固定 8 个播放器组成的池，每种音效有并发上限（开枪 3、命中 2、死亡 2、购买 1、点击 1），还有最小间隔（开枪 40 ms、点击 60 ms 等）；槽位满时重启最老的那个声音，而不是叠加；
+  - 没有窗口的客户端（`--headless`）不创建音频节点，只保留计数；房间服务端根本不加载这个脚本；不做背景音乐。
+- **设置**：音量（默认 70%）和静音保存在 `user://audio_settings.json`，Windows 上位于 `%APPDATA%\Godot\app_userdata\RoomKit Game\`。
+  - 不放在 PlayerClient 目录里：否则重新生成客户端时，它会被当成“用户新增文件”而拒绝替换。
+  - 写入时先写临时文件再改名，文件损坏就回到默认值。
+  - 拖动滑块只改音量，松开时才写一次文件。
+  - 测试可以用 `--audio-settings=<路径>` 指定独立位置。
+- **界面**（`view.gd`）：
+  - 顶部加了“音效 开 / 已静音”按钮和音量滑块，`M` 键切换静音；
+  - 所有按钮在 `_button()` 里统一接一次点击音，每次点击只接一个信号，再加 60 ms 间隔，不会重复。
+- **射击事件**（`examples/shooter/game.gd`，只在客户端接收快照的路径上）：
+  - 新增展示信号 `presentation_cue`，由 `presentation_cues(旧快照, 新快照, 已见的射击编号)` 推导：
+    - **开枪**：服务器快照里新出现的射击编号，按“同一时刻、同一枪口”合并，霰弹枪 6 颗弹丸只响一次；
+    - **命中**：存活玩家的生命值被服务器下调；
+    - **死亡**：从存活变成阵亡，或死亡计数增加；致命一击只响死亡，不再响命中。
+  - 进房后的第一帧、重复或相同的快照、过期快照都不会出声。
+  - 本地玩家自己受伤或阵亡时音调降低。
+- **购买**（`client.gd`）：只在 `retry_asset` 收到服务器确认、资产通过校验、且操作是购买时才播放。
+  - 同一个 `operation_id` 只播一次。
+  - 购买失败、超时待确认、响应格式不对、保存默认配置，都不会播放成功音。
+- **打包**：`tools/build_framework.ps1` 把 `sound.gd` 加进复制清单；独立包构建会复制构建目录里的全部 `.gd`，所以不用再改。
+
+**已知限制**：快照里没有“谁打中谁”的信息，所以“命中”表示任何一次被服务器确认的伤害。两人对战时就等于自己打中了对方；三人以上时，别人之间的互射也会响。要做到只在自己命中时响，最小方案是在射击快照的 shot 里加上 shooter 字段，这属于协议改动，本轮没有做，等决定。
+
+**验证**（均为隔离环境）：
+- `tests/run_client_sound.gd`（新增，无窗口）41/0，退出 0，证据在 `logs/client-sound-ba7aac34027c447882e5a69bdae13f14/`。
+  - 覆盖：默认值、设置保存与重读、损坏文件、静音和零音量不出声、连射 1 秒内 25 次（间隔不小于 40 ms）、同时最多 3 个开枪声和 7 个声音（上限 8）、立即重复点击不重复出声、有窗口时 8 个播放器且静音全部停止；
+  - 真实权威射击快照：一枪一次开枪加一次命中、重复快照和过期快照静默、致命一击只响死亡且只响一次、阵亡期间和复活时静默、霰弹枪只响一次；
+  - 购买：被拒、超时、确认后只响一次、同一操作重复确认不再响、响应格式不对、保存默认配置。
+  - 同一目录下有 `cue-*.wav` 五个试听文件。
+- `tests/run_shooter.gd` 83/0；`tests/run_framework_feedback.gd` 7/0；`tests/run_shooter_visual.gd` 用真实渲染器跑通，60 FPS。
+- `tests/test_player_client.ps1` 28/0，退出 0，证据在 `logs/player-client-4136d40bd34f468dabbb90c4812b3844/`。
+  - 用自己的游戏索引、Operator、公开配置目录和输出目录，从当前源码导出客户端，完成真实注册、登录、双人入房互见、退房、双击启动。
+  - 新 build_id 为 `shooter-dev-002-src-97b98fb2f74e`；改过代码的客户端仍被 BUILD_MISMATCH 拒绝。
+  - 三个客户端和 Operator 的 stderr 中 ERROR/WARNING 均为 0 条；共享的 `artifacts/client` 和游戏索引都没有改动。
+- `--check-only`：受影响的 6 个脚本都能解析。
+- 客户端登录界面截图（带音量控件）在 `logs/client-sound-3daf048c9f8d4576ba037358b7739037/client-login.png`。
+- 测试中修正：
+  - 合成代码里有一个变量类型无法推断，导致 `sound.gd` 编译失败，而 `client.gd` 预加载它，所以整个客户端都会起不来。新测试第一次运行就发现了，已修。
+  - 测试自己的播放器池释放过早，产生泄漏警告；改为等音频线程处理完再释放，产品代码没有改。
+  - 脚本编辑在 `view.gd` 里留下 3 行只有 LF 的换行，已统一成 CRLF。build_id 按文件原始字节计算，所以统一后又变了一次，玩家客户端测试随后重跑，28/0。上面的 build_id 和证据目录都是最终字节下的结果；第一次运行 `logs/player-client-95328043206f4bf2ae6d7158d61dc14e/` 得到的也是 28/0，但对应的是旧字节。另外，工作区换行方式（autocrlf）也会影响 build_id，这个行为以前就存在。
+
+**未运行 / 未验收**：
+- 听感：没法实际监听，音量平衡和音色都没有验收。
+- `tests/test_framework_clients.ps1`：它读取真实服务正在用的共享 `artifacts/framework-games.json`，为了不动真实服务没有跑。
+- 独立 ZIP 包没有重新构建。
+- 仓库副本 `clients/shooter-windows/`、既有 Release 附件和用户的 `PlayerClient/` 都没有重新生成，仍是 `0f559378dddc`，与新源码不再匹配，需要单独安排。
+
+**上线步骤**（版本检查不放宽）：
+1. 管理后台先停止游戏服务器，再运行 `StopManagement.cmd` 关闭管理服务。
+2. 运行 `StartManagement.cmd`，它会从源码重新构建，得到新的 build_id。
+3. 启动游戏服务器后运行 `PreparePlayerClient.cmd`，重新生成 `PlayerClient`。旧客户端会被以“版本不匹配”拒绝，这是预期行为。
+
+### 暂缓任务：GitHub 获取验收
 
 直接 EXE 启动、内容摘要版本配对和 Release 附件准备已实现，用户已人工试玩，状态及验证边界见 STATUS。下一次由 Claude 先核对最新 main、仓库 client-version.json 与对应 Release 附件清单/哈希，准备简短发布说明，明确“需要服务器提供公开配置、当前仅 Windows、尚未跨设备验证”。本轮授权提交推送源码，不包括发布 Release；下一次确认具体发布后再上传现有原文件附件，不重新导出造成 tag/哈希漂移。
+
+发布前核对（Claude，2026-09-29，`main` = `origin/main` = `bf21fe0`，未发布）：
+- 附件：`artifacts/player-clients/release-shooter-client-shooter-dev-002-src-0f559378dddc-4c2ef956/` 共 12 个文件，大小和 SHA256 与清单 JSON、已提交的 `clients/shooter-windows/` 全部一致（`Client.exe` 不进 Git，其余 11 个已跟踪），0 处不一致。
+- 版本：用当前 main 源码重新构建，`build_id` 仍为 `shooter-dev-002-src-0f559378dddc`，与附件一致。
+- `Client.exe` 与本机官方模板 `windows_release_x86_64.exe` 逐字节相同（`d34d36f3…`）。
+- 秘密扫描：只有两处误报——`SetServer.ps1` 里检测私钥的代码行，以及 `Client.exe` 中 mbedtls 内置的 PEM 头字符串；没有连接配置、证书、数据库或密钥文件。
+- 发布说明已写好：`artifacts/player-clients/release-…-4c2ef956-NOTES.md`，写明需要服务器提供公开配置、当前仅支持 Windows、尚未跨设备验证。
+- 用户确认暂不发布。Release 未创建，下载、直接启动和联机验收都没有执行，GitHub 获取流程仍为待验证。发布时直接上传上述现有文件，不重新导出。
 
 发布后在全新隔离目录分别验证 Git 克隆 + FetchClient 和浏览器获取附件：校验全部文件、确认不带服务端秘密、直接 EXE 启动；使用隔离服务器提供公开配置完成真实登录/入房/退房。不能只看下载成功就宣称联机通过。输出一个下载入口、最多三步玩家说明和真实证据；用户真实服务/数据不动，不做 UI、音效、Linux 或清理。完成后由 Codex 复核，再进入后台 UI 小阶段。
 

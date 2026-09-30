@@ -5,7 +5,10 @@ const Paths = preload("res://sdk/roomkit/shared/paths.gd")
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const View = preload("view.gd")
+const Sound = preload("sound.gd")
 var client
+var sound
+var last_purchase_sound := ""
 var world
 var view
 var args: Dictionary = {}
@@ -55,6 +58,11 @@ func _initialize() -> void:
 func _run() -> void:
 	client = AccountClient.new()
 	root.add_child(client)
+	sound = Sound.new()
+	sound.name = "Sound"
+	if args.has("--audio-settings"):
+		sound.settings_path = str(args["--audio-settings"])
+	root.add_child(sound)
 	view = View.new()
 	view.app = self
 	root.add_child(view)
@@ -70,6 +78,8 @@ func _run() -> void:
 	world = game_script.new()
 	world.name = "GameWorld"
 	root.add_child(world)
+	if world.has_signal("presentation_cue"):
+		world.presentation_cue.connect(_on_presentation_cue)
 	root.title = "RoomKit · " + world.title()
 	var manifest_path := "res://game_manifest.json" if FileAccess.file_exists("res://game_manifest.json") else source + "game_manifest.json"
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
@@ -364,6 +374,8 @@ func retry_asset() -> void:
 		result = await client.select_item(operation.slot, operation.item_id, operation.operation_id)
 	if result.ok and _accept_assets(result.get("payload", {})):
 		message = "解锁已保存；可以另行选择默认配置" if operation.kind == "purchase" else "默认配置已保存，下次出生或入房生效"
+		if operation.kind == "purchase":
+			_purchase_confirmed(str(operation.operation_id))
 		pending_asset.clear()
 		_save_pending()
 	elif not result.ok and result.get("code", "") not in ["CONTROL_UNAVAILABLE", "STORAGE_UNAVAILABLE", "STORAGE_TIMEOUT", "TIMEOUT"]:
@@ -374,6 +386,23 @@ func retry_asset() -> void:
 	else:
 		message = "尚未确认保存结果。请恢复连接后点击“查询 / 重试原操作”，不会另起一次扣款。"
 	busy = false
+
+## Success sound only after the server confirmed this operation, once per id.
+func _purchase_confirmed(operation_id: String) -> void:
+	if sound != null and operation_id != last_purchase_sound:
+		last_purchase_sound = operation_id
+		sound.play("purchase")
+
+func _on_presentation_cue(cue: String, detail: Dictionary) -> void:
+	if sound == null or client == null or client.state != "IN_ROOM":
+		return
+	var own: bool = str(detail.get("user_id", "")) == str(client.identity.get("user_id", ""))
+	# The local player's own damage and death play lower so they read as "taken".
+	sound.play(cue, 0.75 if own and cue in ["hit", "death"] else 1.0)
+
+func play_click() -> void:
+	if sound != null:
+		sound.play("click")
 
 func respawn() -> void:
 	if busy or not pending_asset.is_empty() or world == null or not world.has_method("send_respawn") or client.state != "IN_ROOM":

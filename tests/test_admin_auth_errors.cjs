@@ -14,6 +14,8 @@ const definitions = ['const errors=', 'function errorText(', 'async function api
   return line;
 }).join('\n');
 let passed = 0, failed = 0;
+// Structural guard only; actual CSS visibility is also checked in a browser.
+check(/\[hidden\]\s*\{\s*display\s*:\s*none\s*!important\s*;?\s*\}/.test(html), 'hidden state takes precedence over auth/app display styles');
 function check(condition, label) {
   if (condition) { passed++; console.log('PASS ' + label); }
   else { failed++; console.error('FAIL ' + label); }
