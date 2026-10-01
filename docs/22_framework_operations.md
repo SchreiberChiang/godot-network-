@@ -4,7 +4,7 @@
 
 ## 源码运行
 
-Linux 同机的本轮最终结果、原始失败和退出补修见 [备份等待收尾](17_framework_shooter_plan.md#l3-backup-wait)。不以同机通过代替 Windows → Linux 局域网验收。
+Linux 同机的最终结果、原始失败和退出补修见 [备份等待收尾](17_framework_shooter_plan.md#l3-backup-wait)；Windows → Linux 的独立局域网验收、专用客户端与端口见 [跨机试玩](17_framework_shooter_plan.md#linux-lan)。
 
 Windows 需要 Godot 4.7.2；默认路径是 `D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`。不需要 Node、外部数据库服务或旧项目。脚本参数 `-Godot` 可以指定另一个引擎路径，但更换版本后应重新验证。
 

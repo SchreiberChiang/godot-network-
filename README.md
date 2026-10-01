@@ -1,6 +1,6 @@
 # RoomKit：独立的本地房间框架
 
-从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`（已整合原 `codex/shooter-framework` 成果）；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能已有验收；Linux 笔记本的同机完整对局、备份等待和 60 分钟耐久已通过功能门槛，退出补修另经定向复验。原始汇总的一次环境对照失败保留，跨设备联机、公网和 Linux 导出包仍未验收。
+从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`（已整合原 `codex/shooter-framework` 成果）；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能已有验收；Linux 同机完整对局、备份等待和 60 分钟耐久通过功能门槛，原始环境对照失败保留，退出补修另经复验。Windows → Linux 基础跨设备自动验收也已通过；跨机完整一局/耐久、真人画面、公网和 Linux 导出服务器包仍未验收。
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
@@ -37,7 +37,7 @@
 
 房间规则设置、背包与复活、局域网配置、备份恢复、客户端窗口排查和命令行等价入口，见 [本机启动与验证](docs/22_framework_operations.md)。
 
-## Linux 源码启动（同机测试）
+## Linux 源码启动
 
 需要 Godot 4.7.2 官方 Linux 版、pwsh 7.6 和系统的 `libsqlite3.so.0`；引擎和 pwsh 的位置默认在 `~/roomkit/tools`，也可以用 `ROOMKIT_GODOT`、`ROOMKIT_PWSH` 指定。在项目目录下：
 
@@ -47,7 +47,9 @@ bash tools/roomkit_linux.sh status
 bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 ```
 
-每个实例的数据、游戏索引、公开配置和 HOME/XDG/tmp 都在 `data/instance-<名>/`（默认 `l3`），默认只绑定 127.0.0.1；端口可以用 `--panel-port`、`--lobby-port`、`--control-port`、`--udp-range`、`--bind` 指定，但只在实例第一次创建时生效。目前只在一台 x86_64 笔记本上做过同机自动验收，跨机连接和公网还没有验收，结果与已知问题见 [STATUS](STATUS.md)。
+每个实例的数据、游戏索引、公开配置和 HOME/XDG/tmp 都在 `data/instance-<名>/`（默认 `l3`），默认只绑定 127.0.0.1；端口可以用 `--panel-port`、`--lobby-port`、`--control-port`、`--udp-range`、`--bind` 指定，但只在实例第一次创建时生效。已在一台 x86_64 笔记本上完成同机验收，以及 Windows 客户端直连 Linux 的局域网自动验收；公网和 Linux 导出服务器包尚未验收。
+
+本机专用的 Linux 联机客户端：双击 **`OpenLinuxPlayerClient.cmd`** 打开独立目录，再双击其中的 `Client.exe`。它连接笔记本测试实例，保留原 `PlayerClient`；生成的程序和连接配置不进入 Git。邀请码、启停和复验说明见 [Linux 跨机试玩](docs/17_framework_shooter_plan.md#linux-lan)。
 
 ## 独立 Windows 包（无需 Godot 编辑器）
 

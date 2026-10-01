@@ -1,7 +1,13 @@
 # 当前状态：RoomKit（2026-10-01）
 
 <a id="status-validation"></a>
-## 最新结论：Linux 同机功能收尾通过，下一步准备跨设备联机（2026-10-01）
+## 最新结论：Windows → Linux 局域网自动验收通过（2026-10-01）
+
+基准 `main / 572c356`，两台设备用同一提交的新源码目录：Windows `192.168.10.100` → Linux `192.168.10.105`。最终 **38/0、退出 0**：真实 WSS 注册/登录、购买及重复请求不重复扣款、选枪、DTLS/UDP 双人入退房和互见；导出的 `Client.exe` 也在新的目录里完成双人注册、入退房。房间资源与会话清理均已确认。管理后台仅通过 SSH 访问回环端口，玩家连接直接走局域网；未安装、未改防火墙或代理。证据、首轮失败和范围见 [跨机验收](docs/17_framework_shooter_plan.md#linux-lan)。
+
+本机入口：`OpenLinuxPlayerClient.cmd` 打开独立客户端目录；真人画面/听感、公网、Linux 导出服务器包、其它发行版仍未验收。
+
+### 此前同机收尾结果（保留证据边界）
 
 用户授权提交推送，后续暂由 Codex 负责。当前独立结果见 [备份等待与收尾](docs/17_framework_shooter_plan.md#l3-backup-wait)，此前 Claude 的失败和未运行项保留在 [历史收尾结果](docs/17_framework_shooter_plan.md#l3-closeout-result)。以下是功能门槛与补充复验，不把原始非零汇总改写为全绿。
 
@@ -12,7 +18,7 @@
 - **原始汇总限制**：38 步失败 1 步，退出 1，失败是 HOME 目录项对照。Codex 的首次临时启动命令误在 HOME 写了两个输出文件，保存后仅移除这两个自建文件；正式运行的基线包含它们，因此最终对照不同。差异仅这两项；补充运行的 HOME 前后对照通过，原始失败保留。
 - **退出资源泄漏补修**：真实 Linux 宿主退出曾出现 23 个对象、9 个资源警告，专项按严格错误输出判失败。已修复结果服务对房间管理器的强回引用。最终新快照 `20261001221221-79ad35`：两平台集成 **133/0**、引用/回执专项 **9/0**、真实备份登录 **13/0**；Linux 后台退出无资源警告。60 分钟结果对应补修前快照，补修后只跑上述定向回归，未重跑整小时。
 - **Windows 受影响回归**：unit **320/0**、完整对局 **47/0**、契约 **292/0**、页面 **44/0**，其它定向数字见专题；最后的退出补修另按上一条复验。此前 6 客户端突发同时登录 5 成功、1 被拒，尚不声称并发登录全通过。
-- **未运行**：跨机连接、公网、导出包。
+- **未运行**：公网、Linux 导出服务器包；跨机基础流程已按上节补验，不代表跨机完整五分钟结算或长期耐久通过。
 
 ## 当前已实现
 
@@ -25,9 +31,10 @@ Linux（笔记本，Godot 4.7.2 官方版 + pwsh 7.6.6）：同机从源码启�
 | 入口或产物 | 用法与限制 |
 |---|---|
 | StartManagement.cmd / StopManagement.cmd | Windows 源码后台启动/停止；当前推荐 |
-| `tools/roomkit_linux.sh start\|stop\|status` | Linux 源码启动隔离实例；用法见 [README](README.md#linux-源码启动同机测试) |
+| `tools/roomkit_linux.sh start\|stop\|status` | Linux 源码启动隔离实例；用法见 [README](README.md#linux-源码启动) |
 | PreparePlayerClient.cmd → PlayerClient/ | 生成完整玩家目录，直接双击 Client.exe；源码更新后需重新生成并与服务配对 |
 | StartPlayerClient.cmd / StartShooterClient.cmd | 已生成客户端入口 / 源码客户端入口 |
+| OpenLinuxPlayerClient.cmd | 打开本机单独准备的 Linux 联机客户端；无需替换原 PlayerClient，详见 docs/17 |
 | clients/shooter-windows/、旧 Release 附件、独立 ZIP | 未随 Linux 工作重新生成；不作为最新源码交付，Release 仍暂缓 |
 | ROADMAP.html | 离线项目地图；执行状态以本文及 docs/17 顶部为准 |
 

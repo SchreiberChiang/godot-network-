@@ -1,7 +1,70 @@
 # 通用框架与横版射击分支实施计划
 
+<a id="linux-lan"></a>
+## Windows → Linux 局域网交付（Codex，2026-10-01）
+
+**结论**：基础跨设备链路已实测通过。基准为已推送 `main / 572c356`，源码归档 SHA256 `d7dfdf8a965a5b5abeee18fb08a160513786e9a15ddb6540a8dd22be083389aa`；Windows 和 Linux 分别解包到新目录，射击版本同为 `shooter-dev-002-src-70b8f5366f78`，取石子版本同为 `turns-managed-dev-001-src-6c031a3e2b26`。生产服务器、SDK、协议、构建算法没有改动，当前轮只增加跨机驱动、便捷入口和记录。
+
+### 连接与隔离
+
+| 用途 | 本轮地址/端口 | 范围 |
+|---|---|---|
+| Windows 玩家 | `192.168.10.100` | 当时路由通过以太网；不推断 TUN 共存已解决 |
+| Linux 大厅 | `192.168.10.105:28500/TCP` | 玩家直接 WSS 连接，未走 SSH 隧道 |
+| Linux 房间 | `192.168.10.105:28540–28555/UDP` | 玩家直接 DTLS/ENet 连接 |
+| 管理面板 | `127.0.0.1:28491/TCP` | SSH 转发到 Windows 同号回环端口，未开放给 LAN |
+| 内部房间控制 | `127.0.0.1:28501/TCP` | 不转发、不开放给玩家 |
+
+证书和 `server_hostname=localhost` 沿用公开配置；没有关闭证书、票据或版本校验。Linux 启动采用正式 `roomkit_linux.sh`（忽略 SIGPIPE、umask 077），只使用假数据。没有安装、sudo、SSH/防火墙/代理修改，也没有进入实验目录。
+
+本轮本地私有目录：`data/codex-linux-lan-20261001224135-8dd5ca/`；Linux：`~/roomkit/src/572c3563ac02-lan-8dd5ca/`，实例 `lan-8dd5ca`，数据在该快照 `data/instance-lan-8dd5ca/`。原 Windows `data/framework`、共享 `artifacts/client`、原 `PlayerClient`、仓库客户端副本和 Release 附件不参与测试。
+
+### 自动验收与原始失败
+
+`tests/test_linux_lan.ps1` 必须传入显式的准备清单，只有管理 HTTP 通过 SSH，玩家 WSS 和 UDP 都直接连接 Linux。复验命令（本机已有准备目录时）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_linux_lan.ps1 -Phase verify -ContextPath logs/codex-linux-lan/20261001224135-8dd5ca/manifest.json -PlayerDirectory artifacts/linux-lan-20261001224135-8dd5ca/shooter-windows
+```
+
+清单、源码和数据目录是本机准备产物，不随 Git 分发；换机器/重新准备时必须建立新的源码快照与清单，不能把此命令当成干净检出后的通用启动器。驱动核对清单、非空游戏版本、实际工程、完整目标路径无链接；每次产生独立证据目录，临时密码只进私有文件，退出时清除一次性计划。
+
+| 项目 | 结果/证据 |
+|---|---|
+| 准备第二轮 | 8/0，退出 0；SSH 面板、真实 Linux 宿主和直接大厅 TCP 可达 |
+| 最终复验第三轮 | **38/0，退出 0**；证据 `data/codex-linux-lan-20261001224135-8dd5ca/evidence-verify-27028a50/` |
+| 源码客户端 | 两名 Windows 玩家邀请码注册/登录、充值后刷新、购买扣 100、重放不再扣款、选枪、UDP 入退房、精确核对双方玩家 ID |
+| 导出的 Client.exe | 复制到新目录，从项目工作目录启动，不传连接配置参数，读取旁边文件；两个真实程序注册、入房互见、退回大厅、正常退出、无脚本错误。使用无窗口自动流程，不等于真人看过画面 |
+| 清理 | 客户端正常退出；房间 `cleaned=true`、所有会话任务 pending/running/failed 均为 0 |
+| 首次准备失败 | SSH 使用了本地 28492 → 远端 28491；管理 HTTP 的 Host 校验要求同号端口。改用 28491 → 28491，未放宽校验；原退出 1 保留 |
+| 第一次功能复验失败 | 测试误把 SMG 价格写成 300；真实目录定价 100，购买成功、余额 400。纠正断言，产品代码未变；15/1、退出 1 保留 |
+| 第二次功能复验失败 | 35/1、退出 1；清理断言要求房间记录消失，但后台保留 `cleaned=true` 的历史。改为确认资源已回收，并保存 cleanup.json；产品代码未变 |
+
+控制台在 `logs/codex-linux-lan/20261001224135-8dd5ca/`，首轮与修正后的输出分别保存。独立审查补强了空索引误通过、目标子路径链接检查、玩家互见和清理断言；导出版单独验收，不混称源码客户端结果。生成目录约 104.6 MiB，没有压缩，不进 Git；哈希由 `client-version.json` 和自检核对。
+
+补充收尾：用正式入口正常停止实例后，测试端口全部释放、私有目录/数据文件权限核对通过；重启后准备驱动 **7/0、退出 0**，沿用原测试管理员。收集的 Linux 运行日志中脚本错误与 DTLS `-30464` 均为 0；一次性计划已删除，管理员密码精确值在日志中没有匹配。Windows 两库、旧 operator.json 和公开配置的哈希/修改时间 **5/5 不变**。试玩准备辅助脚本首跑漏设 `Expect100Continue=false`，管理 API 等待失败；补齐与验收驱动相同设置后通过，未修改 HTTP 产品代码。一次日志扫描把多个 `false` 的数组当作真而误报，改为逐文件核对后精确匹配为 0；失败输出未覆盖。
+
+交付时笔记本的测试 Operator、宿主与一个真人试玩房间保持运行；未安装开机服务。试玩邀请码写入本机私有 `PLAYTEST.md`，有效 7 天、最多 8 个注册账号，未放进客户端或 Git。便捷目录入口的 `-CheckOnly` 与生成目录 `CheckClient.ps1` 通过；本轮未运行 Godot 全量回归，因为没有改变生产代码。
+
+### 给用户的入口
+
+1. 双击根目录 **`OpenLinuxPlayerClient.cmd`**，打开单独的 Linux 联机客户端目录。
+2. 双击目录里的 **`Client.exe`**。专用邀请码和本轮实例说明在本机 `data/codex-linux-lan-20261001224135-8dd5ca/PLAYTEST.md`，不进入 Git；原 Windows 账号不能用于这份全新的测试库。
+3. 注册后创建/加入射击房间；需要双人时用第二个账号。原 `PlayerClient` 继续连接原服务器。
+
+入口读取忽略目录里的 `artifacts/linux-lan-client.json`；没有准备产物时会明确报缺失，不生成或覆盖旧客户端。笔记本重启后不自动开服；该实例的官方启停方式：
+
+```text
+ssh zhao@192.168.10.105 "bash roomkit/src/572c3563ac02-lan-8dd5ca/tools/roomkit_linux.sh start --instance lan-8dd5ca"
+ssh zhao@192.168.10.105 "bash roomkit/src/572c3563ac02-lan-8dd5ca/tools/roomkit_linux.sh stop --instance lan-8dd5ca"
+```
+
+启动 Operator 后还需从回环管理面板启动游戏宿主，或者用本轮准备驱动 `-Phase prepare` 恢复测试宿主。管理面板通过 `ssh -N -L 127.0.0.1:28491:127.0.0.1:28491 zhao@192.168.10.105` 访问 Windows 的 `http://127.0.0.1:28491/`；测试管理员信息只在本机私有 `admin.json`。
+
+**下一步**：用户真人跨机试玩，随后准备可重复构建的 Linux 服务器分发目录和启动说明，再验证从干净目录部署。此轮未做跨机完整五分钟结算、跨机长时间耐久、公网、Linux 导出服务器包或其它发行版。不会用此前同机数据替代这些验收。
+
 <a id="l3-codex-checkpoint"></a>
-## 当前安排：Linux 同机功能收尾，准备 Windows → Linux 联机（2026-10-01）
+## 此前检查点：Linux 同机功能收尾，准备 Windows → Linux 联机（已执行，2026-10-01）
 
 用户已授权先提交推送现有成果，后续两天暂由 Codex 负责。本节优先于下文历史任务中的“不提交推送”和 Claude 分工；不改变真实数据、实验隔离和跨机验收边界。
 
@@ -644,7 +707,7 @@ Windows 工作线程交接失败目前会标记房间失败，但没有所有权
 <a id="coordination-current"></a>
 ## 协作总览（B1 阶段历史顺序，当前任务见上方）
 
-**只看本节确定谁先做什么。** 下方按日期保留的“当前交接”“下一步”属于当时记录；不得据旧标题并行启动新任务。当前具体代码补修要求仍在 [L2-B1 交接](#next-plan)。
+**当前进度以顶部 [Windows → Linux 交付](#linux-lan) 和 STATUS 为准，暂由 Codex 单方实施。** 下表及下方按日期保留的“当前交接”“下一步”属于当时记录，不得据旧标题并行启动新任务。[L2-B1 交接](#next-plan) 是历史补修要求。
 
 | 顺序 | 谁做 | 完成条件 |
 |---|---|---|
