@@ -98,15 +98,27 @@ func poll() -> void:
 func ready() -> bool:
 	return peers.has(client_id) and peers[client_id].authenticated
 
-func request(action: String, payload: Dictionary, timeout_ms: int = 60000, peer_id: String = "") -> Dictionary:
+func request(action: String, payload: Dictionary, timeout_ms: int = 60000, peer_id: String = "", cancel: Callable = Callable()) -> Dictionary:
 	var deadline := Time.get_ticks_msec() + timeout_ms
 	var target := client_id if peer_id == "" else peer_id
 	while peers.has(target) and not peers[target].authenticated and Time.get_ticks_msec() < deadline:
+		if cancel.is_valid() and cancel.call():
+			return Wire.failure("CONTROL_UNAVAILABLE")
 		await Engine.get_main_loop().process_frame
+	if cancel.is_valid() and cancel.call():
+		return Wire.failure("CONTROL_UNAVAILABLE")
 	var id := _begin(target, action, payload)
 	if id == "":
 		return Wire.failure("CONTROL_UNAVAILABLE")
+	var cancellation_sent := false
 	while pending.has(id) and not pending[id].has("result") and Time.get_ticks_msec() < deadline:
+		if not cancellation_sent and cancel.is_valid() and cancel.call():
+			cancellation_sent = true
+			if peers.has(target) and peers[target].authenticated:
+				peers[target].codec.queue({"version": 1, "kind": "event", "action": "request.cancel", "payload": {"request_id": id}})
+			# Keep awaiting the original result: execution may already have begun.
+			# An abandoned successful login still needs its token for clean-up.
+			# Cancellation is neither a retry nor a rollback promise.
 		await Engine.get_main_loop().process_frame
 	var result: Dictionary = pending.get(id, {}).get("result", Wire.failure("CONTROL_UNAVAILABLE"))
 	pending.erase(id)

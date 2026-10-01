@@ -6,7 +6,13 @@ var schemas: Dictionary = {}
 var grants: Dictionary = {}
 var rpc_config: Dictionary = {}
 var bus
-var manager
+var _manager: WeakRef
+# RoomManager owns this service; its return route must not own the manager.
+var manager:
+	get:
+		return _manager.get_ref() if _manager != null else null
+	set(value):
+		_manager = weakref(value) if value != null else null
 var pending: Dictionary = {}
 
 func configure(local_bus, room_manager, bootstrap: Dictionary) -> void:
@@ -43,4 +49,6 @@ func handle(row: Dictionary, message: Dictionary) -> bool:
 func _submit(room_id: String, result_id: String, hash: String, submission: Dictionary) -> void:
 	var result: Dictionary = await bus.request("result.submit", submission)
 	pending.erase(hash)
-	manager.send_control(room_id, "result.ack", {"result_id": result_id, "record_hash": hash, "ok": result.ok, "code": result.get("code", "")})
+	var target = manager
+	if target != null:
+		target.send_control(room_id, "result.ack", {"result_id": result_id, "record_hash": hash, "ok": result.ok, "code": result.get("code", "")})

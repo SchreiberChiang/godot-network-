@@ -67,11 +67,12 @@ for($index=0; $index -lt 8; $index++) {
     $ready=Rk-WaitReport $client {param($r) $r.phase -eq 'LOBBY' -and $r.ok} 90
     if ($null -eq $ready) { [void](Rk-StopClient $client); throw ('Player '+$index+' could not register.') }
     $account.user_id=$ready.user_id
-    [void](Rk-Api 'asset.adjust' @{user_id=$account.user_id;game_id='turns';coins_delta=500;xp_delta=0;operation_id=[Guid]::NewGuid().ToString('N');reason='endurance funding'})
+    $funded=Rk-Api 'asset.adjust' @{user_id=$account.user_id;game_id='turns';coins_delta=500;xp_delta=0;operation_id=[Guid]::NewGuid().ToString('N');reason='endurance funding'}
+    if (-not $funded.ok) { [void](Rk-StopClient $client); throw ('Player funding refused '+$funded.code) }
     $account.purchase_key='jade_'+[Guid]::NewGuid().ToString('N')
     $bought=Rk-Command $client 'purchase' @{item_id='jade';operation_id=$account.purchase_key}
     if ($null -eq $bought -or -not $bought.ok) { [void](Rk-StopClient $client); throw ('Player '+$index+' could not buy the theme.') }
-    [void](Rk-StopClient $client)
+    if (-not (Rk-StopClient $client)) { throw 'The setup client did not close normally with exit code zero.' }
     $accounts+=$account
 }
 Rk-SaveJson (Join-Path $state 'endurance-accounts.json') $accounts
@@ -120,10 +121,15 @@ while ([DateTime]::UtcNow -lt $deadline) {
         for($move=0; $move -lt 4; $move++) {
             $world=(Rk-Report $clients[0]).world
             $active=@($clients | Where-Object { (Rk-Report $_).user_id -eq $world.active_user })[0]
-            if ($null -ne $active) { [void](Rk-Command $active 'choose' @{take=1} 10) }
+            if ($null -eq $active) { throw 'no connected client owns the active turn' }
+            $chosen=Rk-Command $active 'choose' @{take=1} 10
+            if ($null -eq $chosen -or -not $chosen.ok) { throw ('choose refused or timed out: '+$chosen.code) }
             Start-Sleep -Milliseconds 150
         }
-        foreach($client in $clients) { [void](Rk-Command $client 'leave' @{} 20) }
+        foreach($client in $clients) {
+            $leftRoom=Rk-Command $client 'leave' @{} 20
+            if ($null -eq $leftRoom -or -not $leftRoom.ok) { throw ('leave refused or timed out: '+$leftRoom.code) }
+        }
         foreach($client in $clients) { if (-not (Rk-StopClient $client)) { Note ('cycle '+$cycle+' a client did not close by itself') } }
         $clients=@()
         $clock.Restart()
@@ -171,8 +177,10 @@ while ([DateTime]::UtcNow -lt $deadline) {
     if ($cycle % 5 -eq 0) { Write-Output ('ENDURANCE_PROGRESS '+($row | ConvertTo-Json -Compress)) }
     $cycle++
 }
-[void](Rk-Api 'server.stop' @{immediate=$true;reason='endurance done'})
-[void](Rk-WaitHost 'STOPPED')
+$stoppedHost=Rk-Api 'server.stop' @{immediate=$true;reason='endurance done'}
+if (-not $stoppedHost.ok) { Note ('final server.stop refused '+$stoppedHost.code) }
+$stoppedState=Rk-WaitHost 'STOPPED'
+if ($null -eq $stoppedState -or $stoppedState.host.state -ne 'STOPPED') { Note 'the host did not confirm STOPPED after endurance' }
 $ok=@($samples | Where-Object ok)
 $first=$ok | Select-Object -First 1
 $last=$ok | Select-Object -Last 1

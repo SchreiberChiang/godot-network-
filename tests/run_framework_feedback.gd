@@ -39,6 +39,7 @@ func _verify_feedback() -> void:
 	_check(message == "昵称已保存", "out-of-room snapshots do not change feedback")
 	client.free()
 	world.free()
+	_check(explain("STORAGE_MAINTENANCE") == "服务器维护中，请稍后再试", "storage maintenance has actionable Chinese player feedback")
 	print("FRAMEWORK_FEEDBACK_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
 

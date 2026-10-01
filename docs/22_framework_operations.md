@@ -1,8 +1,10 @@
 # 当前分支的本机启动与验证
 
-当前分支为 codex/shooter-framework，规格见 docs/17，测试证据见 STATUS。这里说明现有入口，不把代码已编写等同于发布验收通过。
+当前主线为 main，规格见 docs/17，测试证据见 STATUS。这里说明现有入口，不把代码已编写等同于发布验收通过。
 
 ## 源码运行
+
+Linux 同机的本轮最终结果、原始失败和退出补修见 [备份等待收尾](17_framework_shooter_plan.md#l3-backup-wait)。不以同机通过代替 Windows → Linux 局域网验收。
 
 Windows 需要 Godot 4.7.2；默认路径是 `D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`。不需要 Node、外部数据库服务或旧项目。脚本参数 `-Godot` 可以指定另一个引擎路径，但更换版本后应重新验证。
 
@@ -68,6 +70,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_framework.ps1 -M
 
 ### 基础回归（`tools/run.ps1`）
 
+备份期间的账号等待与玩家退出取消，分别由 [run_operator_backup_wait.gd](../tests/run_operator_backup_wait.gd) 和 [run_local_rpc_cancel.gd](../tests/run_local_rpc_cancel.gd) 检查。前者使用生产 Operator 处理器加替身，包含实际 10 秒截止与结果 outbox 保留；后者使用真实认证回环 TCP，不启动数据库或管理服务。Windows 通过隔离入口执行：
+
+```powershell
+$r = Join-Path (Get-Location) ('data/backup-wait-' + [guid]::NewGuid().ToString('N'))
+$a = "--data-root=$r/data;--games=$r/games.json;--public-client-dir=$r/public;--operator-log-path=$r/operator.log;--panel-port=28395"
+./tools/run_isolated_test.ps1 -Script tests/run_operator_backup_wait.gd -Isolation $r -Log "$r/result" -TestArgs $a
+$r = Join-Path (Get-Location) ('data/rpc-cancel-' + [guid]::NewGuid().ToString('N'))
+./tools/run_isolated_test.ps1 -Script tests/run_local_rpc_cancel.gd -Isolation $r -Log "$r/result"
+```
+
+Linux C/D/E 驱动 [linux_l3_slice.sh](../tools/linux_l3_slice.sh) 同样先跑这两个专项，再跑正式入口与 60 分钟耐久。耐久单列实际自动备份次数和等待命中数；没有自然命中等待时标为未运行，不用整体退出 0 代替这项证据。
+
+真实备份与 WSS 登录重叠由 [test_operator_backup_login.ps1](../tests/test_operator_backup_login.ps1) 补测。先准备新的源码副本并构建它自己的游戏索引，再传入 `-ProjectRoot '副本绝对路径' -GamesIndex '副本自己的索引绝对路径'`；不要在正在使用的源码目录运行。脚本会调整该副本的 `run/` 权限，在其新建的 `data/test-backup-login-*` 内启动独立 Operator、宿主与玩家，执行真实手动备份和一次登录，要求实际等待日志、备份成功、登录成功、退出码 0，以及会话清理的等待/运行/失败计数都归零。它最多启动三次独立试验以捕获重叠，不会自动重发失败的登录；手动备份重叠不代替自然自动备份的证据。
+
 `-Mode all` 按顺序运行 unit、launcher、integration、demo、players、games、persistence、secure、stress（100 轮）、load（16+4 玩家）、recovery、limits、template、panel、assets。它**不包含**下文的账号、管理、射击和托管专项。
 
 | 模式 | 执行内容 | 成功标记 |
@@ -118,7 +134,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\test_account_deletio
 
 `run_resident_store.gd` 检查常驻存储：新旧路径返回完全一致、每个数据库只有一个工作进程、不产生请求文件、新旧路径并发写同一个库、助手报错时进程不退出、超时和崩溃后重试只扣一次、队列上限、空闲退出、模式开关、全部关闭后自动重启，以及会话校验两条路径一致和句柄不泄漏。其余专项默认走常驻路径；在启动 Godot 或测试脚本前设置 `ROOMKIT_STORAGE_MODE=oneshot`，就可以用一次性路径重跑。
 
-`managed_shutdown` 与 `operator_schedules` 会各自创建私有数据目录，运行前需要存在 `artifacts/framework-games.json` 及其中引用的工程产物；`operator_schedules` 用受控时间验证 30 分钟备份和 10 分钟重启窗口，没有真实等待。`test_helpers.ps1` 覆盖有界助手的超时终止、路径白名单和账号请求的 stdin 模式。`run_storage_timing.gd` 在私有测试目录里实测注册、登录、会话校验、登出、发币、购买、重试和结算的存储层耗时，同时检查账号操作期间数据目录没有出现请求文件、Godot 句柄没有增长；报告写入 `logs/storage-timing-<label>.json`，输出 `STORAGE_TIMING_RESULT passed=... failed=0` 且退出 0 才算通过。耗时受机器负载影响，只能在同一台机器上前后对比。`run_grant_storage.gd` 检查房间签名密钥不落盘及授权上限。`run_asset_snapshot.gd` 走真实资产服务，检查购买、选择、重复请求、同 ID 不同内容、重开后重试、同一请求并发、超额并发购买和并发加币；每步之后用回执流水链核对余额与版本，并数出每个操作实际发生的存储调用次数（购买、选择、发币各 2 次，已提交请求的重复调用 1 次）。在这几条之前的八条依次对应托管注册、[托管模板](24_managed_game_template.md)、[房间规则](25_shooter_room_rules.md)、客户端启动器和四个管理页面函数测试；Node 测试用的是 DOM/API 替身，不算浏览器验收。射击渲染平滑对比 `tests/run_shooter_visual.gd` 需要图形窗口，命令见 [docs/25](25_shooter_room_rules.md)。各专项的最新结果与证据见 [STATUS](../STATUS.md#最新有效验证范围)。
+`managed_shutdown` 与 `operator_schedules` 会各自创建私有数据目录，运行前需要存在 `artifacts/framework-games.json` 及其中引用的工程产物；`operator_schedules` 用受控时间验证 30 分钟备份和 10 分钟重启窗口，没有真实等待。`test_helpers.ps1` 覆盖有界助手的超时终止、路径白名单和账号请求的 stdin 模式。`run_storage_timing.gd` 在私有测试目录里实测注册、登录、会话校验、登出、发币、购买、重试和结算的存储层耗时，同时检查账号操作期间数据目录没有出现请求文件、Godot 句柄没有增长；报告写入 `logs/storage-timing-<label>.json`，输出 `STORAGE_TIMING_RESULT passed=... failed=0` 且退出 0 才算通过。耗时受机器负载影响，只能在同一台机器上前后对比。`run_grant_storage.gd` 检查房间签名密钥不落盘及授权上限。`run_asset_snapshot.gd` 走真实资产服务，检查购买、选择、重复请求、同 ID 不同内容、重开后重试、同一请求并发、超额并发购买和并发加币；每步之后用回执流水链核对余额与版本，并数出每个操作实际发生的存储调用次数（购买、选择、发币各 2 次，已提交请求的重复调用 1 次）。在这几条之前的八条依次对应托管注册、[托管模板](24_managed_game_template.md)、[房间规则](25_shooter_room_rules.md)、客户端启动器和四个管理页面函数测试；Node 测试用的是 DOM/API 替身，不算浏览器验收。射击渲染平滑对比 `tests/run_shooter_visual.gd` 需要图形窗口，命令见 [docs/25](25_shooter_room_rules.md)。各专项的最新结果与证据见 [STATUS](../STATUS.md#status-validation)。
 
 ### 性能测量（评估用，不属于回归门禁）
 

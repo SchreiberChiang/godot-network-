@@ -32,6 +32,9 @@ const HOST_STOP_RETRY_MS := 5000
 ## How long a host's logout request waits for its clean-up job before it is told
 ## LOGOUT_PENDING (the host gives each internal clean-up request at most 10 s).
 const LOGOUT_REPLY_WAIT_MS := 8000
+const BACKUP_WAIT_LIMIT_MS := 10000
+const MAX_BACKUP_WAITERS := 64
+const MAX_ACCOUNT_REQUESTS := MAX_BACKUP_WAITERS + 8
 var accounts = Accounts.new()
 var assets = Assets.new()
 var results = Results.new()
@@ -56,6 +59,11 @@ var recovery_next := 0
 var requested_stop := false
 var restart_requested := false
 var storage_maintenance := false
+var maintenance_kind := ""
+var maintenance_epoch := 0
+var backup_waiters := 0
+# Only context/identity of the internal RPC, never credentials or request data.
+var account_requests: Dictionary = {}
 # One account deletion at a time; backups, restore and config changes wait for it.
 var deletion_busy := false
 var restart_times: Array = []
@@ -322,7 +330,17 @@ func _launch(descriptor: Dictionary, launch_id: String, path: String) -> Diction
 	return {"started": result, "owned": child.journal_record(launch_id), "handoff": child.handoff(launch_id)}
 
 func _host_event(peer_id: String, action: String, payload: Dictionary) -> void:
-	if action == "host.status":
+	if action == "request.cancel":
+		var id := str(payload.get("request_id", ""))
+		if id.length() != 32:
+			return
+		for character in id:
+			if not character in "0123456789abcdef":
+				return
+		var context: Dictionary = account_requests.get(_account_context_key(bus, peer_id, id), {})
+		if not context.is_empty():
+			context.cancelled = true
+	elif action == "host.status":
 		host_peer = peer_id
 		snapshot.host = payload.host
 		snapshot.rooms = payload.rooms
@@ -455,12 +473,12 @@ func _admin(request: Dictionary) -> Dictionary:
 				var proposed := settings.duplicate(true)
 				proposed.merge(payload.get("config", {}), true)
 				if _valid_config(proposed):
-					storage_maintenance = true
+					_begin_storage_maintenance("config")
 					while worker_count > 0:
 						await process_frame
 					var recovered: Dictionary = await _work(results.recover)
 					if int(recovered.get("pending", 0)) > 0:
-						storage_maintenance = false
+						_end_storage_maintenance()
 						return Wire.failure("STORAGE_UNAVAILABLE")
 					var previous := settings.duplicate(true)
 					settings = proposed
@@ -474,7 +492,7 @@ func _admin(request: Dictionary) -> Dictionary:
 						settings = previous
 						_load_catalog()
 						await _work(assets.initialize.bind(root_path, catalog_config))
-					storage_maintenance = false
+					_end_storage_maintenance()
 		"backup.list":
 			result = _payload(await _maintenance({"op": "backup.list"}))
 			if result.ok:
@@ -489,7 +507,7 @@ func _admin(request: Dictionary) -> Dictionary:
 			elif deletion_busy:
 				result = Wire.failure("MAINTENANCE_BUSY")
 			else:
-				storage_maintenance = true
+				_begin_storage_maintenance("restore")
 				while worker_count > 0:
 					await process_frame
 				# Workers keep no connection open between requests; stopping them here
@@ -505,7 +523,7 @@ func _admin(request: Dictionary) -> Dictionary:
 					# The restore revoked every session; nothing is left to clean up.
 					cleanup.cancel_all("restore")
 					_publish_connection()
-				storage_maintenance = false
+				_end_storage_maintenance()
 		"logs.list": result = {"ok": true, "payload": {"logs": [{"label": "operator"}, {"label": "host"}]}}
 		"logs.read":
 			if payload.get("label", "") in ["operator", "host"]:
@@ -549,11 +567,27 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 		if request_bus != null and request_bus == bus:
 			request_bus.respond(peer_id, request_id, result)
 		return
-	if storage_maintenance:
-		# Backups and restores refuse player storage requests for their duration.
-		_note_storage_failure(action + ":" + str(payload.get("op", "")) + ":maintenance", Wire.failure("STORAGE_UNAVAILABLE"))
+	var account_op: bool = action == "account.execute" and payload.get("op", "") in ["account.register", "account.login", "account.change_password", "account.rename"]
+	var context: Dictionary = {"bus": request_bus, "cancelled": false}
+	var context_key := _account_context_key(request_bus, peer_id, request_id)
+	if account_op:
+		if account_requests.size() >= MAX_ACCOUNT_REQUESTS or account_requests.has(context_key):
+			if request_bus != null and request_bus == bus:
+				request_bus.respond(peer_id, request_id, Wire.failure("RATE_LIMITED"))
+			return
+		account_requests[context_key] = context
+	var admission := {"ok": true}
+	if storage_maintenance or quitting:
+		# Only account operations wait through a backup; restore/config never do.
+		admission = await _wait_for_backup(context, peer_id) if account_op else Wire.failure("STORAGE_UNAVAILABLE")
+	elif account_op and _account_request_cancelled(context, peer_id):
+		admission = Wire.failure("CONTROL_UNAVAILABLE")
+	if not admission.ok:
+		if account_op:
+			account_requests.erase(context_key)
+		_note_storage_failure(action + ":" + str(payload.get("op", "")) + ":maintenance", admission)
 		if request_bus != null and request_bus == bus:
-			request_bus.respond(peer_id, request_id, Wire.failure("STORAGE_UNAVAILABLE"))
+			request_bus.respond(peer_id, request_id, admission)
 		return
 	match action:
 		"account.execute":
@@ -561,7 +595,7 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 				result = await _work(accounts.execute.bind(payload))
 				if result.ok and payload.op == "account.login":
 					player_tokens[result.token] = result.identity.user_id
-					if request_bus == null or request_bus != bus or not request_bus.peers.get(peer_id, {}).get("authenticated", false):
+					if _account_request_cancelled(context, peer_id):
 						cleanup.submit(result.token, str(result.identity.user_id), "login_reply_lost")
 		"game.catalog": result = {"ok": true, "payload": {"catalog": catalog_config.duplicate(true)}}
 		"asset.initial": result = await _asset_read(payload.user_id, payload.game_id)
@@ -586,8 +620,54 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 			var checked: Dictionary = results.validate_submission(payload)
 			result = await _work(results.repository.execute.bind(checked.request)) if checked.ok else checked
 	_note_storage_failure(action + ":" + str(payload.get("op", "")), result)
+	if account_op:
+		account_requests.erase(context_key)
 	if request_bus != null and request_bus == bus:
 		request_bus.respond(peer_id, request_id, result)
+
+func _account_context_key(request_bus, peer_id: String, request_id: String) -> String:
+	return str(request_bus.get_instance_id() if request_bus != null else 0) + ":" + peer_id + ":" + request_id
+
+func _account_request_cancelled(context: Dictionary, peer_id: String) -> bool:
+	var original_bus = context.bus
+	return context.cancelled or original_bus == null or original_bus != bus or not original_bus.peers.get(peer_id, {}).get("authenticated", false)
+
+func _begin_storage_maintenance(kind: String) -> void:
+	maintenance_epoch += 1
+	maintenance_kind = kind
+	storage_maintenance = true
+
+func _end_storage_maintenance() -> void:
+	storage_maintenance = false
+	maintenance_kind = ""
+
+## Wait on main-loop frames, without a storage worker. Execute once only if
+## this exact backup window ended before the deadline.
+func _wait_for_backup(context: Dictionary, peer_id: String) -> Dictionary:
+	if quitting or maintenance_kind != "backup":
+		return Wire.failure("STORAGE_MAINTENANCE")
+	if backup_waiters >= MAX_BACKUP_WAITERS:
+		return Wire.failure("RATE_LIMITED")
+	backup_waiters += 1
+	var started := Time.get_ticks_msec()
+	var deadline := started + BACKUP_WAIT_LIMIT_MS
+	var epoch := maintenance_epoch
+	var result: Dictionary
+	print("OPERATOR_BACKUP_WAIT t=", started, " event=queued waiting=", backup_waiters)
+	while true:
+		if _account_request_cancelled(context, peer_id):
+			result = Wire.failure("CONTROL_UNAVAILABLE")
+		elif quitting or maintenance_epoch != epoch or (storage_maintenance and maintenance_kind != "backup") or Time.get_ticks_msec() >= deadline:
+			result = Wire.failure("STORAGE_MAINTENANCE")
+		elif not storage_maintenance:
+			result = {"ok": true}
+		else:
+			await process_frame
+			continue
+		break
+	backup_waiters -= 1
+	print("OPERATOR_BACKUP_WAIT t=", Time.get_ticks_msec(), " event=finished code=", result.get("code", "OK"), " ms=", Time.get_ticks_msec() - started, " waiting=", backup_waiters)
+	return result
 
 ## Hands a logout to the clean-up and waits a bounded time for its end:
 ## done -> ok; old token already invalid -> AUTH_FAILED; still being retried ->
@@ -897,7 +977,7 @@ func _backup(automatic: bool, reason: String) -> Dictionary:
 		if automatic:
 			next_backup = Time.get_ticks_msec() + 60000
 		return Wire.failure("MAINTENANCE_BUSY")
-	storage_maintenance = true
+	_begin_storage_maintenance("backup")
 	var backup_started := Time.get_ticks_msec()
 	print("OPERATOR_MAINTENANCE t=", backup_started, " event=backup_begin automatic=", automatic)
 	while worker_count > 0:
@@ -905,7 +985,7 @@ func _backup(automatic: bool, reason: String) -> Dictionary:
 	var result := _payload(await _maintenance({"op": "backup.create", "automatic": automatic, "reason": reason}))
 	print("OPERATOR_MAINTENANCE t=", Time.get_ticks_msec(), " event=backup_end ms=", Time.get_ticks_msec() - backup_started, " ok=", result.ok)
 	_audit("system" if automatic else "operator", "backup.automatic" if automatic else "backup.snapshot", reason, "OK" if result.ok else result.get("code", "STORAGE_UNAVAILABLE"))
-	storage_maintenance = false
+	_end_storage_maintenance()
 	return result
 
 func _audit(actor: String, action: String, reason: String, code: String, target: String = "") -> void:

@@ -2,6 +2,11 @@
 
 本文件只记录版本号与兼容标识的变化；设计决策与完整兼容说明见 [docs/07](docs/07_versions_decisions.md)，实际验证结果见 [STATUS](STATUS.md)。版本轴彼此独立：源码 SDK、框架包、游戏构建（`build_id` / `compatibility_id` / `game_protocol`）与控制协议 `control_protocol` 分开编号。以下均为本机开发或候选版本，不是正式发布。
 
+## 2026-10-01 Linux 源码与备份等待
+
+- 源码 SDK 仍为 **0.5.0**；账号、控制和结果 Schema 版本不变。内部 RPC 新增可选取消事件，宿主和 Operator 应使用同一份源码部署。
+- 本轮构建为 `shooter-dev-002-src-70b8f5366f78`、`turns-managed-dev-001-src-6c031a3e2b26`，Windows 与 Linux 的摘要一致。当前客户端需随源码更新重新生成；旧玩家副本及旧发行附件没有同步重建。
+
 ## 2026-09-26 源码更新（2026-09-27 本地提交）
 
 - 射击示例升级为 `shooter-dev-002` / `shooter-v2` / `game_protocol=2`：可信清单新增通用整数 `room_rules`，射击状态新增获胜击杀目标。旧射击客户端必须重新构建。

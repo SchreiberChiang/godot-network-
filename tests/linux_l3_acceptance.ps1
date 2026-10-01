@@ -52,9 +52,14 @@ function Client([string]$Name,[string]$Game,[hashtable]$Settings) {
     [void]$clients.Add($client)
     return $client
 }
+function AccountList {
+    $reply=Rk-Api 'account.list' @{query='';offset=0;limit=200}
+    if (-not $reply.ok) { throw ('account.list refused '+$reply.code) }
+    return $reply.payload
+}
 function Snapshot {
     $rows=@{}
-    foreach($account in @((Rk-Api 'account.list' @{query='';offset=0;limit=200}).payload.accounts)) {
+    foreach($account in @((AccountList).accounts)) {
         if ($account.role -ne 'player') { continue }
         $entry=@{}
         foreach($game in @('shooter','turns')) { $s=Rk-Coins $account.user_id $game; $entry[$game]=@{credits=[long]$s.credits;revision=[long]$s.revision;owned=@($s.owned | Sort-Object)} }
@@ -156,7 +161,7 @@ try {
             Require (Rk-Api 'server.stop' @{immediate=$true;reason='backup and restore'}).ok 'host stop requested'
             Require ((Rk-WaitHost 'STOPPED').host.state -eq 'STOPPED') 'host stopped'
             $before=Snapshot
-            $total=[long](Rk-Api 'account.list' @{query='';offset=0;limit=200}).payload.total
+            $total=[long](AccountList).total
             Check ($before.Count -ge 3) ('assets of every player are read ('+$before.Count+' players)')
             $backup=Rk-Api 'backup.create' @{reason='linux acceptance'}
             Require $backup.ok 'backup created'
@@ -166,7 +171,7 @@ try {
             Require $restored.ok ('backup restored ('+$restored.code+')')
             Require (Rk-AdminLogin $adminFile) 'the administrator logs in after the restore (sessions were revoked)'
             $after=Snapshot
-            Check ([long](Rk-Api 'account.list' @{query='';offset=0;limit=200}).payload.total -eq $total) 'the restore kept every account (it is not an emptied database)'
+            Check ([long](AccountList).total -eq $total) 'the restore kept every account (it is not an emptied database)'
             Check (SameSnapshot ($before | ConvertTo-Json -Depth 10 | ConvertFrom-Json) $after) 'the restore undid exactly the later change; every other asset is unchanged'
             Rk-SaveJson $snapshotFile @{players=$after;keeper=$after[$player.user_id].turns;theme='jade'}
         }
@@ -240,8 +245,8 @@ if ($Phase -eq 'fault') {
         $left=StillThere $children
         Check ($left.Count -eq 0) ('host and room left by themselves after losing their controller ('+$left.Count+' still running)')
         $report=Rk-WaitReport $client {param($r) $r.phase -ne 'IN_ROOM'} 30
-        Check ($null -eq $report -or $report.phase -ne 'IN_ROOM') 'the seated player lost the room'
-        foreach($c in $clients) { [void](Rk-StopClient $c) }
+        Check ($null -ne $report -and $report.phase -ne 'IN_ROOM') 'the seated player reported losing the room (a timeout is not evidence)'
+        foreach($c in $clients) { Check (Rk-StopClient $c) 'the fault-test client closes normally with exit code zero' }
         Check (Test-Path -LiteralPath (Join-Path $data 'host-running.json')) 'the host marker of the killed Operator is kept for the next start'
         $hits=SecretHits $secrets @($logs,(Join-Path $project 'run'),$data,$evidence)
         Check ($hits.Count -eq 0) ('no password or session token in logs, runtime files, data JSON or command lines ('+(@($hits | Select-Object -Unique) -join ', ')+')')

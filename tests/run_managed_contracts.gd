@@ -26,6 +26,8 @@ func _run() -> void:
 	for name in ["control.asset.initial", "control.asset.begin", "control.asset.permit", "control.asset.refresh", "control.asset.finish", "control.asset.finish.failed", "managed.account.register", "managed.account.login", "managed.asset.purchase", "managed.asset.select", "managed.login.response", "managed.assets.response", "managed.error.response", "rpc.hello", "rpc.account.execute.typed", "rpc.asset.player", "rpc.response", "reward.batch"]:
 		check(examples.has(name), "required coverage: " + name)
 	var admin_schema: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://schemas/admin_request.schema.json"))
+	check(examples.has("managed.login.maintenance") and not examples["managed.login.maintenance"].message.error.retryable, "maintenance feedback never enables automatic login retry")
+	check(examples.has("rpc.request.cancel"), "optional internal request cancellation has a contract example")
 	for action in admin_schema.properties.action.enum:
 		check(examples.has("admin." + str(action)), "every admin action has an example: " + str(action))
 

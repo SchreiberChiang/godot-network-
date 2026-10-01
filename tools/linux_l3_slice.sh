@@ -209,6 +209,12 @@ mkdir -p "$SRC/data/logout-$ROOMKIT_RUN_ID"; chmod 700 "$SRC/data/logout-$ROOMKI
 rk_step logout_cleanup 300 "${hosted[@]}" "$GODOT" --headless --path "$SRC" --log-file "$RUN/logout_cleanup.godot.log" --script res://tests/run_operator_logout_cleanup.gd -- "--data-root=$SRC/data/logout-$ROOMKIT_RUN_ID/data"
 grep -E '^(PASS|FAIL)|_RESULT' "$RUN/logout_cleanup.out"
 
+section "C0b. bounded backup waiting, result retries and internal RPC cancellation"
+rk_step backup_wait 180 "${hosted[@]}" "$GODOT" --headless --path "$SRC" --log-file "$RUN/backup_wait.godot.log" --script res://tests/run_operator_backup_wait.gd
+grep -E '^FAIL|_RESULT' "$RUN/backup_wait.out"
+rk_step rpc_cancel 180 "$GODOT" --headless --path "$SRC" --log-file "$RUN/rpc_cancel.godot.log" --script res://tests/run_local_rpc_cancel.gd
+grep -E '^FAIL|_RESULT' "$RUN/rpc_cancel.out"
+
 section "C1. official entry: start an isolated instance"
 entry_args=(--instance l3 --panel-port "$I_PANEL" --lobby-port "$I_LOBBY" --control-port "$I_CONTROL" --udp-range "$I_UDP_FIRST-$I_UDP_LAST" --bind 127.0.0.1)
 rk_step entry_refuses_28291 60 bash -c '! "$@"' _ "${entry_env[@]}" bash "$SRC/tools/roomkit_linux.sh" start --instance refused --panel-port 28291
@@ -255,6 +261,19 @@ if [ "$ENDURANCE" -gt 0 ]; then
   printf 'session clean-up events logged by the Operator: %s\n' "$(grep -o 'SESSION_CLEANUP job=[0-9a-f]* event=[a-z_]*' "$INST/logs/console.log" 2>/dev/null | sed 's/.*event=//' | sort | uniq -c | tr '\n' ' ')"
   printf 'storage refusals logged by the Operator: %s\n' "$(grep -c 'OPERATOR_STORAGE_REFUSED' "$INST/logs/console.log" 2>/dev/null)"
   grep 'OPERATOR_STORAGE_REFUSED' "$INST/logs/console.log" 2>/dev/null | sed 's/ t=[0-9]*//' | sort | uniq -c | head -n 10
+  automatic_ok="$(awk '/OPERATOR_MAINTENANCE .*event=backup_begin/ {automatic=($0 ~ /automatic=true/)} /OPERATOR_MAINTENANCE .*event=backup_end/ {if(automatic && $0 ~ /ok=true/) count++; automatic=0} END {print count+0}' "$INST/logs/console.log")"
+  waits_ok="$(grep -c 'OPERATOR_BACKUP_WAIT .*event=finished code=OK' "$INST/logs/console.log" || true)"
+  waits_other="$(grep 'OPERATOR_BACKUP_WAIT .*event=finished' "$INST/logs/console.log" | grep -vc 'code=OK' || true)"
+  if [ "$ENDURANCE" -ge 60 ]; then
+    if [ "$automatic_ok" -ge 2 ]; then rk_record automatic_backups PASS "$automatic_ok successful automatic backup windows observed"; else rk_record automatic_backups FAIL "only $automatic_ok successful automatic backup windows observed; expected at least 2"; fi
+  fi
+  if [ "$waits_ok" -gt 0 ] && [ "$waits_other" -eq 0 ]; then
+    rk_record backup_wait_observed PASS "$waits_ok original account requests waited through real backup windows; no waiting failure"
+  elif [ "$waits_other" -gt 0 ]; then
+    rk_record backup_wait_observed FAIL "$waits_other waiting requests failed (successful=$waits_ok); inspect the fixed-code diagnostic lines"
+  else
+    rk_record backup_wait_observed NOTRUN "no account request naturally overlapped a backup; the real backup wait path needs a separate directed check"
+  fi
 else
   rk_record endurance NOTRUN "ROOMKIT_ENDURANCE_MINUTES=0"
 fi

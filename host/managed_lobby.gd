@@ -61,7 +61,8 @@ func handle_async(connection: Dictionary, message: Dictionary) -> Dictionary:
 		if message.type == "account.logout":
 			result = await _hand_over_logout(str(payload.token), "explicit")
 		else:
-			result = await bus.request("account.execute", payload)
+			var abandoned := func() -> bool: return not peers.has(connection) or connection.get("revoked", false)
+			result = await bus.request("account.execute", payload, 60000, "", abandoned)
 		connection.account_busy = false
 		if not peers.has(connection):
 			if result.ok and message.type == "account.login":

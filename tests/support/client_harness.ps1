@@ -106,7 +106,7 @@ function Rk-StopClient($Client) {
     if (-not $Client.process.WaitForExit(5000)) { $Client.process.Kill(); [void]$Client.process.WaitForExit(5000); $clean=$false }
     # Normally the client deleted its one-use bootstrap; one that never read it must not keep it.
     Remove-Item -LiteralPath (Join-Path $Client.directory 'bootstrap.json') -ErrorAction SilentlyContinue
-    return $clean
+    return $clean -and $Client.process.HasExited -and $Client.process.ExitCode -eq 0
 }
 
 ## The public connection of an instance with an absolute CA path.
