@@ -1,12 +1,21 @@
 param(
     [string]$Godot = 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe',
-    [switch]$PrepareOnly
+    [switch]$PrepareOnly,
+    [string]$OutputDirectory='',
+    [switch]$SkipArchive
 )
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
 $id=[Guid]::NewGuid().ToString('N')
 $work=Join-Path $project ('artifacts\framework-release-work-'+$id)
 $bundle=Join-Path $project ('artifacts\RoomKit-0.5.0-framework-windows-'+$id)
+if($OutputDirectory -ne '') {
+    $bundle=[IO.Path]::GetFullPath($OutputDirectory).TrimEnd('\','/')
+    if(-not $bundle.StartsWith($project+'\artifacts\',[StringComparison]::OrdinalIgnoreCase)){throw 'Release output must stay inside this project artifacts folder.'}
+    $cursor=$bundle
+    while($cursor){$item=Get-Item -LiteralPath $cursor -Force -ErrorAction SilentlyContinue;if($null -ne $item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Refused linked release output.'};$parent=[IO.Path]::GetDirectoryName($cursor);if($parent -eq $cursor){break};$cursor=$parent}
+    if(Test-Path -LiteralPath $bundle){throw 'Release output already exists; nothing is replaced.'}
+}
 $source=Join-Path $work 'host-project'
 $templates=Join-Path ([IO.Path]::GetDirectoryName($Godot)) 'editor_data\export_templates\4.7.2.stable'
 $template=Join-Path $templates 'windows_release_x86_64.exe'
@@ -81,7 +90,7 @@ Copy-Item -LiteralPath (Join-Path $project 'project.godot') -Destination $source
 Copy-Item -LiteralPath (Join-Path $project 'project.godot') -Destination $bundle
 Copy-Item -LiteralPath (Join-Path $project 'LICENSE') -Destination $bundle
 $sourceIndex=Join-Path $work 'framework-games.source.json'
-& (Join-Path $PSScriptRoot 'build_framework.ps1') -IndexPath $sourceIndex
+& (Join-Path $PSScriptRoot 'build_framework.ps1') -IndexPath $sourceIndex -BuildRoot (Join-Path $work 'games')
 $games=Get-Content -Encoding UTF8 -Raw -LiteralPath $sourceIndex | ConvertFrom-Json
 $index=@{}
 foreach($game in @('shooter','turns')) {
@@ -110,6 +119,10 @@ foreach($game in @('shooter','turns')) {
         Copy-Item -LiteralPath $template -Destination (Join-Path $clientDirectory 'Client.exe')
     }
 }
+# Publish the final release manifests in this build's private source index as
+# well. Clients subsequently exported from it must see the release identity,
+# rather than the pre-release development identity written by build_framework.
+WriteUtf8 $sourceIndex ($games | ConvertTo-Json -Depth 30)
 WriteUtf8 (Join-Path $bundle 'artifacts\framework-games.json') ($index | ConvertTo-Json -Depth 30)
 if(-not $PrepareOnly) {
     SetMainLoop $source 'res://host/operator.gd'
@@ -290,11 +303,13 @@ if(-not $PrepareOnly) {
         $checksums.files+=@{path=$relative;sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
     }
     WriteUtf8 (Join-Path $bundle 'checksums.json') ($checksums | ConvertTo-Json -Depth 20)
-    $archive=$bundle+'.zip'
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [IO.Compression.ZipFile]::CreateFromDirectory($bundle,$archive,[IO.Compression.CompressionLevel]::Optimal,$false)
-    $metadata.archive=$archive
-    $metadata.sha256=(Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    if(-not $SkipArchive) {
+        $archive=$bundle+'.zip'
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [IO.Compression.ZipFile]::CreateFromDirectory($bundle,$archive,[IO.Compression.CompressionLevel]::Optimal,$false)
+        $metadata.archive=$archive
+        $metadata.sha256=(Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
     $metadata.immutable_files=$checksums.files.Count
 }
 WriteUtf8 (Join-Path $project 'artifacts\framework-release.json') ($metadata | ConvertTo-Json -Depth 20)

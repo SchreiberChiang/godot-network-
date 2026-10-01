@@ -3,6 +3,7 @@
     [string]$IndexPath = '',
     [string]$ConnectionDirectory = '',
     [string]$OutputRoot = '',
+    [switch]$Unconfigured,
     [switch]$RepositoryCopy,
     [string]$RepositoryDestination = '',
     [string]$Repository = 'SchreiberChiang/godot-network-',
@@ -101,7 +102,7 @@ $template=Join-Path ([IO.Path]::GetDirectoryName($Godot)) 'editor_data\export_te
 if(-not (Test-Path -LiteralPath $Godot -PathType Leaf)) { throw ('Godot editor not found: '+$Godot) }
 if(-not (Test-Path -LiteralPath $template -PathType Leaf)) { throw 'The Godot 4.7.2 Windows release export template is missing.' }
 if(-not (Test-Path -LiteralPath $IndexPath -PathType Leaf)) { throw '缺少游戏索引，请先运行 StartManagement.cmd。' }
-foreach($name in @('connection.json','server.crt')) {
+foreach($name in $(if($Unconfigured){@()}else{@('connection.json','server.crt')})) {
     if(-not (Test-Path -LiteralPath (Join-Path $ConnectionDirectory $name) -PathType Leaf)) { throw ('缺少公开连接文件 '+$name+'，请先运行 StartManagement.cmd，由管理服务发布。') }
 }
 $index=Get-Content -Encoding UTF8 -Raw -LiteralPath $IndexPath | ConvertFrom-Json
@@ -158,7 +159,7 @@ binary_format/architecture="x86_64"
 
     $pckHash=(Get-FileHash -LiteralPath $pack -Algorithm SHA256).Hash.ToLowerInvariant()
     $tag='shooter-client-'+(([string]$manifest.build_id) -replace '[^A-Za-z0-9.-]','-')+'-'+$pckHash.Substring(0,8)
-    $base=[ordered]@{format=2;source='StartManagement';game_id=$manifest.game_id;build_id=$manifest.build_id;compatibility_id=$manifest.compatibility_id;game_protocol=$manifest.game_protocol;engine_template='4.7.2.stable windows_release_x86_64';prepared_at=[DateTime]::UtcNow.ToString('o');release_tag=$tag;release_url=('https://github.com/'+$Repository+'/releases/download/'+$tag+'/')}
+    $base=[ordered]@{format=2;source=$(if($Unconfigured){'PreparedIndex'}else{'StartManagement'});game_id=$manifest.game_id;build_id=$manifest.build_id;compatibility_id=$manifest.compatibility_id;game_protocol=$manifest.game_protocol;engine_template='4.7.2.stable windows_release_x86_64';prepared_at=[DateTime]::UtcNow.ToString('o');release_tag=$tag;release_url=('https://github.com/'+$Repository+'/releases/download/'+$tag+'/')}
 
     # Repository copy: identical export, no server-specific files, plus GitHub fetch helpers.
     if($RepositoryCopy) {
@@ -169,8 +170,10 @@ binary_format/architecture="x86_64"
     }
     Copy-Item -LiteralPath (Join-Path $helpers 'PLAYER_README.md') -Destination (Join-Path $stage 'README.md')
     # SetServer validates the public files (wss url, allowed fields, no private key).
-    $set=& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $stage 'SetServer.ps1') $ConnectionDirectory
-    if($LASTEXITCODE -ne 0) { throw ('公开连接文件未通过检查：'+($set -join ' ')) }
+    if(-not $Unconfigured) {
+        $set=& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $stage 'SetServer.ps1') $ConnectionDirectory
+        if($LASTEXITCODE -ne 0) { throw ('公开连接文件未通过检查：'+($set -join ' ')) }
+    }
     WriteVersion $stage $base
 
     foreach($directory in @($stage,$repoStage)) {
@@ -212,7 +215,7 @@ binary_format/architecture="x86_64"
 } finally {
     if(Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
 }
-$connection=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $target 'connection.json') | ConvertFrom-Json
+$connection=if($Unconfigured){[pscustomobject]@{url='UNCONFIGURED'}}else{Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $target 'connection.json') | ConvertFrom-Json}
 $size=(Get-ChildItem -LiteralPath $target -Recurse -File | Measure-Object Length -Sum).Sum
 Write-Output ('PLAYER_CLIENT_READY '+$target+' build='+$manifest.build_id+' tag='+$tag+' url='+$connection.url+' bytes='+$size)
 if([string]$connection.url -match '^wss://(127\.|localhost)') {
