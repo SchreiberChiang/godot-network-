@@ -97,7 +97,7 @@ try {
     if($page.StatusCode -ne 200 -or $page.Content -notmatch 'RoomKit'){throw 'The forwarded address did not return the RoomKit page.'}
     Write-Output ('LINUX_MANAGEMENT_READY '+$url)
     Write-Output 'Keep this window open while using the panel. Closing it disconnects SSH only.'
-    Write-Output 'The LAN test administrator is separate from your Windows administrator. See the private admin.json listed in docs/17.'
+    Write-Output 'Administrator credentials belong to this instance. See its private playtest instructions in docs/17.'
     if(-not $NoBrowser){Start-Process $url;$browserOpened=$true}
     if($HoldSeconds -gt 0){
         $end=[DateTime]::UtcNow.AddSeconds($HoldSeconds)

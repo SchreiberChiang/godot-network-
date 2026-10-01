@@ -8,6 +8,8 @@ Linux 同机的最终结果、原始失败和退出补修见 [备份等待收尾
 
 Linux 导出服务器普通目录的构建、依赖、启停与自动验收见 [独立目录](17_framework_shooter_plan.md#linux-server-directory)。构建入口 `tools/build_linux_server.ps1`，包内入口 `CheckPackage.sh`、`RoomKit.sh`。专项 `tests/test_linux_server_package.ps1 -ContextPath <本机显式准备清单> -FullRound` 会新建假数据，使用固定隔离端口，不接受旧实例；清单与构建产物在忽略目录，不能直接对真实服务运行。业务由源码 SDK 客户端验证，真实 Client.exe 的入退房另列结果。
 
+本机独立包真人入口为 **PlayLinuxPackage.cmd**，结束用 **StopLinuxPackage.cmd**；三步说明、固定实例与凭据位置见 [独立包试玩](17_framework_shooter_plan.md#linux-package-playtest)。入口防护专项：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_linux_package_entry.ps1`，只创建假工程，不运行引擎/远端服务；测试期间本地 28691 必须空闲。
+
 Windows 需要 Godot 4.7.2；默认路径是 `D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`。不需要 Node、外部数据库服务或旧项目。脚本参数 `-Godot` 可以指定另一个引擎路径，但更换版本后应重新验证。
 
 1. 双击仓库根目录 **StartManagement.cmd**。脚本从当前仓库生成独立游戏工程并启动管理服务，然后打开回环网页。默认网页地址为 http://127.0.0.1:28291/。

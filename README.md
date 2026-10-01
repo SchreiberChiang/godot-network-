@@ -55,6 +55,8 @@ bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 
 ## 独立 Linux 服务器目录（无需 Godot 编辑器）
 
+本机真人试玩：双击根目录 **`PlayLinuxPackage.cmd`**，它启动已准备的独立测试包，打开后台、匹配客户端目录和私有登录说明。后台用 <http://127.0.0.1:28691/>（保持入口窗口打开），玩家直接双击目录内 `Client.exe`。全部结束后双击 **`StopLinuxPackage.cmd`**。这两个入口仅用于本机已准备的测试实例，不是任意服务器的部署工具；Git 克隆不包含本机清单、程序或密码。三步说明见 [独立包试玩](docs/17_framework_shooter_plan.md#linux-package-playtest)。
+
 Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；仍需已有的 **pwsh 7.6.6** 和系统 **libsqlite3.so.0**，脚本不安装依赖。当前目录及实测范围见 [Linux 独立目录](docs/17_framework_shooter_plan.md#linux-server-directory)。
 
 在目录内依次运行 `bash CheckPackage.sh` → `bash RoomKit.sh start --instance demo`；状态用 `bash RoomKit.sh status --instance demo`，停止用 `bash RoomKit.sh stop --instance demo`。默认只绑定回环，新实例的端口与对外地址可在首次启动时设置；重启沿用保存配置。后台通过本机浏览器或同号 SSH 转发访问。玩家仍使用版本匹配的 Windows 客户端。

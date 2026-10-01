@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "main @ ae5225d 加 Linux 独立服务器目录；最新验收范围以 STATUS 和 docs/17 顶部为准",
+  baseline: "main @ 4bbafc8 加 Linux 独立包试玩入口；最新验收范围以 STATUS 和 docs/17 顶部为准",
   statuses: {
     verified:    { label: "已验证", hint: "在条目注明的环境通过指定自动验收；不等于所有平台或场景通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -273,8 +273,8 @@ window.ROADMAP_DATA = {
       title: "Linux 完整服务器与后台",
       summary: "在 Linux 测试机上运行真实服务器，Windows 客户端登录、开房、游戏。",
       details: "源码同机对局与耐久有独立证据。Linux 普通目录已实际运行：完整业务64/0，源码 SDK 双人实战和五分钟签名结算；真实 Client.exe 分别验证双人入退房。只补版权文件的最终重建基础复验54/0，未重复五分钟。其它发行版、公网及导出包长期耐久未验收。",
-      files: ["tools/roomkit_linux.sh", "tools/build_linux_server.ps1", "tools/linux_package_check.sh", "tests/test_linux_server_package.ps1"],
-      docs: ["docs/17_framework_shooter_plan.md#linux-server-directory", "docs/17_framework_shooter_plan.md#linux-lan", "docs/10_environment.md#linux-current"],
+      files: ["tools/roomkit_linux.sh", "tools/build_linux_server.ps1", "tools/linux_package_check.sh", "tests/test_linux_server_package.ps1", "PlayLinuxPackage.cmd", "StopLinuxPackage.cmd"],
+      docs: ["docs/17_framework_shooter_plan.md#linux-package-playtest", "docs/17_framework_shooter_plan.md#linux-server-directory", "docs/17_framework_shooter_plan.md#linux-lan", "docs/10_environment.md#linux-current"],
       evidence: "独立目录自动验收64/0、最终重建54/0；客户端和二进制范围见专题" },
     { id: "plat-public", area: "deliver", phase: 9, status: "pending",
       title: "公网与公网 WSS",

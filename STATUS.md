@@ -5,7 +5,9 @@
 
 已导出可复制的 Linux x86_64 普通目录，包含管理服务、宿主、两种房间程序、存储/维护脚本和校验入口；无需 Godot 编辑器，仍依赖已有 pwsh 7.6.6 与系统 SQLite。完整隔离验收 **64/0、退出 0**：Windows 源码 SDK 双人实战、击杀/复活、真实 300 秒签名结算、购买幂等、备份恢复、停止重启后资产保留；真实 Client.exe 单独验证双人注册与入退房。随后只补齐 Godot 随包版权文件的最终分发目录，基础复验 **54/0、退出 0**，不重复宣称五分钟已在最后二进制上跑过。服务端退出日志、程序路径、700/600 权限及停止后的无残留均核验，当前目录和证据见 [独立目录](docs/17_framework_shooter_plan.md#linux-server-directory)。
 
-不等于真人画面/听感、公网、其它发行版或导出包长期耐久通过；旧失败保留。原 LAN 试玩服务和 Windows 真实数据继续保留，原 PlayerClient、仓库玩家副本及 Release 不替换、不发布。下一步先看独立包的真人后台/玩家画面，再安排部署便利性。
+本机已准备 **PlayLinuxPackage.cmd / StopLinuxPackage.cmd**：打开独立包后台、匹配客户端目录与私有登录说明；关闭入口只断开 SSH，停止入口才请求该实例退出。入口短时启动/重复打开/停止、哈希与证书、SSH 释放已实测；纯防护专项 **14/0**。用法及过程失败见 [独立包试玩](docs/17_framework_shooter_plan.md#linux-package-playtest)。
+
+不等于真人画面/听感、公网、其它发行版或导出包长期耐久通过；旧失败保留。原 LAN 试玩服务和 Windows 真实数据继续保留，原 PlayerClient、仓库玩家副本及 Release 不替换、不发布。下一步由用户查看独立包后台、入退房和音效，再安排部署便利性。
 
 ## 此前：Windows → Linux 局域网自动验收通过（2026-10-01）
 
@@ -41,6 +43,7 @@ Linux（笔记本，Godot 4.7.2 官方版 + pwsh 7.6.6）：源码完整服务�
 | StartManagement.cmd / StopManagement.cmd | Windows 源码后台启动/停止；当前推荐 |
 | `tools/roomkit_linux.sh start\|stop\|status` | Linux 源码启动隔离实例；用法见 [README](README.md#linux-源码启动) |
 | `tools/build_linux_server.ps1` → Linux 普通目录 | 导出独立服务端；包内先 CheckPackage.sh，再 RoomKit.sh start/stop/status；当前目录及依赖见 docs/17 |
+| PlayLinuxPackage.cmd / StopLinuxPackage.cmd | 本机已准备的独立包试玩 / 正常停止；面板 28691，通过 SSH 打开 |
 | PreparePlayerClient.cmd → PlayerClient/ | 生成完整玩家目录，直接双击 Client.exe；源码更新后需重新生成并与服务配对 |
 | StartPlayerClient.cmd / StartShooterClient.cmd | 已生成客户端入口 / 源码客户端入口 |
 | OpenLinuxPlayerClient.cmd | 打开本机单独准备的 Linux 联机客户端；无需替换原 PlayerClient，详见 docs/17 |
