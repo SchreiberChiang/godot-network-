@@ -1,7 +1,45 @@
 # 通用框架与横版射击分支实施计划
 
+<a id="linux-server-directory"></a>
+## Linux 独立服务器目录（Codex，2026-10-02）
+
+新增 `tools/build_linux_server.ps1`，在 Windows 用已安装的 Godot 4.7.2 导出普通服务器目录。目录包含 Operator、ManagedHost、射击/取石子房间各自的 ELF/PCK、存储与维护助手、游戏索引、来源哈希、校验清单和说明；不含真实数据库、私钥、公开连接配置或实验扩展。无需 Linux Godot 编辑器，仍依赖已有 **pwsh 7.6.6** 和系统 **libsqlite3.so.0**，不自动安装依赖。
+
+当前干净产物：`artifacts/RoomKit-0.5.0-linux-x86_64-20261001164710-0b536417/`，附 Godot 的 LICENSE/COPYRIGHT。构建工作与四次导出输出在 `artifacts/linux-server-build-20261001164710-0b536417/`。`linux-package.json` 记录基准提交 `ae5225d` 加本轮工作区源文件 SHA256；不是把未提交修改称为该基准的原始内容。射击/取石子保留内容摘要 `70b8f5366f78` / `6c031a3e2b26`，不按操作系统重写游戏版本。
+
+### 运行与维护
+
+```bash
+bash CheckPackage.sh                 # 校验哈希、引擎、动态库、真实 pwsh/SQLite；设置执行权限
+bash RoomKit.sh start --instance demo
+bash RoomKit.sh status --instance demo
+bash RoomKit.sh stop --instance demo # 请求退出，不发信号
+```
+
+第一次可以显式给 `--panel-port`、`--lobby-port`、`--control-port`、`--udp-range` 和 `--bind`。随后重启会读取保存的面板端口和实例配置；不会误用默认端口。后台保持回环监听，从 Windows 访问时用同号 SSH 转发。数据、HOME/XDG/tmp 在 `data/instance-<名>/`，包根 `run/` 与 `games/<游戏>/server.log` 也需要可写。同一包目录一次运行一个实例，运行过的目录含私有数据，不能再直接分发。
+
+### 独立验收及范围
+
+`tests/test_linux_server_package.ps1` 仅接受显式的本机准备清单及固定隔离端口；清单不随 Git 分发，不能将它当成任意服务的通用测试入口。Linux 最终目录为 `~/roomkit/releases/linux-20261001164710-0b536417/`；实例 `export-0b536417` 使用面板 28691（回环 SSH）、大厅 28700/TCP、控制 28701（回环）、房间 28740–28755/UDP。此前完整对局实例为包 `20261001162854-0de8fab1` 的 `export-04a03141`，两实例验收后均已正常停止；原 LAN 实例保留运行。
+
+| 验收层 | 结果与证据 |
+|---|---|
+| 包校验与实际启动 | 四个 ELF 的官方引擎身份、库依赖和文件 SHA256 通过；真实 pwsh 加载 SQLite 通过，`/usr/bin/true` 冒充运行时被拒，篡改 README 后校验拒绝，恢复后校验成功；`logs/codex-linux-package/deploy-04.out`、`check-tamper-04.out` |
+| 完整业务（20261001162854） | **64/0、退出 0**：购买幂等、两种房间 READY/停止、双人击杀/复活、实际 300 秒及精确签名奖励、真实 Client.exe 双人注册/入退房互见、备份恢复、端口保存及重启持久化、两次停服日志；`logs/codex-linux-package/acceptance-04.out`、`data/codex-linux-package-20261001162854-0de8fab1-3079fa55/` |
+| 最终分发（20261001164710） | **54/0、退出 0**：只补随包版权文件/README的重建，全部运行源文件与上一包一致，唯一来源差异是构建脚本；重跑基础业务、真实 Client.exe、备份恢复、重启及退出日志，未再次等待五分钟。PCK 重导出后字节不同，不混称同一二进制；`logs/codex-linux-package/acceptance-05.out`、`data/codex-linux-package-20261001164710-0b536417-8323480e/` |
+| 实际程序与私有边界 | 完整业务轮 `/proc` 核对 Operator、ManagedHost 和射击房间来自包内 ELF；目录/文件 700/600，两包停止后均无残留进程、监听或启动 JSON；`logs/codex-linux-package/inspect-running-04.out`、`inspect-stopped-04.out`、`inspect-final-stopped.out` |
+| Windows 回归 | unit 320/0、注册表 77/0、Operator 投影 12/0、摘要 55/0；服务入口仅 `--check-only` 2/0；报告读取故障注入 3/0，未初始化响应的认领边界 8/0。最后两项为纯驱动验证，不是服务端功能测试。源码/客户端版本未改变 |
+
+完整业务、购买幂等、射击击杀/复活及 300 秒签名结算用 **Windows 源码 SDK 测试客户端**；另从同一清单导出真实 **Client.exe**，单独验收双人注册、入退房与互见。两层不混称，自动无窗口测试不等于真人画面/听感验收。首次停止后、重启前保存服务器日志，最后再次保存，避免覆盖退出错误。
+
+收尾：最终 23 个分发文件均进入校验清单，源文件 SHA256 与当前工作区一致；原 Linux LAN Operator 仍为 PID 402793，Windows 两库、旧 operator.json、公开配置和证书哈希/修改时间 5/5 不变。传输 tar 仅作本地测试搬运，SHA256 在 `logs/codex-linux-package/package-04.sha256`；交付物是上述普通干净目录，不分发运行过的 Linux 目录。
+
+失败保留：包 01 是早期启动候选，补了端口保存与真实依赖加载后被 03 取代。业务轮 02 为 29/1：等待对局时 Windows 驱动报告 Access is denied，两个客户端随后正常关闭、错误输出为空，因没有堆栈不能确认根因；补收报告文件存在检查的异常边界并新增定位。业务轮 03 为 32/1：移动请求刚确认便被射击请求覆盖，未走到射程内；测试改为等待服务器位置，产品规则未改。两轮都正常请求停止自己的隔离服务，证据与假数据未覆盖。
+
+不代表其它发行版、ARM、公网、无人值守开机部署或导出包数小时耐久已通过；不安装开机服务，不改 SSH、防火墙或代理，不进入 SQLite 实验。下一步优先真人查看导出服务的后台与独立玩家画面，再决定小云服务器部署和运维便利性，不马上换存储实现。
+
 <a id="linux-management-entry"></a>
-## Linux 后台入口与下一阶段（Codex，2026-10-01）
+## Linux 后台入口与分发计划（Codex，2026-10-01；执行结果见上）
 
 ### 台式机怎样打开后台
 
@@ -19,7 +57,7 @@
 
 ### 接下来做到 Linux 分发目录交付
 
-本轮已做构建资源调查，以下三项由 Codex 连续推进，每项留独立证据；遇到具体产品取舍才询问用户。**尚未实施 Linux 导出包**，不把找到模板当成包运行通过。
+以下是 2026-10-01 构建资源调查后的三项安排，执行结果见上方 [独立目录交付](#linux-server-directory)。每项留独立证据，不把找到模板当成包运行通过。
 
 | 顺序 | 实现范围 | 交付门槛 |
 |---|---|---|

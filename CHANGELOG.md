@@ -2,6 +2,11 @@
 
 本文件只记录版本号与兼容标识的变化；设计决策与完整兼容说明见 [docs/07](docs/07_versions_decisions.md)，实际验证结果见 [STATUS](STATUS.md)。版本轴彼此独立：源码 SDK、框架包、游戏构建（`build_id` / `compatibility_id` / `game_protocol`）与控制协议 `control_protocol` 分开编号。以下均为本机开发或候选版本，不是正式发布。
 
+## 2026-10-02 Linux 服务器目录候选
+
+- 新增 Linux x86_64 独立服务器目录构建；包含官方 Godot 4.7.2 程序，存储仍用外部 pwsh 7.6.6。SDK/框架版本继续为 **0.5.0**，线上协议与数据库格式不变。
+- 导出服务器沿用内容摘要身份 `shooter-dev-002-src-70b8f5366f78` / `turns-managed-dev-001-src-6c031a3e2b26`，可与同一清单的 Windows 玩家客户端配对。没有发布 GitHub Release 或更新旧发行包。
+
 ## 2026-10-01 Linux 源码与备份等待
 
 - 源码 SDK 仍为 **0.5.0**；账号、控制和结果 Schema 版本不变。内部 RPC 新增可选取消事件，宿主和 Operator 应使用同一份源码部署。

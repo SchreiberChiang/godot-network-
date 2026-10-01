@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-10-02 Codex Linux 独立服务器目录（基准 `main / ae5225d`）：新增 `tools/build_linux_server.ps1`、`tools/linux_package_check.sh`、`tests/test_linux_server_package.ps1`；修改 `host/operator.gd` 的导出版宿主平台文件名、`tools/roomkit_linux.sh` 的包运行/端口保存/路径检查、`tests/run_operator_projection.gd` 与 `tests/support/client_harness.ps1` 的报告读取边界；更新 README、STATUS、CHANGELOG、docs/10、17、22、本清单和路线图。干净分发目录、Linux 隔离部署、假库、玩家客户端和失败证据仅在忽略目录，不把二进制或私有数据加入 Git。执行范围见 [独立目录](17_framework_shooter_plan.md#linux-server-directory)。
+
 2026-10-01 Codex Linux 后台入口（基准 `main / 7d5594e`）：新增 `OpenLinuxManagement.cmd`、`tools/open_linux_management.ps1`；更新 README、STATUS、docs/10、17 和本清单。仅建立自持有的回环 SSH 转发，保留原服务与真实数据；补记 Linux 分发目录的资源调查与下一阶段任务，尚未修改导出或服务器代码。
 
 2026-10-01 Codex 局域网跨机验收（基准 `main / 572c356`）：新增 `tests/test_linux_lan.ps1`、`OpenLinuxPlayerClient.cmd`、`tools/open_linux_player_client.ps1`；更新 README、STATUS、docs/10、17、22、本清单及路线图数据。生产服务器、SDK、协议和构建规则未改；源码快照、假数据库、私有测试说明、公开连接配置和新导出的客户端仅在忽略目录。说明见 [Windows → Linux](17_framework_shooter_plan.md#linux-lan)。

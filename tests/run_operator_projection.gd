@@ -5,6 +5,9 @@ var passed := 0
 var failed := 0
 
 func _initialize() -> void:
+	check(Operator._exported_host_filename("Windows") == "ManagedHost.exe", "Windows export keeps its trusted host filename")
+	check(Operator._exported_host_filename("Linux") == "ManagedHost.x86_64", "Linux export uses its trusted host filename")
+	check(Operator._exported_host_filename("macOS") == "" and Operator._exported_host_filename("../other") == "", "unsupported platform cannot select an arbitrary executable")
 	var sample := {"ok": true, "metrics": {"system_cpu_percent": 42, "data_disk_free_bytes": 1234}}
 	var projected := Operator._metric_snapshot(sample)
 	check(projected.available and projected.system_cpu_percent == 42 and projected.sampled_at > 0, "available sample has values and real sample time")

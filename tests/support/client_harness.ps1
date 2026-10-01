@@ -16,8 +16,9 @@ function Rk-SaveJson([string]$Path,$Value) {
     Move-Item -LiteralPath $temporary -Destination $Path -Force
 }
 function Rk-ReadJson([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) { return $null }
-    try { return Get-Content -Encoding UTF8 -Raw -LiteralPath $Path | ConvertFrom-Json } catch { return $null }
+    # Reports are atomically replaced by a running client. Both existence and
+    # content reads can race that replacement; let the caller's bounded poll retry.
+    try { if (-not (Test-Path -LiteralPath $Path)) { return $null }; return Get-Content -Encoding UTF8 -Raw -LiteralPath $Path | ConvertFrom-Json } catch { return $null }
 }
 
 ## Administrator API. -Anonymous for setup/login. Throws on a transport failure

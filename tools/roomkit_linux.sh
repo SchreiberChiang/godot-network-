@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RoomKit on Linux from source: start, stop or inspect one isolated instance of
+# RoomKit on Linux from source or an exported package: one isolated instance of
 # the management service (Operator -> managed host -> lobby -> rooms).
 #
 #   tools/roomkit_linux.sh start  [options]
@@ -35,13 +35,20 @@ trap '' PIPE
 PROJECT="$(cd "$(dirname "$0")/.." && pwd -P)"
 GODOT="${ROOMKIT_GODOT:-$HOME/roomkit/tools/godot/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64}"
 PWSH="${ROOMKIT_PWSH:-$HOME/roomkit/tools/pwsh/7.6.6/pwsh}"
+EXPORTED=0
+if [ -f "$PROJECT/linux-package.json" ]; then
+  EXPORTED=1
+  GODOT="$PROJECT/Operator.x86_64"
+fi
 command="${1:-}"; [ $# -gt 0 ] && shift
 NAME=l3 PANEL=28491 LOBBY=28500 CONTROL=28501 UDP=28540-28555 BIND=127.0.0.1
+PANEL_EXPLICIT=0
 fail() { echo "ROOMKIT_FAILED $*" >&2; exit 1; }
 while [ $# -gt 0 ]; do
+  [ $# -ge 2 ] || fail "missing option value for $1"
   case "$1" in
     --instance) NAME="${2:-}"; shift 2 ;;
-    --panel-port) PANEL="${2:-}"; shift 2 ;;
+    --panel-port) PANEL="${2:-}"; PANEL_EXPLICIT=1; shift 2 ;;
     --lobby-port) LOBBY="${2:-}"; shift 2 ;;
     --control-port) CONTROL="${2:-}"; shift 2 ;;
     --udp-range) UDP="${2:-}"; shift 2 ;;
@@ -53,6 +60,8 @@ done
 INST="$PROJECT/data/instance-$NAME"
 DATA="$INST/data"
 STATE="$INST/instance.json"
+PANEL_SETTING="$INST/panel.port"
+config_field() { sed -n 's/.*"'"$1"'": *"\{0,1\}\([^",}]*\).*/\1/p' "$DATA/config.json"; }
 
 # Start time of a live process; nothing for a missing one or a zombie (exited).
 start_time() { awk '$3 != "Z" {print $22}' "/proc/$1/stat" 2>/dev/null; }
@@ -85,8 +94,9 @@ udp_in_range() {
 ## Their command lines name this folder (--path, a script under tools/, or a
 ## prepared game project inside the instance). This script itself is skipped.
 source_processes() {
-  local pid
-  for pid in $(pgrep -f -- "$PROJECT/|$PROJECT( |$)" 2>/dev/null); do
+  local pid literal
+  literal="$(printf '%s' "$PROJECT" | sed 's/[][\\.^$*+?(){}|]/\\&/g')"
+  for pid in $(pgrep -f -- "$literal/|$literal( |$)" 2>/dev/null); do
     [ "$pid" = "$$" ] && continue
     { tr '\0' ' ' < "/proc/$pid/cmdline"; } 2>/dev/null | grep -q 'roomkit_linux\.sh' && continue
     [ -e "/proc/$pid" ] && echo "$pid"
@@ -135,6 +145,15 @@ do_start() {
   [ -x "$PWSH" ] || fail "pwsh not found: $PWSH"
   pid="$(recorded_pid "$STATE")"
   if [ -n "$pid" ]; then do_status; return 0; fi
+  if [ "$PANEL_EXPLICIT" -eq 0 ] && [ -f "$PANEL_SETTING" ]; then
+    [ ! -L "$PANEL_SETTING" ] || fail "panel setting is a symbolic link"
+    PANEL="$(cat "$PANEL_SETTING")"
+  fi
+  if [ -f "$DATA/config.json" ]; then
+    [ ! -L "$DATA/config.json" ] || fail "instance configuration is a symbolic link"
+    LOBBY="$(config_field lobby_port)"; CONTROL="$(config_field control_port)"
+    UDP="$(config_field udp_first)-$(config_field udp_last)"; BIND="$(config_field lobby_bind)"
+  fi
   for port in "$PANEL" "$LOBBY" "$CONTROL"; do
     [[ "$port" =~ ^[0-9]{4,5}$ ]] && [ "$port" -ge 1024 ] && [ "$port" -le 65535 ] || fail "invalid port $port"
   done
@@ -162,12 +181,21 @@ do_start() {
   done
   export HOME="$INST/home" XDG_CONFIG_HOME="$INST/xdg/config" XDG_CACHE_HOME="$INST/xdg/cache" XDG_DATA_HOME="$INST/xdg/data" TMPDIR="$INST/tmp"
   export ROOMKIT_PWSH="$PWSH" POWERSHELL_TELEMETRY_OPTOUT=1 POWERSHELL_UPDATECHECK=Off DOTNET_CLI_TELEMETRY_OPTOUT=1
+  [ ! -L "$PANEL_SETTING" ] || fail "panel setting is a symbolic link"
+  printf '%s\n' "$PANEL" > "$PANEL_SETTING" && chmod 600 "$PANEL_SETTING" || fail "cannot save panel port"
   if [ ! -f "$INST/games.json" ]; then
-    "$PWSH" -NoProfile -NonInteractive -File "$PROJECT/tools/build_framework.ps1" -IndexPath "$INST/games.json" -BuildRoot "$INST/build" > "$INST/logs/build.log" 2>&1 || fail "game build failed; see $INST/logs/build.log"
+    if [ "$EXPORTED" -eq 1 ]; then
+      [ -f "$PROJECT/games.json" ] && [ ! -L "$PROJECT/games.json" ] || fail "package game index missing or linked"
+      cp "$PROJECT/games.json" "$INST/games.json" && chmod 600 "$INST/games.json" || fail "cannot prepare package game index"
+    else
+      "$PWSH" -NoProfile -NonInteractive -File "$PROJECT/tools/build_framework.ps1" -IndexPath "$INST/games.json" -BuildRoot "$INST/build" > "$INST/logs/build.log" 2>&1 || fail "game build failed; see $INST/logs/build.log"
+    fi
   fi
   rm -f "$DATA/operator-stop.request"
   cd "$INST" || fail "cannot enter $INST"
-  setsid "$GODOT" --headless --path "$PROJECT" --log-file "$INST/logs/operator.log" --script res://host/operator.gd -- \
+  local engine_args=()
+  if [ "$EXPORTED" -eq 0 ]; then engine_args=(--path "$PROJECT" --script res://host/operator.gd); fi
+  setsid "$GODOT" --headless "${engine_args[@]}" --log-file "$INST/logs/operator.log" -- \
     "--data-root=$DATA" "--games=$INST/games.json" "--public-client-dir=$INST/public" "--operator-log-path=$INST/logs/operator.log" \
     "--panel-port=$PANEL" "--initial-bind=$BIND" "--initial-ports=$LOBBY,$CONTROL,$first,$last" \
     < /dev/null > "$INST/logs/console.log" 2> "$INST/logs/stderr.log" &

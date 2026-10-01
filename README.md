@@ -1,6 +1,6 @@
 # RoomKit：独立的本地房间框架
 
-从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`（已整合原 `codex/shooter-framework` 成果）；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能已有验收；Linux 同机完整对局、备份等待和 60 分钟耐久通过功能门槛，原始环境对照失败保留，退出补修另经复验。Windows → Linux 基础跨设备自动验收也已通过；跨机完整一局/耐久、真人画面、公网和 Linux 导出服务器包仍未验收。
+从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能与 Linux 源码服务已有验收；Linux 独立服务器普通目录也已构建和隔离运行。跨机完整对局用源码 SDK 客户端验证，真实 Client.exe 的双人入退房另列结果；真人画面、公网、其它发行版和导出包长期耐久仍未验收。
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
@@ -47,11 +47,19 @@ bash tools/roomkit_linux.sh status
 bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 ```
 
-每个实例的数据、游戏索引、公开配置和 HOME/XDG/tmp 都在 `data/instance-<名>/`（默认 `l3`），默认只绑定 127.0.0.1；端口可以用 `--panel-port`、`--lobby-port`、`--control-port`、`--udp-range`、`--bind` 指定，但只在实例第一次创建时生效。已在一台 x86_64 笔记本上完成同机验收，以及 Windows 客户端直连 Linux 的局域网自动验收；公网和 Linux 导出服务器包尚未验收。
+每个实例的数据、游戏索引、公开配置和 HOME/XDG/tmp 都在 `data/instance-<名>/`（默认 `l3`），默认只绑定 127.0.0.1；端口可以用 `--panel-port`、`--lobby-port`、`--control-port`、`--udp-range`、`--bind` 指定，但只在实例第一次创建时生效。已在一台 x86_64 笔记本上完成同机及 Windows 客户端直连 Linux 的局域网自动验收；公网尚未验收，独立导出目录的入口见下一节。
 
 本机专用的 Linux 联机客户端：双击 **`OpenLinuxPlayerClient.cmd`** 打开独立目录，再双击其中的 `Client.exe`。它连接笔记本测试实例，保留原 `PlayerClient`；生成的程序和连接配置不进入 Git。邀请码、启停和复验说明见 [Linux 跨机试玩](docs/17_framework_shooter_plan.md#linux-lan)。
 
 **从台式机打开 Linux 后台：双击根目录 `OpenLinuxManagement.cmd`，保持窗口打开。** 入口建立 SSH 转发，再在浏览器打开 <http://127.0.0.1:28491/>；按回车或关闭入口窗口只断开这次转发，不停 Linux 服务。后台只监听笔记本自己的回环地址，不能直接打开 `http://192.168.10.105:28491/`。网址填在浏览器地址栏，不是 SSH 终端命令；测试管理员与 Windows 管理员不同，信息在本机私有 `data/codex-linux-lan-20261001224135-8dd5ca/admin.json`。入口不启动远程服务，SSH 认证不可用时明确报错，不修改 SSH 配置。说明见 [后台访问与下一阶段](docs/17_framework_shooter_plan.md#linux-management-entry)。
+
+## 独立 Linux 服务器目录（无需 Godot 编辑器）
+
+Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；仍需已有的 **pwsh 7.6.6** 和系统 **libsqlite3.so.0**，脚本不安装依赖。当前目录及实测范围见 [Linux 独立目录](docs/17_framework_shooter_plan.md#linux-server-directory)。
+
+在目录内依次运行 `bash CheckPackage.sh` → `bash RoomKit.sh start --instance demo`；状态用 `bash RoomKit.sh status --instance demo`，停止用 `bash RoomKit.sh stop --instance demo`。默认只绑定回环，新实例的端口与对外地址可在首次启动时设置；重启沿用保存配置。后台通过本机浏览器或同号 SSH 转发访问。玩家仍使用版本匹配的 Windows 客户端。
+
+运行会产生私有账号库、密钥与日志；给别人分发应使用 Windows 构建出的干净目录，不能复制已经运行过的目录。其它发行版、ARM、公网和开机服务另行验收。
 
 ## 独立 Windows 包（无需 Godot 编辑器）
 
@@ -73,7 +81,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\new_game.ps1 -Manage
 
 ## 文档导航
 
-目前已完成项目地图、主线整理、独立客户端、后台 UI 和基础音效，Linux 同机阶段验收已交付并待复核，见 [阶段交付](docs/17_framework_shooter_plan.md#l3-stage-delivery)；分工见 [协作总览](docs/17_framework_shooter_plan.md#coordination-current)。见 [已确认规划](docs/17_framework_shooter_plan.md#next-plan)、[清理候选表](docs/17_framework_shooter_plan.md#清理候选表) 和 [下一阶段建议](docs/17_framework_shooter_plan.md#下一阶段实施建议与验收门槛)。
+目前已完成项目地图、主线整理、独立客户端、后台 UI、基础音效与 Linux 独立目录，最新交付见 [Linux 服务器目录](docs/17_framework_shooter_plan.md#linux-server-directory)；分工见 [协作总览](docs/17_framework_shooter_plan.md#coordination-current)。见 [已确认规划](docs/17_framework_shooter_plan.md#next-plan)、[清理候选表](docs/17_framework_shooter_plan.md#清理候选表) 和 [下一阶段建议](docs/17_framework_shooter_plan.md#下一阶段实施建议与验收门槛)。
 
 | 需要了解 | 文档 |
 |---|---|

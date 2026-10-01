@@ -301,8 +301,16 @@ func _start_host() -> Dictionary:
 func _host_descriptor() -> Dictionary:
 	var descriptor := {"executable": OS.get_executable_path(), "args": ["--headless", "--path", Paths.absolute("res://"), "--log-file", root_path.path_join("logs/managed-host.log"), "--script", "res://host/managed_host.gd", "--"]}
 	if not OS.has_feature("editor"):
-		descriptor = {"executable": Paths.absolute("res://ManagedHost.exe"), "args": ["--headless", "--log-file", root_path.path_join("logs/managed-host.log"), "--"]}
+		var filename := _exported_host_filename(OS.get_name())
+		descriptor = {"executable": Paths.absolute("res://" + filename) if filename != "" else "", "args": ["--headless", "--log-file", root_path.path_join("logs/managed-host.log"), "--"]}
 	return descriptor
+
+## Fixed deployment names, never supplied by a player or an HTTP request.
+static func _exported_host_filename(platform: String) -> String:
+	match platform:
+		"Windows": return "ManagedHost.exe"
+		"Linux": return "ManagedHost.x86_64"
+	return ""
 
 ## Forced stop of the owned managed host. Windows: the identity helper on a
 ## worker thread (unchanged). Linux: the owner, on this thread; when the exit
