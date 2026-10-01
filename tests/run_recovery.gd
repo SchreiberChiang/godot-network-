@@ -4,7 +4,8 @@ func _run() -> void:
 	report_name = "recovery"
 	work = ProjectSettings.globalize_path("res://data/restart-test-" + Wire.uid())
 	var output: Array = []
-	check(OS.execute("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ProjectSettings.globalize_path("res://tools/protect_data.ps1"), "-ProjectRoot", ProjectSettings.globalize_path("res://"), "-DataRoot", work], output) == 0, "private restart fixture")
+	# Linux: posix_data_root.gd is the counterpart of protect_data.ps1 (700 folders).
+	check(preload("res://host/platform/posix_data_root.gd").prepare(work) if OS.get_name() == "Linux" else OS.execute("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ProjectSettings.globalize_path("res://tools/protect_data.ps1"), "-ProjectRoot", ProjectSettings.globalize_path("res://"), "-DataRoot", work], output) == 0, "private restart fixture")
 	var base: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/development.json"))
 	base.godot_executable = OS.get_executable_path()
 	var free_range := free_udp_range()
@@ -100,7 +101,9 @@ func start_host(label: String, source: Dictionary) -> Dictionary:
 	file.store_string(JSON.stringify(config))
 	file.close()
 	var launch := Wire.uid()
+	var launch_started := Time.get_ticks_msec()
 	var result: Dictionary = manager.launcher.launch({"executable": OS.get_executable_path(), "args": ["--headless", "--path", ProjectSettings.globalize_path("res://"), "--log-file", work.path_join(label + ".log"), "--script", "res://tests/fixtures/recovery_host.gd", "--"]}, launch, ["--launch-id=" + launch, "--settings=" + path])
+	print("RECOVERY_LAUNCH_DIAG label=", label, " ok=", result.ok, " code=", result.get("code", ""), " pid_positive=", int(result.get("pid", 0)) > 0, " capture=", result.get("capture", "-"), " stage=", result.get("stage", "-"), " error=", result.get("error", "-"), " still_running=", manager.launcher.probe(launch), " ms=", Time.get_ticks_msec() - launch_started)
 	check(result.ok, "verified recovery host " + label)
 	var child := {"launch_id": launch, "output": config.report}
 	children.append(child)

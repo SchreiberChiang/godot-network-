@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 # per table of both databases, the rows in which any column contains any needle;
 # backup takes online SQLite copies of both databases (a stand-in for an older
 # backup); rate_limits counts login rate-limit keys. Never touches other data.
-$project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
+$project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\','/')
 $target=[IO.Path]::GetFullPath($Directory)
 if ([IO.Path]::GetDirectoryName($target) -ne (Join-Path $project 'data') -or [IO.Path]::GetFileName($target) -notmatch '^test-account-deletion-[a-f0-9]{32}$') { throw 'Test fixture directory refused' }
 if ($Copy -and $Copy -notmatch '^[a-z]{1,16}$') { throw 'Copy name refused' }

@@ -19,9 +19,16 @@ static func execute(helper: String, arguments: Array, directory: String, timeout
 	var output: Array = []
 	var code := OS.execute("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://tools/bounded_helper.ps1"), "-Request", path, "-TimeoutMs", str(timeout_ms)], output, false, false)
 	DirAccess.remove_absolute(path)
-	if code != 0 or output.is_empty():
+	if output.is_empty():
 		return {"ok": false, "code": "HELPER_FAILED", "state": "unknown"}
-	var parsed: Variant = JSON.parse_string(str(output[0]))
+	var reader := JSON.new()
+	var parsed: Variant = reader.data if reader.parse(str(output[0]).strip_edges()) == OK else null
+	if code != 0:
+		# bounded_helper.ps1 exits 1 with its own fixed failure line; keep that
+		# code (HELPER_TIMEOUT or HELPER_FAILED) so a timeout is not reported as a
+		# generic failure. Anything else stays HELPER_FAILED.
+		var wrapper_code := str(parsed.get("code", "")) if parsed is Dictionary else ""
+		return {"ok": false, "code": wrapper_code if wrapper_code in ["HELPER_TIMEOUT", "HELPER_FAILED"] else "HELPER_FAILED", "state": "unknown"}
 	return parsed if parsed is Dictionary else {"ok": false, "code": "HELPER_FAILED", "state": "unknown"}
 
 ## Same bounded helper, but the job and a request body travel over standard input

@@ -1,5 +1,17 @@
 extends SceneTree
 ## Composition root: one private operator owns databases and the managed host process.
+##
+## Linux (first slice): the runtime folder is 700 and every JSON file this
+## Operator writes (configuration, operator marker, host observation record,
+## managed-host bootstrap with its RPC token, maintenance requests) is 600 before
+## it is renamed into place; the TLS key and certificate are 600 as well. The
+## managed host is started on a worker thread and taken over with the single-use
+## hand-over (never written to disk). A forced stop runs on the main thread
+## through the owner; when it cannot be confirmed the host stays owned and the
+## stop is retried every HOST_STOP_RETRY_MS. A host marker or process journal
+## left by an earlier run is checked read-only (ProcessLauncher.inspect_previous):
+## nothing is released before the recorded processes are gone, and nothing from
+## an earlier run is ever claimed or signalled.
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Paths = preload("res://sdk/roomkit/shared/paths.gd")
 const Format = preload("res://sdk/roomkit/shared/result_format.gd")
@@ -14,6 +26,12 @@ const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const GameServices = preload("res://host/core/managed_game_registry.gd")
 const Resident = preload("res://host/storage/resident_store.gd")
 const AccountDeletion = preload("res://host/core/account_deletion.gd")
+const PrivatePath = preload("res://host/platform/posix_private_path.gd")
+const SessionCleanup = preload("res://host/core/session_cleanup.gd")
+const HOST_STOP_RETRY_MS := 5000
+## How long a host's logout request waits for its clean-up job before it is told
+## LOGOUT_PENDING (the host gives each internal clean-up request at most 10 s).
+const LOGOUT_REPLY_WAIT_MS := 8000
 var accounts = Accounts.new()
 var assets = Assets.new()
 var results = Results.new()
@@ -43,6 +61,8 @@ var deletion_busy := false
 var restart_times: Array = []
 var restart_after := 0
 var player_tokens: Dictionary = {}
+# Owns the clean-up of every player token this Operator issued (session_cleanup.gd).
+var cleanup = SessionCleanup.new()
 var snapshot: Dictionary = {"host": {"state": "STOPPED", "pid": 0, "uptime": 0, "maintenance": false, "countdown": 0, "error": ""}, "rooms": [], "players": [], "metrics": {}, "games": []}
 var audit: Array = []
 var next_metrics := 0
@@ -50,8 +70,14 @@ var metrics_busy := false
 var next_backup := 0
 var quitting := false
 var args: Dictionary = {}
+# Linux: a forced host stop that could not be confirmed yet.
+var host_stop_pending := false
+var host_stop_attempts := 0
+var next_host_stop := 0
 
 func _initialize() -> void:
+	cleanup.start_attempt = _cleanup_attempt
+	cleanup.on_finished = _cleanup_finished
 	for arg in OS.get_cmdline_user_args():
 		var pair := arg.split("=", true, 1)
 		if pair.size() == 2:
@@ -88,6 +114,14 @@ func _run() -> void:
 			return
 		settings = saved
 	else:
+		# A new data root may get its network settings from the trusted start entry
+		# (isolated instances); an existing config.json always wins.
+		var initial := _initial_network(args)
+		if initial.has("error") or not _valid_config(_merged(settings, initial)):
+			printerr("OPERATOR_FAILED code=INVALID_CONFIG")
+			quit(1)
+			return
+		settings = _merged(settings, initial)
 		_write_json(root_path.path_join("config.json"), settings)
 	_load_catalog()
 	if not (await _work(assets.initialize.bind(root_path, catalog_config))).ok:
@@ -106,6 +140,10 @@ func _run() -> void:
 	if not FileAccess.file_exists(security.key) or not FileAccess.file_exists(security.certificate):
 		security = await _work(preload("res://sdk/roomkit/shared/secure_transport.gd").create_local_certificate.bind(root_path))
 	if security.is_empty():
+		quit(1)
+		return
+	if OS.get_name() == "Linux" and not (PrivatePath.protect_file(str(security.key), root_path).ok and PrivatePath.protect_file(str(security.certificate), root_path).ok):
+		printerr("OPERATOR_FAILED code=PRIVATE_CONFIG_FAILED")
 		quit(1)
 		return
 	_publish_connection()
@@ -132,7 +170,10 @@ func _process(_delta: float) -> bool:
 		bus.poll()
 	if not ready:
 		return false
+	cleanup.poll(storage_maintenance)
 	http.poll()
+	if host_stop_pending and host_owned and Time.get_ticks_msec() >= next_host_stop:
+		_retry_host_stop()
 	if host_owned and not starting and launcher.probe(host_launch) == "exited":
 		host_closing = true
 		_host_exited.call_deferred()
@@ -211,9 +252,11 @@ func _start_host() -> Dictionary:
 		starting = false
 		return Wire.failure("PRIVATE_CONFIG_FAILED")
 	DirAccess.make_dir_recursive_absolute(root_path.path_join("logs"))
-	var descriptor := {"executable": OS.get_executable_path(), "args": ["--headless", "--path", Paths.absolute("res://"), "--log-file", root_path.path_join("logs/managed-host.log"), "--script", "res://host/managed_host.gd", "--"]}
-	if not OS.has_feature("editor"):
-		descriptor = {"executable": Paths.absolute("res://ManagedHost.exe"), "args": ["--headless", "--log-file", root_path.path_join("logs/managed-host.log"), "--"]}
+	if OS.get_name() == "Linux" and not PrivatePath.protect_directory(root_path.path_join("logs"), root_path).ok:
+		starting = false
+		DirAccess.remove_absolute(path)
+		return Wire.failure("PRIVATE_CONFIG_FAILED")
+	var descriptor := _host_descriptor()
 	var launched: Dictionary = await _work(_launch.bind(descriptor, host_launch, path))
 	if not launched.owned.is_empty():
 		# The hand-over (Linux: a single-use in-memory token) moves the child; the
@@ -226,25 +269,57 @@ func _start_host() -> Dictionary:
 	if not launched.started.ok:
 		snapshot.host.state = "FAILED"
 		snapshot.host.error = launched.started.code
+		# A host that never started never consumed its bootstrap (RPC token).
+		DirAccess.remove_absolute(path)
 		bus.close()
 		if host_owned:
-			await _work(_terminate_owned.bind(launcher.record(host_launch)))
+			await _force_stop_host()
 		return launched.started
 	var deadline := Time.get_ticks_msec() + 20000
 	while host_owned and host_peer == "" and Time.get_ticks_msec() < deadline:
 		await process_frame
 	if host_peer == "":
+		# Normally the host removes it on start; one that never got that far must
+		# not leave its RPC token behind (the token is worthless once the bus closes).
+		DirAccess.remove_absolute(path)
 		bus.close()
 		if host_owned:
-			await _work(_terminate_owned.bind(launcher.record(host_launch)))
+			await _force_stop_host()
 		snapshot.host.error = "HOST_START_TIMEOUT"
 		return Wire.failure("HOST_START_TIMEOUT")
 	return {"ok": true, "payload": snapshot.host.duplicate(true)}
 
+## The trusted managed-host program (never chosen by a request).
+func _host_descriptor() -> Dictionary:
+	var descriptor := {"executable": OS.get_executable_path(), "args": ["--headless", "--path", Paths.absolute("res://"), "--log-file", root_path.path_join("logs/managed-host.log"), "--script", "res://host/managed_host.gd", "--"]}
+	if not OS.has_feature("editor"):
+		descriptor = {"executable": Paths.absolute("res://ManagedHost.exe"), "args": ["--headless", "--log-file", root_path.path_join("logs/managed-host.log"), "--"]}
+	return descriptor
+
+## Forced stop of the owned managed host. Windows: the identity helper on a
+## worker thread (unchanged). Linux: the owner, on this thread; when the exit
+## cannot be confirmed the host stays owned (nothing is released) and the stop
+## is retried from _process.
+func _force_stop_host() -> void:
+	if OS.get_name() != "Linux":
+		await _work(_terminate_owned.bind(launcher.record(host_launch)))
+		return
+	host_stop_attempts = 0
+	_retry_host_stop()
+
+func _retry_host_stop() -> void:
+	host_stop_attempts += 1
+	if launcher.terminate(host_launch):
+		host_stop_pending = false
+		return
+	host_stop_pending = true
+	next_host_stop = Time.get_ticks_msec() + HOST_STOP_RETRY_MS
+	snapshot.host.error = "PROCESS_IDENTITY_UNVERIFIED"
+
 func _launch(descriptor: Dictionary, launch_id: String, path: String) -> Dictionary:
 	var child = Launcher.new()
 	var result: Dictionary = child.launch(descriptor, launch_id, ["--launch-id=" + launch_id, "--managed-config=" + path])
-	return {"started": result, "owned": child.record(launch_id), "handoff": child.handoff(launch_id)}
+	return {"started": result, "owned": child.journal_record(launch_id), "handoff": child.handoff(launch_id)}
 
 func _host_event(peer_id: String, action: String, payload: Dictionary) -> void:
 	if action == "host.status":
@@ -258,14 +333,16 @@ func _host_event(peer_id: String, action: String, payload: Dictionary) -> void:
 
 func _host_exited() -> void:
 	launcher.forget(host_launch)
+	host_stop_pending = false
 	snapshot.host.state = "STOPPED" if requested_stop else "FAILED"
 	snapshot.host.pid = 0
 	snapshot.players = []
 	if bus != null:
 		bus.close()
+	# The host is gone: this Operator takes over every token it still holds. A
+	# token leaves player_tokens only once its clean-up is confirmed.
 	for token in player_tokens.keys():
-		await _work(accounts.execute.bind({"op": "session.logout", "token": token}))
-	player_tokens.clear()
+		cleanup.submit(token, str(player_tokens[token]), "host_exit")
 	# Rooms self-stop on control loss. Reuse is gated by verified exit and UDP rebinding.
 	var end := Time.get_ticks_msec() + 60000
 	var clean := false
@@ -308,6 +385,7 @@ func _admin(request: Dictionary) -> Dictionary:
 	var payload: Dictionary = request.payload
 	var token: String = request.get("token", "")
 	if storage_maintenance or quitting:
+		_note_storage_failure("admin:" + action + ":maintenance", Wire.failure("STORAGE_MAINTENANCE"))
 		return Wire.failure("STORAGE_MAINTENANCE")
 	if action == "setup.status":
 		return _payload(await _work(accounts.execute.bind({"op": "setup.status"})))
@@ -325,6 +403,7 @@ func _admin(request: Dictionary) -> Dictionary:
 		return _payload(reply)
 	var auth: Dictionary = await _work(accounts.execute.bind({"op": "session.authenticate", "token": token}))
 	if not auth.ok:
+		_note_storage_failure("admin:" + action, auth)
 		# Admission/storage failure is not evidence that the credential is invalid.
 		# Preserve the safe error code so the browser can retry its existing session.
 		return Wire.failure(str(auth.get("code", "STORAGE_UNAVAILABLE")))
@@ -334,6 +413,7 @@ func _admin(request: Dictionary) -> Dictionary:
 		return _payload(await _work(accounts.execute.bind({"op": "session.logout", "token": token})))
 	if action == "status":
 		var public := snapshot.duplicate(true)
+		public.session_cleanup = cleanup.status()
 		public.games = _public_games()
 		return {"ok": true, "payload": public}
 	if storage_maintenance:
@@ -422,6 +502,8 @@ func _admin(request: Dictionary) -> Dictionary:
 					await _work(assets.initialize.bind(root_path, catalog_config))
 					await _work(results.initialize.bind(root_path, results.schemas, "assets.sqlite"))
 					player_tokens.clear()
+					# The restore revoked every session; nothing is left to clean up.
+					cleanup.cancel_all("restore")
 					_publish_connection()
 				storage_maintenance = false
 		"logs.list": result = {"ok": true, "payload": {"logs": [{"label": "operator"}, {"label": "host"}]}}
@@ -454,9 +536,24 @@ func _account_request(action: String, payload: Dictionary, token: String) -> Dic
 	return result
 
 func _rpc_request(peer_id: String, request_id: String, action: String, payload: Dictionary) -> void:
+	# Async storage work belongs to this exact host connection. A replacement
+	# host must not receive an old response, and an abandoned successful login
+	# must still hand its newly issued token to this Operator's clean-up.
+	var request_bus = bus
 	var result: Dictionary = Wire.failure("INVALID_OPTIONS")
+	if action == "account.execute" and payload.get("op", "") == "session.logout":
+		# Every logout of a known token becomes a clean-up job that this Operator owns;
+		# it is queued even while storage maintenance runs.
+		result = await _logout(str(payload.get("token", "")), str(payload.get("reason", "host")))
+		_note_storage_failure(action + ":session.logout", result)
+		if request_bus != null and request_bus == bus:
+			request_bus.respond(peer_id, request_id, result)
+		return
 	if storage_maintenance:
-		bus.respond(peer_id, request_id, Wire.failure("STORAGE_UNAVAILABLE"))
+		# Backups and restores refuse player storage requests for their duration.
+		_note_storage_failure(action + ":" + str(payload.get("op", "")) + ":maintenance", Wire.failure("STORAGE_UNAVAILABLE"))
+		if request_bus != null and request_bus == bus:
+			request_bus.respond(peer_id, request_id, Wire.failure("STORAGE_UNAVAILABLE"))
 		return
 	match action:
 		"account.execute":
@@ -464,8 +561,8 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 				result = await _work(accounts.execute.bind(payload))
 				if result.ok and payload.op == "account.login":
 					player_tokens[result.token] = result.identity.user_id
-				if payload.op == "session.logout":
-					player_tokens.erase(payload.get("token", ""))
+					if request_bus == null or request_bus != bus or not request_bus.peers.get(peer_id, {}).get("authenticated", false):
+						cleanup.submit(result.token, str(result.identity.user_id), "login_reply_lost")
 		"game.catalog": result = {"ok": true, "payload": {"catalog": catalog_config.duplicate(true)}}
 		"asset.initial": result = await _asset_read(payload.user_id, payload.game_id)
 		"asset.player":
@@ -488,8 +585,49 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 		"result.submit":
 			var checked: Dictionary = results.validate_submission(payload)
 			result = await _work(results.repository.execute.bind(checked.request)) if checked.ok else checked
-	if bus != null:
-		bus.respond(peer_id, request_id, result)
+	_note_storage_failure(action + ":" + str(payload.get("op", "")), result)
+	if request_bus != null and request_bus == bus:
+		request_bus.respond(peer_id, request_id, result)
+
+## Hands a logout to the clean-up and waits a bounded time for its end:
+## done -> ok; old token already invalid -> AUTH_FAILED; still being retried ->
+## LOGOUT_PENDING (the job continues here); failed -> its last code.
+func _logout(token: String, reason: String) -> Dictionary:
+	var submitted: Dictionary = cleanup.submit(token, str(player_tokens.get(token, "")), reason)
+	if not submitted.ok:
+		return Wire.failure(submitted.code)
+	var job_id: String = submitted.job_id
+	var deadline := Time.get_ticks_msec() + LOGOUT_REPLY_WAIT_MS
+	while cleanup.job_state(job_id) in ["queued", "waiting", "running"] and Time.get_ticks_msec() < deadline:
+		await process_frame
+	var ended: Dictionary = cleanup.outcomes.get(job_id, {})
+	match str(ended.get("outcome", "")):
+		"done":
+			return {"ok": true, "code": ""}
+		"invalid":
+			return Wire.failure("AUTH_FAILED")
+		"failed":
+			return {"ok": false, "code": str(ended.get("code", "CLEANUP_FAILED")), "payload": {"job_id": job_id}}
+		"cancelled":
+			return {"ok": true, "code": ""}
+	return {"ok": false, "code": "LOGOUT_PENDING", "payload": {"job_id": job_id}}
+
+## One clean-up attempt on the shared worker pool (it counts in worker_count, so
+## backups and restores still wait for it). Not awaited by the caller.
+func _cleanup_attempt(job_id: String, token: String, attempt: int) -> void:
+	var result: Dictionary = await _work(accounts.execute.bind({"op": "session.logout", "token": token}))
+	cleanup.complete(job_id, attempt, result)
+
+func _cleanup_finished(token: String, outcome: String) -> void:
+	if outcome in ["done", "invalid"]:
+		player_tokens.erase(token)
+
+## One log line per storage-side refusal (action and code only; no token, name or
+## payload), so a lost logout or admin request under load can be traced.
+static func _note_storage_failure(what: String, result: Dictionary) -> void:
+	var code := str(result.get("code", ""))
+	if not result.get("ok", false) and (code in ["STORAGE_UNAVAILABLE", "RATE_LIMITED", "STORAGE_MAINTENANCE"] or code.begins_with("HELPER_")):
+		print("OPERATOR_STORAGE_REFUSED t=", Time.get_ticks_msec(), " what=", what, " code=", code)
 
 func _policy(game_id: String):
 	return game_services.policies.get(game_id)
@@ -513,6 +651,31 @@ func _public_games() -> Array:
 	for game_id in games:
 		rows.append({"game_id": game_id, "name": games[game_id].get("name", game_id), "modes": games[game_id].manifest.modes, "room_rules": games[game_id].manifest.get("room_rules", {}), "asset_space": game_services.default_spaces.get(game_id, game_id)})
 	return rows
+
+## --initial-bind=<IPv4> (lobby, rooms and the advertised address) and
+## --initial-ports=<lobby>,<control>,<udp first>,<udp last>; only read when the
+## data root has no config.json yet. {"error": ...} for a malformed value.
+static func _initial_network(values: Dictionary) -> Dictionary:
+	var result := {}
+	if values.has("--initial-bind"):
+		var address := str(values["--initial-bind"])
+		if not address.is_valid_ip_address() or ":" in address:
+			return {"error": "INVALID_CONFIG"}
+		result.merge({"lobby_bind": address, "game_bind": address, "advertised_host": address}, true)
+	if values.has("--initial-ports"):
+		var parts := str(values["--initial-ports"]).split(",")
+		if parts.size() != 4:
+			return {"error": "INVALID_CONFIG"}
+		for part in parts:
+			if not part.is_valid_int():
+				return {"error": "INVALID_CONFIG"}
+		result.merge({"lobby_port": int(parts[0]), "control_port": int(parts[1]), "udp_first": int(parts[2]), "udp_last": int(parts[3])}, true)
+	return result
+
+static func _merged(base: Dictionary, extra: Dictionary) -> Dictionary:
+	var copy := base.duplicate(true)
+	copy.merge(extra, true)
+	return copy
 
 func _load_catalog() -> void:
 	catalog_config = game_services.catalog_for(settings.asset_spaces)
@@ -668,6 +831,7 @@ func _disconnect_player(user_id: String) -> Dictionary:
 	for key in player_tokens.keys():
 		if player_tokens[key] == user_id:
 			player_tokens.erase(key)
+	cleanup.cancel_user(user_id, "account_revoked")
 	var was_online := _player_online(user_id)
 	if bus != null and host_owned:
 		bus.broadcast("account.revoked", {"user_id": user_id})
@@ -734,9 +898,12 @@ func _backup(automatic: bool, reason: String) -> Dictionary:
 			next_backup = Time.get_ticks_msec() + 60000
 		return Wire.failure("MAINTENANCE_BUSY")
 	storage_maintenance = true
+	var backup_started := Time.get_ticks_msec()
+	print("OPERATOR_MAINTENANCE t=", backup_started, " event=backup_begin automatic=", automatic)
 	while worker_count > 0:
 		await process_frame
 	var result := _payload(await _maintenance({"op": "backup.create", "automatic": automatic, "reason": reason}))
+	print("OPERATOR_MAINTENANCE t=", Time.get_ticks_msec(), " event=backup_end ms=", Time.get_ticks_msec() - backup_started, " ok=", result.ok)
 	_audit("system" if automatic else "operator", "backup.automatic" if automatic else "backup.snapshot", reason, "OK" if result.ok else result.get("code", "STORAGE_UNAVAILABLE"))
 	storage_maintenance = false
 	return result
@@ -755,6 +922,9 @@ func _audit(actor: String, action: String, reason: String, code: String, target:
 		file.seek_end()
 		file.store_line(JSON.stringify(row))
 		file.close()
+		# Linux: owner-only whatever umask the Operator was started with.
+		if OS.get_name() == "Linux":
+			PrivatePath.protect_file(path, root_path)
 	if audit.size() > 1000:
 		audit.pop_front()
 
@@ -775,6 +945,13 @@ func _shutdown() -> void:
 		await _host_command("server.stop", {"immediate": true})
 		while host_owned or host_closing:
 			await process_frame
+	# Pending clean-up keeps its own deadline (35 s per job); what is left after that
+	# is logged as failed by the clean-up itself.
+	var cleanup_end := Time.get_ticks_msec() + SessionCleanup.JOB_DEADLINE_MS + 1000
+	while not cleanup.idle() and Time.get_ticks_msec() < cleanup_end:
+		await process_frame
+	if not cleanup.idle():
+		print("SESSION_CLEANUP event=operator_stopping pending=", cleanup.status().pending, " running=", cleanup.status().running)
 	while worker_count > 0:
 		await process_frame
 	http.close()
@@ -784,6 +961,18 @@ func _shutdown() -> void:
 	quit(0)
 
 static func _protect_runtime() -> Dictionary:
+	if OS.get_name() == "Linux":
+		# Same scope as tools/protect_runtime.ps1: res://run, 700, with its marker.
+		var runtime := Paths.absolute("res://run")
+		if not PrivatePath.protect_directory(runtime, runtime).ok:
+			return {"ok": false}
+		var marker := runtime.path_join(".gdignore")
+		if not FileAccess.file_exists(marker):
+			var created := FileAccess.open(marker, FileAccess.WRITE)
+			if created == null:
+				return {"ok": false}
+			created.close()
+		return {"ok": PrivatePath.protect_file(marker, runtime).ok}
 	var output: Array = []
 	var code := OS.execute("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", Paths.absolute("res://tools/protect_runtime.ps1"), "-ProjectRoot", Paths.absolute("res://")], output, false, false)
 	return {"ok": code == 0}
@@ -800,9 +989,9 @@ static func _inspect_old_rooms(path: String) -> Dictionary:
 	if journal.is_empty():
 		return Wire.failure("RECOVERY_REQUIRED")
 	for entry in journal.entries.values():
-		if entry.owned.is_empty() or not entry.owned.get("verified", false):
+		if entry.owned.is_empty() or not Launcher.inspectable(entry.owned):
 			return Wire.failure("RECOVERY_REQUIRED")
-		if Launcher.new()._inspect("inspect", entry.owned).get("state", "unknown") != "exited":
+		if Launcher.inspect_previous(entry.owned).get("state", "unknown") != "exited":
 			return Wire.failure("RECOVERY_REQUIRED")
 		var probe := ENetMultiplayerPeer.new()
 		probe.set_bind_ip("0.0.0.0")
@@ -817,7 +1006,10 @@ func _recover_previous() -> void:
 	var path := root_path.path_join("host-running.json")
 	var owned := Wire.decode(FileAccess.get_file_as_bytes(path), "", 65536)
 	var inspected: Dictionary = {}
-	if owned.get("verified", false) and owned.has_all(["pid", "parent_pid", "launch_id", "created_filetime", "executable"]):
+	# Read-only: the previous controller's host is never claimed or signalled.
+	if str(owned.get("platform", "")) == "linux" and Launcher.inspectable(owned):
+		inspected = Launcher.inspect_previous(owned)
+	elif owned.get("verified", false) and owned.has_all(["pid", "parent_pid", "launch_id", "created_filetime", "executable"]):
 		inspected = await _work(Launcher.new()._inspect.bind("inspect", owned))
 	if inspected.get("state", "unknown") == "exited":
 		var rooms: Dictionary = await _work(_inspect_old_rooms.bind(root_path.path_join("processes.json")))
@@ -870,6 +1062,10 @@ static func _write_json(path: String, value: Dictionary) -> bool:
 	file.store_string(JSON.stringify(value))
 	file.flush()
 	file.close()
+	# Linux: owner-only before the file appears under its real name.
+	if OS.get_name() == "Linux" and not PrivatePath.protect_file(path + ".tmp", path.get_base_dir()).ok:
+		DirAccess.remove_absolute(path + ".tmp")
+		return false
 	return DirAccess.rename_absolute(path + ".tmp", path) == OK
 
 static func _payload(result: Dictionary) -> Dictionary:

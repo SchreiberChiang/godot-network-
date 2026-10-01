@@ -1321,3 +1321,198 @@ Codex 独立静态复核：改动范围为文档与路线图页面/数据，未�
 | `git diff --check` | 退出 0 |
 | 浏览器交互（内置浏览器，经本机临时静态服务器 `http://127.0.0.1:28999/`） | 两种视图切换、搜索、状态筛选、模块筛选、键盘展开/收起、复制路径、清空按钮、`/` 与 `Esc` 快捷键、无结果提示与重置、深浅色、375 px 窄屏无横向滚动、控制台无错误，均通过；截图确认文字可读、无遮挡。发现并修正两处：长搜索词与 `/` 提示重叠；窄屏下吸顶工具栏过高 |
 | 真实浏览器 `file://` 双击打开 | Claude 未运行：内置浏览器以静态快照打开、Chrome 扩展未连接。随后用户反馈除清理候选步骤之外，其余步骤基本已验收，补充本机双击使用反馈；不是 Claude/Codex 的自动浏览器测试 |
+
+<a id="status-20261001-l3"></a>
+## 2026-10-01 L3 阶段交付前的 STATUS 全文
+
+2026-10-01 Linux L2 收尾与 L3 同机验收交付时从 `STATUS.md` 第 3 行起逐字迁出；只降一级标题并把相对链接改为从本目录出发。各段“当前”“下一步”指写入时。
+
+### 当前安排（Codex，2026-10-01）
+
+Linux Operator 第一切片的代码与原始验收证据复核通过；未独立重跑 Linux。下一轮由 Claude 连续完成 L2 收尾及 L3 同机闭环：恢复/资源限制→正式启动与真实宿主→账号资产维护→60分钟有限耐久和 Windows 回归，阶段结束集中交付，不逐小项等待用户。完整交接、停点和验收范围见 [连续任务单](../17_framework_shooter_plan.md#linux-batch-current)。跨机/公网不在本轮；实验继续暂停，真实数据和旧标记保留，不提交推送。下方各轮暂停/待复核属于历史，当前安排以本段为准。
+
+### Claude：Linux Operator 第一切片验收（2026-10-01，未提交，待 Codex 复核）
+
+- **Linux 实机第二轮** `20260930232030-ec349a`（全新源码和运行目录）：**22 步全部通过，退出码 0**。
+  - 纯校验（含真实符号链接）25/0。
+  - 8 种非法参数全部以退出 64 被拒，没有创建任何东西，也没有端口监听。
+  - 隔离 Operator 19/0，注入 6/0：私有目录和权限、宿主启停、程序不存在、启动超时、停止重试、交接失败、控制断开后宿主自行退出；真实托管宿主明确报 `RECOVERY_UNSUPPORTED`，没有绕过。
+  - 残留检查：进程、28391/28300/28301 端口监听、权限、启动配置和宿主标记、`data/framework` 与 `artifacts/client`，全部通过。
+  - `run_unit` 318/0。
+- **第一轮** `20260930230000-20f6ae`：22 步中 2 步失败，已保留记录。
+  - 测试写的游戏索引是 644，已修。
+  - 宿主没真正启动时，带 RPC 令牌的启动配置留在 `run/`：这是 Operator 在两个平台都有的缺陷，已修。
+- **Windows 回归**：Operator 日程调度 52/0、投影 9/0、鉴权错误 6/0；unit 320/0、真实启动器 64/0、集成 133/0、托管关停 55/0、日志专项 14/0、替身引擎拒绝测试 41/0。真实数据和旧 `operator.json` 没有变化。
+- **未运行**：Linux 上经 Operator 做备份、恢复、结算、删除；完整托管宿主（大厅和房间）；跨机连接；真实 Operator 进程被外部杀掉。
+- 详见 [docs/17 Linux Operator 第一切片结果](../17_framework_shooter_plan.md#linux-operator-第一切片结果claude2026-10-01未提交待-codex-复核)。
+
+### 2026-10-01 误启动真实 Operator：暂停验收并保留现场
+
+Claude 报告语法检查误将 host/operator.gd 无参数运行，05:45:34–05:45:51 启动真实 Operator（PID 49928），随后强制结束。Codex 只读核查：PID 不在、无 Godot 进程、28291 无监听；accounts.sqlite/assets.sqlite 的修改时间分别为 05:45:40/05:45:48，operator.json 为 05:45:51 且仍指向 49928；公开 connection.json/server.crt 为 05:45:49。发布证书与当前服务证书 SHA256 一致，不代表已核对启动前副本。
+
+原始输出在 logs/l2b3-review/check-operator.stdout（包含 OPERATOR_READY，无 OPERATOR_DELETION 事件），对应 stderr 为 0 字节。operator-audit.jsonl、maintenance-audit.jsonl、account-deletions.jsonl 在事件之后均无新增记录，最近记录分别为 09-30 18:53:35、09-30 18:53:34、09-27 23:26:22。未发现完成续删的日志证据，但不能据此排除数据库内部部分写入；未打开数据库，未核对数据库删除作业表，缺少启动前副本，数据差异未知。SQLite 崩溃恢复不等于撤销已提交写入。
+
+本轮未删除标记、未恢复数据库、未启动任何服务、未连接 Linux。先保留现场；后续由 Claude 对离线副本检查删除作业/完整性（副本需私有权限，禁止输出身份和凭据），补齐语法检查及隔离验收的防误启动措施后，再恢复 Linux Operator 验收。未提交推送。
+
+**Claude 事件收尾（2026-10-01，未提交，待 Codex 复核）**：原数据库和 `operator.json` 保持原样，没有恢复或删除。
+- **离线副本**：`data/incident-20261001-copy-48daf417eb6e/`，只有当前用户可访问；两个库的哈希与原文件一致。
+- **汇总结果**（`logs/incident-20261001/inspect-summary.txt`，只有计数和固定名称）：
+  - 两个库 `integrity_check` 和 `quick_check` 都是 ok。
+  - 删除作业 2 条，都已完成并关闭，**没有未完成项**。
+  - 事件窗口内没有新建的审计、账号、会话、邀请、删除记录，各表最新时间都早于事件。
+  - 无法确认的：启动时是否删过已过期的会话（被删的行不留痕迹）；公开 `connection.json`/`server.crt` 重写前的内容。
+- **防误启动**：
+  - `tools/check_scripts.ps1` 只用 `--check-only` 做语法检查，已验证不会执行脚本；检查服务入口后，真实数据的文件和哈希都没变。
+  - `tools/run_isolated_test.ps1` 只运行测试脚本；Operator 或托管宿主类测试必须显式给出隔离的数据目录、非 28291 的面板端口、非 `artifacts/client` 的公开目录，否则拒绝（退出 64），已逐项验证。
+  - `tests/run_posix_operator.gd` 自身也检查这些参数。
+- 详见 [docs/17 事件收尾](../17_framework_shooter_plan.md#incident-20261001)。Linux Operator 验收仍暂停，等 Codex 复核。
+
+**Claude 防误启动边界补强（2026-10-01，未提交，待 Codex 复核）**：
+- `tools/run_isolated_test.ps1` 先规范化路径再检查：拒绝 `..` 段、符号链接和目录联接；只放行 `tests/` 下的脚本。
+- 服务识别顺着 `extends`（引号路径、相对路径、`class_name`）和 `preload`/`load` 一直找到底，无法识别的基类直接拒绝。
+- 每次运行必须用一个新建在 `data/` 内的隔离目录。服务类测试的数据目录、游戏索引、公开目录、日志和运行日志都必须在其中，面板端口必须显式给出且不是 28291。
+- `tests/run_posix_operator.gd` 的自检也同步改了。
+- 替身引擎拒绝测试 `tests/test_isolated_runner.ps1` **30/0**，每项都核对了拒绝原因，全程没有启动真实引擎或服务入口。测试前后真实数据和 `host/` 文件的哈希都没变。
+- 原数据库和 `operator.json` 继续保持原样。
+
+**Claude 防误启动第二轮补强（2026-10-01，未提交，待 Codex 复核）**：
+- **重复参数**：同名参数一律拒绝，所以“共享索引 + 隔离索引”这种写法无法通过。
+- **按参数名检查路径**：四个路径参数按名字检查，空值、相对路径、只有文件名都拒绝；调用方不能自带 `--isolation`。
+- **Linux 完整路径**：检查每个路径参数的完整目标路径有没有经过符号链接。写游戏索引前还要确认没有链接、目标不存在、上级目录存在，而且只写校验过的那个路径（规则在 `tests/support/operator_isolation.gd`）。
+- **测试结果**：替身引擎拒绝测试 **38/0**；纯校验测试 Windows 20/0（链接用例未运行），本机 WSL 25/0（含真实符号链接）。全程没有启动服务，真实数据和 `host/` 文件的哈希都没变。
+
+
+**最新复核（2026-10-01）：Windows 恢复补修通过，可继续 Linux Operator 隔离适配。** 捕获身份时只有助手超时/失败才允许一次只读重试，真正身份不符仍拒绝；总等待可能增加。基线与修复前高压核验均 24/30、修复后两轮 30/30（Claude 原始输出已核对）；Codex 独立 run_recovery 24/0、进程退出 0，证据 logs/recovery-codex-review/。早先无诊断的失败仅推测同因，不宣称已直接证明。
+
+### 当前下一步
+
+1. Claude 按 docs/17 当前交接实现 Linux Operator 私有目录、启动配置和宿主启停，先隔离回环测试。
+2. 进程日志恢复与资源限制仍需补齐，不能跳过后宣称完整后台已支持；随后才安排跨机联机。
+3. 实验继续暂停。本轮恢复修复及复核文档尚未提交推送，未连接 Linux、未修改真实数据。
+
+以下为修补前失败证据，保留历史，不再视为未调查：
+
+本轮独立证据：logs/l2b2-codex-final/unit.txt 为 UNIT_RESULT 320/0、进程退出 0；recovery.txt / recovery-errors.txt 为 SECURE_RESULT 5/4，外层 verified recovery host old 失败，后续 READY/端口/退出断言失败。恢复进程已结束，但当前轮未成功取得其数值退出码，不将工具外层退出 0 当作测试通过；随后通过 Win32_Process 核对没有 Godot 进程残留，未执行批量清理。Claude 5 次不稳定记录继续保留在 logs/l2b2-review/；没有基线对照，原因未明。
+
+分工、证据等级、设备使用顺序及可转交消息集中在 [协作总览](../17_framework_shooter_plan.md#coordination-current)。用户不用自行判断两个 AI 的测试是否等价。
+
+### 三条工作线
+
+| 工作线 | 负责人 | 当前事实 | 下一动作 |
+|---|---|---|---|
+| P：PowerShell 正式存储及 Linux 接入 | Claude 实现，Codex 复核 | L1 脚本互开已验证；L2-A 有限定范围的通过记录；B1 正常链路及补修证据已复核 | 保留官方引擎，进入隔离房间生命周期 |
+| B1 独立复验 | Codex | 已实机完成：16 步中仅既有 unit 限制失败，SSH/测试退出 1；正常两种存储模式通过 | 旧快照复验与最新补修复核分开记录，缺陷已收口 |
+| G：原生 SQLite 导入崩溃实验 | 另一 AI | 最新转述称已准备判空补丁，未安装/编译；源码哈希、补丁和当前进程未由 Codex 实机核对 | 等主线释放设备；先复核原始证据，再讨论编译与对照 |
+
+### 最新有效验证范围
+
+| 证据 | 已知结果 | 不能据此推定 |
+|---|---|---|
+| Claude Linux B1 最终轮，Codex 已读本地原始输出 | 一次性 48/0（注入 2/0），常驻 67/0（注入 5/0），替身 shell 27/0，SIGPIPE 拒绝 2/0，所有权 55/0、真实子程序 67/0；16 步失败 1 步 | 不是 Codex 独立 Linux 重跑，不是完整服务器通过 |
+| 同轮 Linux unit | 292/1，房间管理器的平台限制；汇总保持非零 | 不能删除这项失败来声称全绿 |
+| Codex 超时故障注入 | Windows 真实子进程/管道，仅替换 Linux 启动入口并注入终止失败；150 ms 截止后 828 ms 仍 pending，断言失败；随后确认清理 | 未在 Linux 实机复现，不是自然发生的 kill 失败 |
+| Codex Windows 回归 | 规则 55/0、unit 320/0、常驻存储 34/0 | 不证明 Linux 超时缺陷修好 |
+| Codex 独立 Linux 复验（10-01） | 一次性 48/0 + 注入 2/0，常驻 67/0 + 注入 5/0，助手 27/0，SIGPIPE 拒绝 2/0，所有权 55/0、67/0；unit 292/1；16 步失败 1 步 | 原源码包重跑，非新增测试设计；不证明 kill 失败边界已修好 |
+| Claude B1 超时补修（10-01，未提交，待 Codex 复核） | Linux 改为非阻塞管道和调用线程内的有界循环，不再依赖 kill 成功；停不掉时返回 `HELPER_UNFINISHED`、记录和管道保留并登记待回收（上限 4 个，满后 `HELPER_BACKLOG_FULL`）；常驻 worker 阻塞时不启第二个。Linux 实机 `20260930182509-d7d0cd`：替身 shell 27/0 + 注入 14/0（挂起、400 KiB 不读、错误输出不关，均约 0.5 秒返回），一次性 48/0 + 注入 2/0，常驻 67/0 + 注入 5/0，所有权 55/0、67/0，SIGPIPE 拒绝 2/0，收尾检查通过；unit 292/1，16 步失败 1 步。Codex 截止注入改接新代码后在 Windows 通过。Windows 回归 unit 320/0、常驻存储 34/0、账号 85/0、资产 83/0、集成 133/0 等 | kill 失败只是注入，不是自然实机失败；完整后台、房间、联机，以及 Linux 上的删除、结算、恢复都未测 |
+| Claude 绝对截止与原子预算补修（10-01，未提交，待 Codex 复核） | 每轮循环和标准错误排空都检查截止时间，迟到的回复不接受；启动前在锁内预留名额，进行中加待回收合计不超过 8，满额时不启动进程。Linux 实机 `20260930185629-ebc89a`：替身 shell 35/0 + 注入 17/0（12 个并发：峰值 8 个子进程、4 个被拒；停不掉时 8 个待回收，全部在约 0.85 秒内返回），一次性 48/0 + 注入 2/0，常驻 67/0 + 注入 5/0，收尾检查通过；unit 292/1，16 步失败 1 步。Windows 替身管道探针：新代码 3/0，旧代码 0/3；回归 unit 320/0、常驻存储 34/0、账号 85/0、资产 83/0 等 | 真实管道的持续输出测试区分不了新旧代码（旧代码也能过）；kill 失败只是注入；完整后台、房间、联机未测 |
+| Claude L2-B2 第一小项：Linux 房间生命周期（10-01，未提交，待 Codex 复核） | RoomManager 在 Linux 上接通创建、启动、注册、UDP 实际绑定后 READY、心跳、停止、确认退出、端口回收；运行目录 700、启动文件 600；工作线程启动改用一次性交接，失败时认领并停掉房间，认领不了就保留房间和端口；停不掉时重试且不释放资源；Operator 托管宿主改用交接凭据。Linux 实机 `20260930193037-54ca61`：13 步全部通过、退出 0；集成 133/0（22 个真实子进程），房间专项 22/0 + 注入 5/0，所有权 55/0、67/0，UDP、进程、启动文件无残留，**`run_unit` 318/0**（房间管理器平台限制已解除）。Windows：unit 320/0、集成 133/0、真实启动器 64/0、limits 8/0、托管关停 55/0 | Windows `run_recovery` 不稳定（5 次中 2 次在外层启动恢复宿主一步失败，未与基线对照、未归因）；Linux 上的进程日志和单房间内存上限明确拒绝；Operator、托管宿主、大厅、结算、跨机联机都没在 Linux 上跑 |
+| Claude Windows 恢复回归调查（10-01，基于 `9d82d20`，未提交，待 Codex 复核） | 两个隔离副本（b9aa587 / 9d82d20）加完全相同的诊断补丁交替对照：正常负载 22/22 对 22/22，大数据目录 8/8 对 8/8；主仓库 12/12。定位：Windows 启动后的身份核验是两级 PowerShell，外层截止 10 s，高负载下会超时，被判为 `PROCESS_IDENTITY_UNVERIFIED`；压测中基线 24/30、修复前 24/30、修复后 30/30 和 30/30。修复：保留 `HELPER_TIMEOUT`，助手级失败时只读重试一次核验，带回脱敏诊断，没有延长超时。修复后回归：unit 320/0、真实启动器 64/0、集成 133/0、limits 8/0、`run_recovery` 24/0、常驻存储 34/0、账号 85/0 | 正常运行中的原始失败没有直接抓到诊断，归因依据的是压测复现和基线对照；持续极端负载下两次核验都超时仍会失败（不杀进程）；Linux 未跑 |
+
+证据：
+
+- [Claude 最终 Linux 输出](../../logs/l2b1-linux/run-20260930171501-208b39.txt)。
+- [Claude 超时补修 Linux 输出](../../logs/l2b1-linux/run-20260930182509-d7d0cd.txt)、Windows 回归与截止注入在 `logs/l2b1-fix-review/`；说明见 [docs/17 管道超时补修结果](../17_framework_shooter_plan.md#管道超时补修结果claude2026-10-01未提交待-codex-复核)。
+- [Claude 绝对截止与预算补修 Linux 输出](../../logs/l2b1-linux/run-20260930185629-ebc89a.txt)；新旧对照和 Windows 回归在 `logs/l2b1-budget-review/`；说明见 [docs/17 绝对截止与原子预算补修结果](../17_framework_shooter_plan.md#绝对截止与原子预算补修结果claude2026-10-01未提交待-codex-复核)。
+- 恢复回归调查：`logs/recovery-bisect/`（基线/当前隔离副本、各次原始输出与退出码、核验压测、修复后回归）；说明见 [docs/17 恢复回归调查结果](../17_framework_shooter_plan.md#恢复回归调查结果claude2026-10-01未提交待-codex-复核)。
+- [Claude L2-B2 房间生命周期 Linux 输出](../../logs/l2b2-linux/run-20260930193037-54ca61.txt)；Windows 回归与 `run_recovery` 各次输出在 `logs/l2b2-review/`；说明见 [docs/17 L2-B2 第一小项结果](../17_framework_shooter_plan.md#l2-b2-第一小项结果linux-房间生命周期claude2026-10-01未提交待-codex-复核)。
+- [Codex 超时失败](../../logs/l2b1-codex-review-9a80562ebb904089a307732024ed94d8/review_timeout.txt)、[Windows 常驻回归](../../logs/l2b1-codex-review-9a80562ebb904089a307732024ed94d8/run_resident_store.txt)。
+- [Codex 独立 Linux 输出](../../logs/codex-l2b1-7f1a0ba8/verification-retry-02.txt)、[汇总](../../logs/codex-l2b1-7f1a0ba8/independent-result.txt)。成功启动入口为 RetryVerification.cmd；原源码包未改，仅收窄外层环境扫描。该运行号已使用，不重复双击。
+
+这些 logs 是本机证据，不随 Git 分发；完整历史与旧证据索引见 [归档](../archive/status_history.md#status-20261001)。
+
+前次整理的文档检查：5 份文档的 128 个本地链接路径均存在，4 个新/保留的入口锚点存在，旧 STATUS 除相对链接调整外完整归档；git diff --check 通过。未逐项重验全部历史标题锚点；当时没有运行功能测试，后续实机复验见上表。
+
+独立复验启动尝试（2026-10-01）：用户已暂停实验并在交互终端输入密码，但 SSH 返回 255，verification.txt 为空，未收到远端测试结果；具体错误只显示在原终端，待取得后再判断，不能归因为密码错误。随后只读连接探测确认 SSH 可达且主机指纹匹配；不代表认证成功。该次没有有效结果；用户再次输入密码后 retry-02 已完成复验，结果见上表。
+
+### 当前已实现
+
+Windows 上已具备管理后台、邀请码账号、按游戏隔离的永久资产、房间生命周期、结算、备份恢复及测试账号删除；示例为射击与取石子。已加入独立客户端直接启动、内容摘要配对、新后台与基础音效。用户已反馈后台登录/建房、独立客户端入退房、基础音效等试玩正常；这些反馈不扩展为完整跨设备验收。
+
+Linux 已安装官方 Godot 与 PowerShell，完成构建摘要、存储脚本、进程/权限和部分 Godot 存储接入验证。完整 Operator、房间、跨机闭环仍未完成。
+
+### 当前交付物
+
+| 入口或产物 | 用法与限制 |
+|---|---|
+| StartManagement.cmd / StopManagement.cmd | Windows 源码后台启动/停止；当前推荐 |
+| PreparePlayerClient.cmd → PlayerClient/ | 生成完整玩家目录，直接双击 Client.exe；源码更新后需重新生成并与服务配对 |
+| StartPlayerClient.cmd / StartShooterClient.cmd | 已生成客户端入口 / 源码客户端入口 |
+| clients/shooter-windows/、旧 Release 附件、独立 ZIP | 未随 Linux 工作重新生成；旧版本和证据见归档，不作为最新源码交付。Release 仍暂缓 |
+| ROADMAP.html | 离线项目地图；当前执行状态以本文及 docs/17 顶部为准 |
+
+### 未运行 / 未验收
+
+- Linux 完整后台、房间、跨机联机；Linux 删除/结算/恢复专项；Codex 对最新补修的独立 Linux 实机重跑（Claude 已跑）。
+- G 实验修补引擎的编译、首次导入对照和完整业务验证；实验目录与当前运行状态的独立核对。
+- 公网外部设备验收、TUN 共存、长期负载与耐久、最新交付包重建、GitHub 实际获取。
+- 历史专项未运行范围不因本轮整理消失，详见归档。
+
+### 已知问题与限制
+
+- B1 截止/预算缺陷已收口；8 为在途与待回收合计上限，4 为阻止新启动的阈值，常驻 worker 每库单独管理。并非保证任意操作严格在零误差的毫秒截止内结束。
+- Linux 运行前须满足 SIGPIPE 启动防护、锁定引擎提交与私有路径规则；Windows 启动方法不能原样照搬。
+- 一次性存储调用仍慢，常驻热请求快；当前测量不保证未来小云服务器性能。实验与主线可能有时间重叠，耗时需要空闲时重测。
+- G 原型首次导入崩溃尚未修复验收；不能用第二次成功或候选补丁替代首次通过。
+- 历史客户端测试有写命令文件 Access is denied 等偶发失败；未因本轮整理修复。
+
+### 工作区与交接
+
+本地 main / HEAD 为 b9aa587e5a5d9051360f6550c1f6ed8aec2db65d（本轮核实）；远端本轮未 fetch，不能据此声称同步。L2-A/B1、G 原型和驱动等仍未提交，主要由 Claude 维护；Codex 本轮整理文档，生产代码未改。没有提交推送。
+
+Linux 地址、工具路径与隔离区域见 [环境现状](../10_environment.md#linux-current)。同一工作区单方写入；同一笔记本只运行一条验收或编译任务。主线不读实验目录；若需实验核对，应另列只读范围，不隐含在主线扫描里。
+
+### 第一阶段检查（2026-09-28）
+
+文档与路线图的历史自动检查、用户反馈和清理候选未验收范围已完整迁入 [历史归档](../archive/status_history.md#status-20261001)。
+
+本轮 Codex 补充验收：真实启动器 test_launcher_real.gd 64/0、退出 0，句柄数 318 → 318；输出 logs/recovery-codex-review/launcher-corrected.txt。首条命令误写为不存在的 run_launcher_real.gd，退出 1；纠正入口后才执行专项，错误输出保留，不计产品失败。本轮未独立重跑高压矩阵或 Linux。
+
+#### Codex 事件收尾复核（2026-10-01）：防护仍需补修
+
+已阅读 logs/incident-20261001/inspect-summary.txt 和检查脚本：Claude 的副本检查报告两库完整性 ok、2 条删除作业均 done/closed、无未完成项。此为证据复核，Codex 未重新打开数据库；不能证明已过期会话未被清理，也没有启动前数据差异证据。
+
+防误启动暂不通过：tools/run_isolated_test.ps1 在规范化前按字符串前缀允许 tests/，且仅用单层 extends 正则识别服务。Codex 将 Script 设为 tests/../host/operator.gd、Godot 设为不存在的 Z:\ROOMKIT_NONEXISTENT_ENGINE.exe，实际到达第 53 行 Start-Process 而非拒绝（退出 1，找不到引擎）；没有启动 Godot。需先规范化路径、拒绝链接绕行，避免用单层源码正则作为隔离依据。
+
+tests/run_posix_operator.gd 仅检查 --games 存在，随即以 WRITE 打开其值；没有限制为本次隔离目录，因此可覆盖共享 artifacts/framework-games.json。--public-client-dir 也需完整路径边界检查，不能仅判断参数存在或与 artifacts/client 字面相等。请统一将测试数据、索引、公开配置及日志输出限制在本次隔离范围，覆盖路径穿越、链接、共享索引和间接继承入口的拒绝用例。Linux 验收继续暂停；原数据和标记保留，未提交推送。
+#### Codex 防误启动补强二次复核（2026-10-01）
+
+独立执行 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_isolated_runner.ps1：ISOLATED_RUNNER_RESULT passed=30 failed=0，进程退出 0，全程替身引擎。未启动真实 Godot，未打开数据库，未连接 Linux。
+
+仍需补齐三处边界：
+1. 重复参数：两层校验将参数折叠成字典，仅检查最后值；run_posix_operator 随后逐条处理所有 --games 并 WRITE。前置共享索引、后置隔离索引即可绕过。Codex 用不存在的 Z:\ROOMKIT_NONEXISTENT_ENGINE.exe 验证，runner 输出 service_like=True 后到达 Start-Process 第142行，退出1（找不到引擎），未按64拒绝。仅创建 data/codex-guard-092398450fe242c5998bdf9f63f8031b 隔离目录。应拒绝重复参数，再以同一份校验后的参数执行。
+2. Windows runner 只对含斜杠的参数值校验路径；必需路径参数可传空字符串/纯文件名而跳过检查。必须按参数名无条件验证必需路径，明确相对路径解析基准。
+3. Linux 自检只对 isolation 根调用 _has_link，未检查 games 等完整子路径；且未要求 games 不存在，随后直接 WRITE。须在写索引前验证完整路径无链接、目标未存在，避免已有隔离目录内的链接或旧索引被覆盖。此项为代码审阅发现，未在 Linux 实机复现。
+
+请用替身或纯校验探针覆盖三类反例；不以真实服务证明拒绝。Linux Operator 验收仍暂停。原数据/标记不动，未提交推送。
+#### Codex 防误启动三项补修复核（2026-10-01）：可恢复限定实机验收
+
+已核对重复参数拒绝、按名称检查路径，以及 Linux 完整目标链接检查/已存在索引拒绝。Operator 测试现在只向校验返回的 games 路径写一次。独立执行 tests/test_isolated_runner.ps1：38/0，退出0，替身引擎；证据 logs/incident-codex-final/runner.txt。通过 tools/run_isolated_test.ps1 执行 tests/run_operator_isolation_rules.gd：20/0、Linux链接用例未运行1项，退出0；证据 data/codex-isolation-rules-2e459b94501941eba4edafb3ae5849ea/rules.stdout 与 rules.stderr。未启动 Operator/宿主或打开真实数据库。WSL 25项输出仅阅读 Claude 证据，不作为 Codex 独立 Linux 实机通过。
+
+本次防误启动补修允许进入下一门禁：Claude 在笔记本全新源码/运行目录中先执行纯校验（含真实符号链接及非法参数拒绝），通过后仅运行 Linux Operator 第一切片和必要 Windows 回归。实验继续暂停，不用 sudo、不改防火墙、不启动完整联机，不修改真实数据/陈旧 operator.json，不提交推送。保留 RECOVERY_UNSUPPORTED 等未实现限制。静态扫描是防误操作工具，不是对任意测试代码的安全沙箱；运行前仍检查测试入口和实际隔离参数。完整宿主后续使用独立大厅/控制/房间端口。
+
+<a id="status-20261001-l3-closeout"></a>
+## 2026-10-01 注销收尾前的 STATUS 第一屏
+
+收尾结果交付时从 `STATUS.md` 逐字迁出（降一级标题、链接改为从本目录出发）。
+
+### 最新结论：L3 同机功能已交付，耐久仍未通过（2026-10-01，未提交）
+
+按 [连续任务单](../17_framework_shooter_plan.md#linux-batch-current) 推进，阶段终点仍需耐久收尾。详细结果、命令和证据见 [docs/17 阶段交付](../17_framework_shooter_plan.md#l3-stage-delivery)。
+
+**Codex 当前决定**：允许仅对已知旧会话注销做有限补发，Claude 连续修复后复验 Linux C/D/E（含完整60分钟）及受影响的 Windows 回归；具体上限、旧令牌安全边界和测试见 [收尾任务](../17_framework_shooter_plan.md#l3-logout-closeout)。Codex 已核对最终 Linux 原始日志，未独立重跑 Linux；另用 Windows 真实 Godot + 假存储/假通道确认“注销失败仍丢弃内存清理责任”缺陷，探针 **1/2、引擎退出1**，不是真实联机测试。证据 `data/codex-l3-logout-review-b7ba44f1d1a84b22af250bf3797fd346/logout.stdout`，未启动真实服务/数据库。
+
+- **Linux 笔记本最终轮** `20261001060258-bdccea`：45 步中 44 步通过；**60 分钟耐久 1 步失败**（78 个周期中 75 个通过）。
+  - 通过：进程日志与跨运行只读恢复、房间内存上限、Linux 维护（指标、备份、恢复）、真实托管宿主、账号删除与迟到结算、正式入口 `tools/roomkit_linux.sh`（隔离实例，只绑 127.0.0.1）、两个真实无窗口客户端完整对局与签名结算、备份恢复、停止重启后数据保留、杀掉本轮创建并核验的 Operator 后宿主和房间自行退出并只读恢复、无残留、无误杀、无秘密残留，unit 318/0。
+  - 失败：耐久后段有 3 个周期因 `ALREADY_LOGGED_IN` 失败。推断原因（未证实）：CPU 93–100% 时，存储助手偶发拒绝，玩家退出时的会话注销丢失，会话一直残留；管理请求也有 2 次被拒，导致 2 个房间没关掉。注销补发范围已由上面的收尾任务明确，尚未实现/复验；历史提议见 [原待决事项](../17_framework_shooter_plan.md#l3-decisions)；已加只记操作名和错误码的诊断日志。
+- **Windows 回归**：见 docs/17 阶段交付的最终源码回归表。
+- **未运行**：Windows 客户端连 Linux（下一阶段，需要防火墙决定）、公网、导出包、长期或云端容量。

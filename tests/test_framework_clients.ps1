@@ -1,16 +1,20 @@
-param([switch]$Visual,[string]$Godot='D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe')
+param([switch]$Visual,[string]$Godot='',[string]$GamesIndex='')
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'support/portable.ps1')
+$Godot=Rk-Godot $Godot
 [Net.ServicePointManager]::Expect100Continue=$false
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $pointer=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $project 'run/operator-test-context.json') | ConvertFrom-Json
 $ctx=Get-Content -Encoding UTF8 -Raw -LiteralPath $pointer.path | ConvertFrom-Json
-$builds=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $project 'artifacts/framework-games.json') | ConvertFrom-Json
+# GamesIndex: the index the Operator under test uses (default: the shared build index).
+if(-not $GamesIndex){$GamesIndex=Join-Path $project 'artifacts/framework-games.json'}
+$builds=Get-Content -Encoding UTF8 -Raw -LiteralPath $GamesIndex | ConvertFrom-Json
 $runId=[Guid]::NewGuid().ToString('N')
 $evidence=Join-Path $ctx.evidence ('clients-'+$runId)
 $private=Join-Path $ctx.test_root ('clients-'+$runId)
 foreach($candidate in @($evidence,$private)) {
     $resolved=[IO.Path]::GetFullPath($candidate)
-    if(-not $resolved.StartsWith($project.TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Test directory outside project'}
+    if(-not (Rk-Inside $resolved $project)){throw 'Test directory outside project'}
     New-Item -ItemType Directory -Path $resolved -Force | Out-Null
 }
 $utf8=New-Object Text.UTF8Encoding($false)
@@ -62,8 +66,7 @@ function Start-Client([string]$name,[string]$game,$credentials=$null,[bool]$regi
     Save-Json $bootstrap @{connection=$connection;manifest=$builds.$game.manifest;game_id=$game;username=$credentials.username;password=$credentials.password;display_name=$credentials.display_name;invite_code=$ctx.invite_code;register=$register;report_path=$report;control_directory=$directory;timeout_ms=1000000}
     $arguments=@('--path',$project,'--script','res://tests/run_framework_clients.gd','--',('--test-config='+$bootstrap))
     if(-not $Visual){$arguments=@('--headless')+$arguments}
-    $quoted=foreach($argument in $arguments){'"'+($argument -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"'}
-    $process=Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $directory 'console.log') -RedirectStandardError (Join-Path $directory 'stderr.log')
+    $process=Rk-StartHidden $Godot $arguments (Join-Path $directory 'console.log') (Join-Path $directory 'stderr.log')
     $ownedHandle=$process.Handle
     $client=@{name=$name;game=$game;directory=$directory;report=$report;process=$process;handle=$ownedHandle;credentials=$credentials;user_id=''}
     [void]$script:clients.Add($client)
@@ -119,7 +122,9 @@ try {
     $moved=Wait-Report $one {param($r) (Player $r $one.user_id).x -gt 325} 6
     [void](Command $one 'input' @{move=0;duration_ms=0})
     Check ((Player $moved $one.user_id).x -gt 325) 'real server movement reaches open firing lane'
-    $killDeadline=[DateTime]::UtcNow.AddSeconds(35)
+    # Up to 90 s of real fire inside the 300 s round (35 s was too short on the
+    # slower Linux laptop: 3 hits, target at 25 hp, in run 20261001093407-3c5c8d).
+    $killDeadline=[DateTime]::UtcNow.AddSeconds(90)
     $jumpClock=[Diagnostics.Stopwatch]::StartNew()
     do {
         $r=Report $one
@@ -184,11 +189,15 @@ try {
     Check ((Player $jade $turnOne.user_id).theme -eq 'jade') 'non-shooter adapter receives and renders confirmed theme'
     $noTheme=Command $turnOne 'select' @{slot='theme';item_id='classic';operation_id=('seated_'+$runId)}
     Check (-not $noTheme.ok -and $noTheme.code -eq 'ASSET_OPERATION_DENIED') 'non-shooter room applies lobby-only policy without death rules'
-    for($i=0;$i-lt 6;$i++){
+    # Each move goes to the player the latest report names as active, and the next
+    # move waits until the reports show that turn taken (a fixed sleep raced the
+    # 200 ms report interval: a move could go to the player who was not active).
+    for($i=0;$i-lt 12 -and [int](Report $turnOne).world.round -lt 2;$i++){
         $r=Report $turnOne
+        $turn=[int]$r.world.turn
         $active=if($r.world.active_user -eq $turnOne.user_id){$turnOne}else{$turnTwo}
         [void](Command $active 'choose' @{take=2})
-        Start-Sleep -Milliseconds 120
+        try{[void](Wait-Report $turnOne {param($x) [int]$x.world.turn -gt $turn -or [int]$x.world.round -ge 2} 5)}catch{}
     }
     [void](Wait-Report $turnOne {param($r) $r.world.round -ge 2} 10)
     Check $true 'real non-shooter turns complete a round through separate gameplay protocol'

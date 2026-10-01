@@ -13,10 +13,12 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $ownedProcess = $null
 $result = @{ state = 'unknown'; code = 'PROCESS_IDENTITY_UNVERIFIED' }
+$stage = 'arguments'
 try {
     if ($Mode -ne 'capture' -and $ExpectedCreationFileTime -notmatch '^\d+$') {
         throw 'Expected creation time required.'
     }
+    $stage = 'lookup'
     try {
         $ownedProcess = [System.Diagnostics.Process]::GetProcessById($ProcessId)
     } catch [System.ArgumentException] {
@@ -30,10 +32,14 @@ try {
     if ($ownedProcess.HasExited) {
         $result = @{ state = 'exited'; code = '' }
     } else {
+        $stage = 'start_time'
         $creation = $ownedProcess.StartTime.ToUniversalTime().ToFileTimeUtc().ToString()
+        $stage = 'main_module'
         $actualExecutable = [System.IO.Path]::GetFullPath($ownedProcess.MainModule.FileName)
         $expectedPath = [System.IO.Path]::GetFullPath($ExpectedExecutable)
+        $stage = 'cim'
         $metadata = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $ProcessId" -OperationTimeoutSec 3
+        $stage = 'compare'
         $marker = '(?<!\S)"?--launch-id=' + [regex]::Escape($LaunchId) + '"?(?=\s|$)'
         $matchesIdentity = $null -ne $metadata `
             -and [string]::Equals($actualExecutable, $expectedPath, [StringComparison]::OrdinalIgnoreCase) `
@@ -42,6 +48,14 @@ try {
             -and ($Mode -eq 'capture' -or $creation -eq $ExpectedCreationFileTime)
         if ($ownedProcess.HasExited) {
             $result = @{ state = 'exited'; code = '' }
+        } elseif (-not $matchesIdentity) {
+            $result.stage = 'mismatch'
+            $result.error = (@(
+                $(if ($null -eq $metadata) { 'no_metadata' }),
+                $(if (-not [string]::Equals($actualExecutable, $expectedPath, [StringComparison]::OrdinalIgnoreCase)) { 'executable' }),
+                $(if ($null -ne $metadata -and [int]$metadata.ParentProcessId -ne $ExpectedParentPid) { 'parent' }),
+                $(if ($null -ne $metadata -and -not [regex]::IsMatch([string]$metadata.CommandLine, $marker)) { 'marker' })
+            ) | Where-Object { $_ }) -join '+'
         } elseif ($matchesIdentity) {
             $result = @{ state = 'running'; code = ''; created_filetime = $creation }
             if ($Mode -eq 'inspect') {
@@ -74,7 +88,7 @@ public static class RoomKitOwnedProcess {
     }
 } catch {
     # Fail closed. An inaccessible or unverified process is never killed.
-    $result = @{ state = 'unknown'; code = 'PROCESS_IDENTITY_UNVERIFIED' }
+    $result = @{ state = 'unknown'; code = 'PROCESS_IDENTITY_UNVERIFIED'; stage = $stage; error = $_.Exception.GetType().Name }
 } finally {
     if ($null -ne $ownedProcess) { $ownedProcess.Dispose() }
 }

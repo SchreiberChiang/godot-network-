@@ -1,8 +1,12 @@
 param()
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$testRoot=Join-Path $project ('data\test-maintenance-'+[Guid]::NewGuid().ToString('N'))
+$testRoot=Join-Path (Join-Path $project 'data') ('test-maintenance-'+[Guid]::NewGuid().ToString('N'))
 $utf8=New-Object Text.UTF8Encoding($false)
+# Runs under Windows PowerShell 5.1 and under pwsh on Linux (no $IsLinux on 5.1).
+$posix=[IO.Path]::DirectorySeparatorChar -eq '/'
+$sep=[string][IO.Path]::DirectorySeparatorChar
+function Mode([string]$Path) { return [int][IO.File]::GetUnixFileMode($Path) }
 $passed=0
 $failed=0
 function Check([bool]$Value,[string]$Label) {
@@ -21,8 +25,16 @@ function ReadScalar([string]$Database,[string]$Sql,[string]$Column) {
     try { return $handle.Query($Sql,@())[0][$Column] } finally { $handle.Dispose() }
 }
 try {
-    $ready=& (Join-Path $project 'tools/protect_data.ps1') -ProjectRoot $project -DataRoot $testRoot
-    if ($ready -notcontains 'PRIVATE_DATA_READY') { throw 'Private fixture failed' }
+    if ($posix) {
+        # Linux counterpart of protect_data.ps1 for this fixture: data and the test root 700.
+        foreach($folder in @((Join-Path $project 'data'),$testRoot)) {
+            [void][IO.Directory]::CreateDirectory($folder)
+            [IO.File]::SetUnixFileMode($folder,[IO.UnixFileMode]'UserRead,UserWrite,UserExecute')
+        }
+    } else {
+        $ready=& (Join-Path $project 'tools/protect_data.ps1') -ProjectRoot $project -DataRoot $testRoot
+        if ($ready -notcontains 'PRIVATE_DATA_READY') { throw 'Private fixture failed' }
+    }
     $source=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $project 'tools/sqlite_store.ps1')
     $binding=[regex]::Match($source,"(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@")
     Add-Type -TypeDefinition $binding.Groups[1].Value
@@ -59,6 +71,10 @@ try {
     $backupDir=Join-Path (Join-Path $testRoot 'backups') $backup.backup_id
     Check ((Test-Path -LiteralPath (Join-Path $backupDir 'server.key')) -and (Test-Path -LiteralPath (Join-Path $backupDir 'config.json'))) 'private TLS and operator config included'
     Check ((ConvertTo-Json -InputObject $backup -Depth 12) -notmatch 'fixture-private-key|fixture-token-digest') 'backup response redacts credentials'
+    if ($posix) {
+        $loose=@(Get-ChildItem -LiteralPath $backupDir -File -Force | Where-Object { (Mode $_.FullName) -ne 384 })
+        Check ((Mode (Join-Path $testRoot 'backups')) -eq 448 -and (Mode $backupDir) -eq 448 -and $loose.Count -eq 0 -and (Mode (Join-Path $testRoot 'maintenance-audit.jsonl')) -eq 384 -and (Mode (Join-Path $testRoot 'maintenance.lock')) -eq 384) ('Linux: backup folders 700, backup files, audit and lock 600 (loose: '+$loose.Count+')')
+    }
     $listed=InvokeMaintenance @{op='backup.list'}
     $publicBackup=@($listed.backups | Where-Object backup_id -eq $backup.backup_id)[0]
     $actualBytes=0L
@@ -135,17 +151,20 @@ try {
     [IO.File]::Delete($outsideRequest)
     Check (-not $outside.ok -and $outside.code -eq 'INVALID_DATA_PATH') 'project root outside private data subtree refused'
     $junction=Join-Path $testRoot 'reparse-fixture'
-    [void](New-Item -ItemType Junction -Path $junction -Target (Join-Path $testRoot 'backups'))
+    # Windows: an NTFS junction; Linux: a symbolic link to a folder.
+    [void](New-Item -ItemType $(if ($posix) {'SymbolicLink'} else {'Junction'}) -Path $junction -Target (Join-Path $testRoot 'backups'))
     $junctionRequest=Join-Path $testRoot 'junction-request.json'
     try {
         [IO.File]::WriteAllText($junctionRequest,(@{op='backup.list';root=$junction}|ConvertTo-Json -Compress),$utf8)
         $reparse=(& (Join-Path $project 'tools/operator_maintenance.ps1') -Request $junctionRequest) | ConvertFrom-Json
-        Check (-not $reparse.ok -and $reparse.code -eq 'REPARSE_POINT_REFUSED') 'actual NTFS junction in data path refused'
+        Check (-not $reparse.ok -and $reparse.code -eq 'REPARSE_POINT_REFUSED') $(if ($posix) {'actual symbolic link in data path refused'} else {'actual NTFS junction in data path refused'})
     } finally {
         [IO.File]::Delete($junctionRequest)
         $junctionFull=[IO.Path]::GetFullPath($junction)
-        if (-not $junctionFull.StartsWith($testRoot+'\',[StringComparison]::OrdinalIgnoreCase) -or -not ((Get-Item -LiteralPath $junctionFull -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Junction cleanup identity mismatch' }
-        [IO.Directory]::Delete($junctionFull,$false)
+        $comparison=if ($posix) { [StringComparison]::Ordinal } else { [StringComparison]::OrdinalIgnoreCase }
+        if (-not $junctionFull.StartsWith($testRoot+$sep,$comparison) -or -not ((Get-Item -LiteralPath $junctionFull -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Junction cleanup identity mismatch' }
+        # Removes the link itself, never the folder it points to.
+        if ($posix) { [IO.File]::Delete($junctionFull) } else { [IO.Directory]::Delete($junctionFull,$false) }
     }
     Check (Test-Path -LiteralPath (Join-Path $testRoot 'backups')) 'junction cleanup retains real backup directory'
     Check ((ReadScalar 'accounts.sqlite' 'PRAGMA integrity_check' 'integrity_check') -eq 'ok' -and (ReadScalar 'assets.sqlite' 'PRAGMA integrity_check' 'integrity_check') -eq 'ok') 'both live SQLite databases retain integrity'

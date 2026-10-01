@@ -1,6 +1,6 @@
 # RoomKit：独立的本地房间框架
 
-在 Windows 本机运行的多游戏房间框架，从零开发：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`（已整合原 `codex/shooter-framework` 成果）；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能已有验收；Linux 笔记本已完成部分基础与存储测试，完整服务端、跨设备联机和公网仍未验收。
+在 Windows 本机运行的多游戏房间框架，从零开发：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`（已整合原 `codex/shooter-framework` 成果）；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能已有验收；Linux 笔记本已跑通同机完整服务的大部分自动验收，L3 尚有两项收尾门槛，跨设备联机和公网仍未验收。
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
@@ -37,6 +37,18 @@
 
 房间规则设置、背包与复活、局域网配置、备份恢复、客户端窗口排查和命令行等价入口，见 [本机启动与验证](docs/22_framework_operations.md)。
 
+## Linux 源码启动（同机测试）
+
+需要 Godot 4.7.2 官方 Linux 版、pwsh 7.6 和系统的 `libsqlite3.so.0`；引擎和 pwsh 的位置默认在 `~/roomkit/tools`，也可以用 `ROOMKIT_GODOT`、`ROOMKIT_PWSH` 指定。在项目目录下：
+
+```bash
+bash tools/roomkit_linux.sh start     # 打印面板地址，默认 http://127.0.0.1:28491/
+bash tools/roomkit_linux.sh status
+bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
+```
+
+每个实例的数据、游戏索引、公开配置和 HOME/XDG/tmp 都在 `data/instance-<名>/`（默认 `l3`），默认只绑定 127.0.0.1；端口可以用 `--panel-port`、`--lobby-port`、`--control-port`、`--udp-range`、`--bind` 指定，但只在实例第一次创建时生效。目前只在一台 x86_64 笔记本上做过同机自动验收，跨机连接和公网还没有验收，结果与已知问题见 [STATUS](STATUS.md)。
+
 ## 独立 Windows 包（无需 Godot 编辑器）
 
 运行 `tools/build_framework_release.ps1` 构建。最新 ZIP 和解压位置记录在 `artifacts/framework-release.json`。解压后按顺序：`CheckFramework.cmd` 校验 → `StartPanel.cmd` 打开管理后台 → 玩家用 `StartShooter.cmd` / `StartTurns.cmd` → 全部关闭用 `StopFramework.cmd`；`PublishClients.cmd` 生成给玩家的公开连接配置。只分发构建时的干净 ZIP，不要分发跑过测试的解压目录。
@@ -57,7 +69,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\new_game.ps1 -Manage
 
 ## 文档导航
 
-目前已完成项目地图、主线整理、独立客户端、后台 UI 和基础音效，正在推进 Linux；当前先收口存储接入复验与超时补修，分工见 [协作总览](docs/17_framework_shooter_plan.md#coordination-current)。见 [已确认规划](docs/17_framework_shooter_plan.md#next-plan)、[清理候选表](docs/17_framework_shooter_plan.md#清理候选表) 和 [下一阶段建议](docs/17_framework_shooter_plan.md#下一阶段实施建议与验收门槛)。
+目前已完成项目地图、主线整理、独立客户端、后台 UI 和基础音效，Linux 同机阶段验收已交付并待复核，见 [阶段交付](docs/17_framework_shooter_plan.md#l3-stage-delivery)；分工见 [协作总览](docs/17_framework_shooter_plan.md#coordination-current)。见 [已确认规划](docs/17_framework_shooter_plan.md#next-plan)、[清理候选表](docs/17_framework_shooter_plan.md#清理候选表) 和 [下一阶段建议](docs/17_framework_shooter_plan.md#下一阶段实施建议与验收门槛)。
 
 | 需要了解 | 文档 |
 |---|---|

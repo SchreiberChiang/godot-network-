@@ -15,6 +15,7 @@ extends RefCounted
 ## repeated admin request or from the Operator's start-up. Success is reported only
 ## after step 5.
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
+const PrivatePath = preload("res://host/platform/posix_private_path.gd")
 const JOURNAL := "account-deletions.jsonl"
 
 ## Same pseudonym as account_store.ps1 and sqlite_store.ps1 derive.
@@ -133,6 +134,9 @@ static func append_journal(root: String, entry: Dictionary) -> bool:
 	file.flush()
 	var error := file.get_error()
 	file.close()
+	# Linux: owner-only whatever umask the Operator was started with.
+	if OS.get_name() == "Linux" and not PrivatePath.protect_file(path, root).ok:
+		return false
 	return error == OK and FileAccess.get_file_as_string(path).contains(line)
 
 ## backup_id -> pseudonyms of deleted accounts that backup may still contain.
@@ -182,6 +186,8 @@ static func _replace_file(path: String, text: String) -> bool:
 	file.flush()
 	var error := file.get_error()
 	file.close()
+	if error == OK and OS.get_name() == "Linux" and not PrivatePath.protect_file(path + ".tmp", path.get_base_dir()).ok:
+		error = FAILED
 	if error != OK or DirAccess.rename_absolute(path + ".tmp", path) != OK:
 		DirAccess.remove_absolute(path + ".tmp")
 		return false

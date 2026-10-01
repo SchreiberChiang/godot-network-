@@ -1,4 +1,4 @@
-param([string]$Godot='D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe')
+param([string]$Godot='')
 # Test-stage account deletion through a real, isolated Operator (docs/17 section 7):
 # a real managed host and room, two real WSS clients (the victim sits in the room),
 # admin protection, typed confirmation, online kick, old credentials, other player
@@ -7,14 +7,18 @@ param([string]$Godot='D:\SteamLibrary\steamapps\common\Godot Engine\godot.window
 # incomplete and finished by a retry, administrator reasons that name the account, and
 # deletions interrupted before and after the database steps finished on Operator start-up. Only fake accounts in data\test-account-deletion-<id> are touched.
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'support/portable.ps1')
+$Godot=Rk-Godot $Godot
 [Net.ServicePointManager]::Expect100Continue=$false
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $testId=[Guid]::NewGuid().ToString('N')
-$testRoot=Join-Path $project ('data\test-account-deletion-'+$testId)
-$evidence=Join-Path $project ('logs\account-deletion-'+$testId)
+$testRoot=Join-Path (Join-Path $project 'data') ('test-account-deletion-'+$testId)
+$evidence=Join-Path (Join-Path $project 'logs') ('account-deletion-'+$testId)
 New-Item -ItemType Directory -Path $evidence -Force | Out-Null
-& (Join-Path $project 'tools\protect_data.ps1') -ProjectRoot $project -DataRoot $testRoot | Out-Null
-& (Join-Path $project 'tools\protect_runtime.ps1') -ProjectRoot $project | Out-Null
+Rk-ProtectData $project $testRoot
+Rk-ProtectRuntime $project
+$gamesIndex=Join-Path $testRoot 'games.json'
+Copy-Item -LiteralPath (Join-Path $project 'artifacts/framework-games.json') -Destination $gamesIndex
 $utf8=New-Object Text.UTF8Encoding($false)
 function Free-TcpPort { $l=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0); $l.Start(); $n=$l.LocalEndpoint.Port; $l.Stop(); return $n }
 function Save-Json($path,$value) { [IO.File]::WriteAllText($path,($value | ConvertTo-Json -Depth 40 -Compress),$utf8) }
@@ -37,10 +41,9 @@ function Check($condition,$name) {
     if ($condition) { $script:passed++; Write-Output ('PASS '+$name) } else { $script:failed++; Write-Output ('FAIL '+$name) }
 }
 function Start-Operator([string]$Label) {
-    $arguments=@('--headless','--path',$project,'--log-file',(Join-Path $evidence ('operator-'+$Label+'.log')),'--script','res://host/operator.gd','--',('--data-root='+$testRoot),('--panel-port='+$panelPort))
-    $quoted=foreach($a in $arguments) { '"'+($a -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }
-    $p=Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $evidence ('console-'+$Label+'.log')) -RedirectStandardError (Join-Path $evidence ('stderr-'+$Label+'.log'))
-    $null=$p.Handle
+    # Index copy and public client files inside this test's folder (never artifacts/client).
+    $arguments=@('--headless','--path',$project,'--log-file',(Join-Path $evidence ('operator-'+$Label+'.log')),'--script','res://host/operator.gd','--',('--data-root='+$testRoot),('--panel-port='+$panelPort),('--games='+$gamesIndex),('--public-client-dir='+(Join-Path $testRoot 'public')))
+    $p=Rk-StartHidden $Godot $arguments (Join-Path $evidence ('console-'+$Label+'.log')) (Join-Path $evidence ('stderr-'+$Label+'.log'))
     $deadline=[DateTime]::UtcNow.AddSeconds(60)
     $ready=$false
     while (-not $ready -and [DateTime]::UtcNow -lt $deadline -and -not $p.HasExited) {
@@ -67,10 +70,8 @@ function Offline-Helper([hashtable]$Config) {
     $Config.data_root=$testRoot
     Save-Json $private $Config
     $arguments=@('--headless','--path',$project,'--script','res://tests/fixtures/deletion_offline.gd','--',('--config='+$private))
-    $quoted=foreach($a in $arguments) { '"'+($a -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }
     $log=Join-Path $evidence ('offline-'+$Config.mode+'.log')
-    $p=Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError ($log+'.stderr')
-    $null=$p.Handle
+    $p=Rk-StartHidden $Godot $arguments $log ($log+'.stderr')
     if (-not $p.WaitForExit(120000)) { $p.Kill(); return $null }
     Remove-Item -LiteralPath $private -ErrorAction SilentlyContinue
     $line=Select-String -Path $log -Pattern '^DELETION_OFFLINE (.+)$' | Select-Object -Last 1
@@ -81,15 +82,13 @@ function Start-Client([string]$Name,[hashtable]$Extra) {
     $directory=Join-Path $evidence $Name
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
     $bootstrap=Join-Path $testRoot ('client-'+$Name+'.json')
-    $builds=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $project 'artifacts/framework-games.json') | ConvertFrom-Json
+    $builds=Get-Content -Encoding UTF8 -Raw -LiteralPath $gamesIndex | ConvertFrom-Json
     $connection=@{url=('wss://127.0.0.1:'+$settings.lobby_port);ca_certificate=(Join-Path $testRoot 'server.crt');server_hostname='localhost';game_id='shooter'}
     $config=@{connection=$connection;manifest=$builds.shooter.manifest;game_id='shooter';report_path=(Join-Path $directory 'report.json');control_directory=$directory;timeout_ms=600000;register=$true}
     foreach($k in $Extra.Keys) { $config[$k]=$Extra[$k] }
     Save-Json $bootstrap $config
     $arguments=@('--headless','--path',$project,'--script','res://tests/run_deletion_client.gd','--',('--test-config='+$bootstrap))
-    $quoted=foreach($a in $arguments) { '"'+($a -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }
-    $p=Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $directory 'console.log') -RedirectStandardError (Join-Path $directory 'stderr.log')
-    $null=$p.Handle
+    $p=Rk-StartHidden $Godot $arguments (Join-Path $directory 'console.log') (Join-Path $directory 'stderr.log')
     return @{process=$p;directory=$directory;report=(Join-Path $directory 'report.json')}
 }
 function Wait-Report($client,[scriptblock]$Condition,[int]$Seconds) {
@@ -153,13 +152,15 @@ try {
     Check ((Online $victimId) -and (Api 'account.get' @{user_id=$victimId}).ok) 'refusals left the victim untouched'
     # Operator audit write failure during the close-out: incomplete, then a retry finishes.
     $auditPath=Join-Path $testRoot 'operator-audit.jsonl'
-    Set-ItemProperty -LiteralPath $auditPath -Name IsReadOnly -Value $true
+    # A folder on the audit's temporary path makes its rewrite fail on every platform
+    # (a read-only file does not stop a rename on Linux).
+    New-Item -ItemType Directory -Path ($auditPath+'.tmp') | Out-Null
     $sensitive='cleanup of '+$victimName.ToUpperInvariant()+' ('+$victimId+')'
     $first=Api 'account.delete' @{user_id=$victimId;confirm_username=$victimName.ToUpperInvariant();reason=$sensitive}
     Save-Json (Join-Path $evidence 'delete-response-incomplete.json') $first
     Check ((-not $first.ok) -and $first.code -eq 'ACCOUNT_DELETION_INCOMPLETE' -and $first.payload.stage -eq 'operator' -and $first.payload.cause -eq 'AUDIT_WRITE_FAILED') ('operator audit write failure reported as incomplete ('+$first.code+'/'+$first.payload.stage+'/'+$first.payload.cause+')')
     Check ((Api 'account.get' @{user_id=$victimId}).code -eq 'ACCOUNT_ALREADY_DELETED' -and [IO.File]::ReadAllText($auditPath).Contains($victimId)) 'both databases done but the operator audit still pending'
-    Set-ItemProperty -LiteralPath $auditPath -Name IsReadOnly -Value $false
+    [IO.Directory]::Delete($auditPath+'.tmp',$false)
     $clock=[Diagnostics.Stopwatch]::StartNew()
     $deleted=Api 'account.delete' @{user_id=$victimId;confirm_username=$victimName;reason=$sensitive}
     $clock.Stop()
@@ -192,7 +193,7 @@ try {
     Check (@($backups | Where-Object { $_.backup_id -eq $olderBackup -and $_.deleted_accounts -eq 1 }).Count -eq 1) 'backup list marks the older backup'
     $files=([IO.File]::ReadAllText((Join-Path $testRoot 'account-deletions.jsonl'))+[IO.File]::ReadAllText($auditPath)+[IO.File]::ReadAllText((Join-Path $testRoot 'maintenance-audit.jsonl'))).ToLowerInvariant()
     Check ($files.Contains('"event":"done"') -and $files.Contains('account.delete') -and -not $files.Contains($victimId) -and -not $files.Contains($victimName)) 'journal, operator audit and maintenance audit free of the user_id and username'
-    $scan=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $project 'tests\fixtures\deletion_database.ps1') -Directory $testRoot -Mode scan -Needles ($victimId+','+$victimName) | ConvertFrom-Json
+    $scan=& (Rk-PowerShell) -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $project 'tests/fixtures/deletion_database.ps1') -Directory $testRoot -Mode scan -Needles ($victimId+','+$victimName) | ConvertFrom-Json
     Check ($scan.ok -and $scan.total -eq 0) ('no row in either current database mentions the victim, reasons included ('+(ConvertTo-Json $scan.tables -Compress)+')')
 
     # Interruptions while the Operator is stopped: one job after the account step only,
@@ -224,7 +225,7 @@ try {
     $sha=[Security.Cryptography.SHA256]::Create()
     $fourthSubject='deleted_'+[BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($fourthId))).Replace('-','').ToLowerInvariant().Substring(0,32)
     Check ($afterRestart.Contains('"subject":"'+$fourthSubject+'"') -and $afterRestart.Contains($olderBackup)) 'journal entry for the resumed close-out lists the older backup'
-    $scan=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $project 'tests\fixtures\deletion_database.ps1') -Directory $testRoot -Mode scan -Needles ($thirdId+','+$thirdName+','+$fourthId+','+$fourthName) | ConvertFrom-Json
+    $scan=& (Rk-PowerShell) -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $project 'tests/fixtures/deletion_database.ps1') -Directory $testRoot -Mode scan -Needles ($thirdId+','+$thirdName+','+$fourthId+','+$fourthName) | ConvertFrom-Json
     Check ($scan.ok -and $scan.total -eq 0) ('no row in either current database mentions the resumed accounts ('+(ConvertTo-Json $scan.tables -Compress)+')')
 
     # Restoring the older backup brings the deleted account back, as the page warns.

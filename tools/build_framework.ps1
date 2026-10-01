@@ -1,13 +1,21 @@
-param([string]$IndexPath = '')
+# BuildRoot: parent folder of the prepared game projects (default: artifacts);
+# the Linux start entry keeps them inside its instance folder.
+param([string]$IndexPath = '', [string]$BuildRoot = '')
 $ErrorActionPreference='Stop'
-$projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$buildRoot=Join-Path $projectRoot ('artifacts\framework-'+[Guid]::NewGuid().ToString('N'))
+# Runs under Windows PowerShell 5.1 and pwsh on Linux: paths use '/', which both accept.
+$projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
+$sep=[string][IO.Path]::DirectorySeparatorChar
+$comparison=if ($sep -eq '/') { [StringComparison]::Ordinal } else { [StringComparison]::OrdinalIgnoreCase }
+if ($BuildRoot -eq '') { $BuildRoot=Join-Path $projectRoot 'artifacts' }
+$BuildRoot=[IO.Path]::GetFullPath($BuildRoot).TrimEnd('\','/')
+if (-not $BuildRoot.StartsWith($projectRoot+$sep,$comparison)) { throw 'Framework build folder must stay within this project.' }
+$buildRoot=Join-Path $BuildRoot ('framework-'+[Guid]::NewGuid().ToString('N'))
 $entries=@{}
 $services=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $projectRoot 'examples/framework/services.json') | ConvertFrom-Json
 $utf8=New-Object Text.UTF8Encoding($false)
-if ($IndexPath -eq '') { $IndexPath=Join-Path $projectRoot 'artifacts\framework-games.json' }
+if ($IndexPath -eq '') { $IndexPath=Join-Path $projectRoot 'artifacts/framework-games.json' }
 $IndexPath=[IO.Path]::GetFullPath($IndexPath)
-if (-not $IndexPath.StartsWith($projectRoot+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Framework index must stay within this project.' }
+if (-not $IndexPath.StartsWith($projectRoot+$sep,$comparison)) { throw 'Framework index must stay within this project.' }
 New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($IndexPath)) | Out-Null
 . (Join-Path $PSScriptRoot 'content_digest.ps1')
 foreach($item in @(@{id='shooter';source='shooter'},@{id='turns';source='turn_based'})) {

@@ -3,7 +3,8 @@ extends SceneTree
 ## children (examples/minimal/room.gd), owned by the process owner. Complements
 ## tests/run_integration.gd (normal lifecycle, timeouts, crash, forced stop,
 ## forged registration), which also runs on Linux now.
-## Covered here: private runtime files, start on a worker thread with the
+## Covered here: the process journal (Linux record, removed after a confirmed
+## exit), the per-room memory limit, private runtime files, start on a worker thread with the
 ## single-use hand-over, a failed hand-over, a child that exits at once, a record
 ## that no longer matches (quarantine), and a stop that cannot be confirmed.
 ## Lines marked INJECTED replace a launcher answer (hand-over, reclaim or stop
@@ -117,15 +118,46 @@ func _run() -> void:
 	var children_before := _children()
 	print("INFO engine=", Engine.get_version_info().string, " children_at_start=", children_before)
 
-	# ---- refusals that must not be skipped silently ----
-	var refused = Manager.new()
-	var journal := settings.duplicate(true)
-	journal.process_journal = "res://run/test-journal.json"
-	journal.control_port = 28199
-	check(refused.initialize(journal).code == "RECOVERY_UNSUPPORTED", "the process journal (Windows helpers) is refused on Linux instead of being skipped")
-	var limited := settings.duplicate(true)
-	limited.max_room_memory_mb = 256
-	check(Manager.new().initialize(limited).code == "RESOURCE_LIMIT_UNSUPPORTED", "a per-room memory limit is refused on Linux instead of being silently not enforced")
+	# ---- process journal: reserved before the start, the Linux record after it ----
+	var journal_folder := "res://data/posix-rooms-journal"
+	var journal_path := ProjectSettings.globalize_path(journal_folder.path_join("processes.json"))
+	var journalled = Manager.new()
+	var with_journal := settings.duplicate(true)
+	with_journal.process_journal = journal_path
+	with_journal.control_port = 28199
+	with_journal.udp_first = 28170
+	with_journal.udp_last = 28179
+	check(journalled.initialize(with_journal, InjectedLauncher.new()).ok and _mode(journal_path) == 384 and _mode(journal_path.get_base_dir()) == 448, "a room manager with a process journal initialises on Linux; the journal is 600 in a 700 folder")
+	_fixture(journalled, "")
+	var logged: Dictionary = journalled.create_room("minimal_room", options)
+	check(logged.ok and await _wait(journalled, func(): return journalled.snapshot(logged.room_id).get("heartbeats", 0) >= 2), "a room with the journal becomes READY")
+	var logged_row: Dictionary = journalled.rooms.get(logged.get("room_id", ""), {})
+	var on_disk: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(journal_path))
+	var entry: Dictionary = on_disk.entries.get(logged_row.get("launch_id", ""), {})
+	check(not entry.is_empty() and int(entry.port) == int(logged_row.port) and entry.owned.get("platform", "") == "linux" and int(entry.owned.pid) == int(logged_row.pid) and entry.owned.boot_id == Launcher.boot_id() and Launcher.inspect_previous(entry.owned).state == "running", "the journal holds the room's port and its Linux record (pid, start time, boot id); read-only inspection sees it running")
+	check(not FileAccess.get_file_as_string(journal_path).contains("token"), "the journal holds no token")
+	journalled.stop_room(logged.room_id)
+	check(await _wait(journalled, func(): return journalled.snapshot(logged.room_id).get("cleaned", false)) and journalled.ports.leases.is_empty(), "stopping the room confirms the exit and releases the port")
+	on_disk = JSON.parse_string(FileAccess.get_file_as_string(journal_path))
+	check(on_disk.entries.is_empty(), "after a confirmed exit the journal entry is removed")
+
+	# ---- per-room memory limit, read from /proc of our own child ----
+	var roomy = Manager.new()
+	var generous := settings.duplicate(true)
+	generous.max_room_memory_mb = 4096
+	generous.udp_first = 28180
+	generous.udp_last = 28184
+	check(roomy.initialize(generous, InjectedLauncher.new()).ok, "a room manager with a memory limit initialises on Linux")
+	_fixture(roomy, "")
+	var measured: Dictionary = roomy.create_room("minimal_room", options)
+	check(measured.ok and await _wait(roomy, func(): return not roomy.rooms[measured.room_id].get("metrics", {}).is_empty()), "the memory of a READY room is measured")
+	var metrics: Dictionary = roomy.rooms[measured.room_id].get("metrics", {})
+	print("INFO room working_set_bytes=", metrics.get("working_set_bytes", -1), " cpu_ms=", metrics.get("cpu_ms", -1))
+	check(int(metrics.get("working_set_bytes", 0)) > 1048576 and int(metrics.get("cpu_ms", -1)) >= 0 and roomy.snapshot(measured.room_id).state == "READY", "under the limit the room keeps running with a plausible working set")
+	roomy.config.max_room_memory_mb = 1
+	check(await _wait(roomy, func(): return roomy.snapshot(measured.room_id).get("cleaned", false)), "over the limit the room is stopped")
+	var over: Dictionary = roomy.snapshot(measured.room_id)
+	check(over.code == "ROOM_MEMORY_LIMIT" and over.exit_confirmed and not _alive(int(over.pid)) and roomy.ports.leases.is_empty(), "it ends with ROOM_MEMORY_LIMIT, exit confirmed, port released (%s)" % over.get("code", ""))
 
 	var direct = _make(false, 28100)
 	var runtime: String = direct.runtime_root
@@ -206,10 +238,12 @@ func _run() -> void:
 	check_injected(threaded.launcher.reclaim(orphan_row.launch_id) and await _wait(threaded, func(): return threaded.snapshot(orphan.room_id).get("cleaned", false)) and threaded.ports.leases.is_empty(), "(clean-up) once claimed, the retried stop ends it and the port is released")
 
 	# ---- nothing left ----
-	for manager in [direct, threaded]:
+	for manager in [journalled, roomy, direct, threaded]:
 		manager.stop_all()
 		await _wait(manager, func(): return manager.active_count() == 0, 10000)
 		check(manager.close(), "the room manager closes after all rooms are cleaned")
+	DirAccess.remove_absolute(journal_path)
+	DirAccess.remove_absolute(journal_path.get_base_dir())
 	await create_timer(0.3).timeout
 	check(_children() == children_before, "no room child or zombie of this process remains (%d -> %d)" % [children_before, _children()])
 	var leftovers: Array = Array(DirAccess.get_files_at(runtime)).filter(func(name): return name.ends_with(".json"))

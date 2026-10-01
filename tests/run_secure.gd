@@ -30,7 +30,8 @@ func _process(_delta: float) -> bool:
 func _run() -> void:
 	work = ProjectSettings.globalize_path("res://data/secure-test-" + Wire.uid())
 	var output: Array = []
-	check(OS.execute("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ProjectSettings.globalize_path("res://tools/protect_data.ps1"), "-ProjectRoot", ProjectSettings.globalize_path("res://"), "-DataRoot", work], output) == 0, "private security fixture directory")
+	# Linux: posix_data_root.gd is the counterpart of protect_data.ps1 (700 folders).
+	check(preload("res://host/platform/posix_data_root.gd").prepare(work) if OS.get_name() == "Linux" else OS.execute("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ProjectSettings.globalize_path("res://tools/protect_data.ps1"), "-ProjectRoot", ProjectSettings.globalize_path("res://"), "-DataRoot", work], output) == 0, "private security fixture directory")
 	security = Secure.create_local_certificate(work)
 	check(not security.is_empty(), "local certificate generated without trusting it globally")
 	var expiry := int(Time.get_unix_time_from_system()) + 3600

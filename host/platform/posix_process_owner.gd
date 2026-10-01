@@ -381,6 +381,34 @@ func unheld_ids() -> Array:
 	_guard.unlock()
 	return ids
 
+## Resource use of a RUNNING child held by this object, read from /proc only
+## after /proc still shows our direct child with the recorded start time:
+## {"state": "running", "working_set_bytes", "cpu_ms"}; otherwise {"state": ...}
+## ("exited" or "unknown"). Read-only; never signals anything.
+func usage(launch_id: String) -> Dictionary:
+	_guard.lock()
+	var result := {"state": "unknown"}
+	var owned := _held(launch_id)
+	if not owned.is_empty():
+		_observe(owned)
+		if owned.state == EXITED:
+			result = {"state": "exited"}
+		elif owned.state == RUNNING and backend.has_method("read"):
+			var seen: Dictionary = backend.identity(int(owned.pid))
+			if not seen.is_empty() and int(seen.ppid) == int(owned.parent_pid) and str(seen.start_time) == str(owned.start_time):
+				var rss_kb := -1
+				for line in backend.read("/proc/%d/status" % int(owned.pid)).split("\n"):
+					if line.begins_with("VmRSS:"):
+						rss_kb = int(line.substr(6).strip_edges().split(" ")[0])
+				var stat: String = backend.read("/proc/%d/stat" % int(owned.pid))
+				var fields := stat.substr(stat.rfind(")") + 2).strip_edges().split(" ")
+				# utime and stime (fields 14 and 15 of stat) in clock ticks; Linux
+				# reports them in USER_HZ, which is 100 on every supported kernel.
+				if rss_kb >= 0 and fields.size() > 12:
+					result = {"state": "running", "working_set_bytes": rss_kb * 1024, "cpu_ms": (int(fields[11]) + int(fields[12])) * 10}
+	_guard.unlock()
+	return result
+
 ## Signals sent through this registry (all holders), for tests and diagnostics.
 func kills_sent() -> int:
 	_guard.lock()

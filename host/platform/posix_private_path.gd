@@ -96,6 +96,8 @@ static func _has_link(clean: String) -> bool:
 	var cursor := clean
 	while cursor != "/" and cursor != "":
 		var base := cursor.get_base_dir()
+		if base == cursor:
+			break  # a root such as "C:/" (the loop is meant for Linux paths)
 		var parent := DirAccess.open(base)
 		# A parent that exists but cannot be listed cannot be checked: refuse.
 		# One that does not exist yet holds nothing, and is itself checked next.

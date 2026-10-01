@@ -35,6 +35,16 @@ func terminate(launch_id: String) -> bool:
 func record(launch_id: String) -> Dictionary:
 	return _records.get(launch_id, {}).duplicate(true)
 
+## What the process journal persists (ProcessLauncher.journal_record).
+func journal_record(launch_id: String) -> Dictionary:
+	return record(launch_id)
+
+## Simulated resource use of a running child (ProcessLauncher.usage).
+func usage(launch_id: String) -> Dictionary:
+	if probe(launch_id) != "running":
+		return {"state": probe(launch_id)}
+	return {"state": "running", "working_set_bytes": 1048576, "cpu_ms": 0}
+
 func forget(launch_id: String) -> bool:
 	if probe(launch_id) != "exited":
 		return false

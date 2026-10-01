@@ -31,6 +31,15 @@ func configure(local_bus, bind_address: String, advertised_address: String) -> v
 	# start() requires a provider for TLS; managed login authenticates remotely instead.
 	identity_provider = preload("res://host/core/identity_provider.gd").new()
 
+## Every end of a player session goes to the Operator as one logout request with
+## a reason; the Operator owns the clean-up and its bounded retries
+## (host/core/session_cleanup.gd). This side never repeats a logout and waits at
+## most LOGOUT_REQUEST_MS for the Operator's answer.
+const LOGOUT_REQUEST_MS := 10000
+
+func _hand_over_logout(token: String, reason: String) -> Dictionary:
+	return await bus.request("account.execute", {"op": "session.logout", "token": token, "reason": reason}, LOGOUT_REQUEST_MS)
+
 func handle_async(connection: Dictionary, message: Dictionary) -> Dictionary:
 	if connection.get("revoked", false):
 		return Wire.failure("AUTH_FAILED")
@@ -48,21 +57,32 @@ func handle_async(connection: Dictionary, message: Dictionary) -> Dictionary:
 			payload.token = connection.get("account_token", "")
 		if message.type in ["account.register", "account.login", "account.change_password"]:
 			payload.client_ip = connection.tcp.get_connected_host()
-		var result: Dictionary = await bus.request("account.execute", payload)
+		var result: Dictionary
+		if message.type == "account.logout":
+			result = await _hand_over_logout(str(payload.token), "explicit")
+		else:
+			result = await bus.request("account.execute", payload)
 		connection.account_busy = false
 		if not peers.has(connection):
 			if result.ok and message.type == "account.login":
-				bus.request.call_deferred("account.execute", {"op": "session.logout", "token": result.token})
+				_hand_over_logout.call_deferred(str(result.token), "late_login")
 			return Wire.failure("CONTROL_UNAVAILABLE")
 		if result.ok and message.type == "account.login":
 			if result.identity.role != "player":
-				await bus.request("account.execute", {"op": "session.logout", "token": result.token})
+				await _hand_over_logout(str(result.token), "wrong_role")
 				return Wire.failure("AUTH_FAILED")
 			connection.user = result.identity
 			connection.expires = result.expires
 			connection.account_token = result.token
 			account_tokens[connection.user.user_id] = result.token
-		if result.ok and message.type in ["account.logout", "account.change_password"]:
+		if message.type == "account.logout":
+			# The player asked to leave: the connection ends whatever the clean-up
+			# answered (LOGOUT_PENDING means the Operator is still retrying); the
+			# reply below carries the real code. The Operator now owns the token.
+			account_tokens.erase(connection.user.get("user_id", ""))
+			connection.revoked = true
+			_finish_session.call_deferred(connection)
+		elif result.ok and message.type == "account.change_password":
 			connection.revoked = true
 			_finish_session.call_deferred(connection)
 		if result.ok and message.type == "account.rename":
@@ -207,6 +227,8 @@ func _drop(connection: Dictionary) -> void:
 				_revoke_seat(seat)
 		var token: String = account_tokens.get(user_id, "")
 		account_tokens.erase(user_id)
+		# Not awaited: the Operator owns the clean-up. Without a control channel the
+		# Operator's own host-exit clean-up takes the token over.
 		if token != "" and bus != null and bus.ready():
-			bus.request.call_deferred("account.execute", {"op": "session.logout", "token": token})
+			_hand_over_logout.call_deferred(token, "disconnect")
 	super._drop(connection)

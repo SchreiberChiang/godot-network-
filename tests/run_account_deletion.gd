@@ -170,11 +170,13 @@ func _run() -> void:
 		"broken line " + victim_id]) + "\n")
 	write_text(maintenance_audit, JSON.stringify({"time": 4, "op": "backup.create", "reason": "before removing dq_victim01", "code": ""}) + "\n")
 	var original := FileAccess.get_file_as_string(operator_audit)
-	check(FileAccess.set_read_only_attribute(operator_audit, true) == OK, "operator audit file made read-only for the write-failure case")
+	# A folder on the temporary path makes the rewrite fail on every platform (a
+	# read-only file does not stop a rename on Linux).
+	check(DirAccess.make_dir_absolute(operator_audit + ".tmp") == OK, "operator audit rewrite blocked (a folder occupies its temporary path)")
 	var blocked: Dictionary = Deletion.scrub_files([operator_audit, maintenance_audit], ready_job)
 	check(not blocked.ok and blocked.code == "AUDIT_WRITE_FAILED", "audit rewrite failure reported, not success")
 	check(FileAccess.get_file_as_string(operator_audit) == original and not FileAccess.file_exists(operator_audit + ".tmp"), "failed rewrite leaves the file intact and no temporary copy")
-	FileAccess.set_read_only_attribute(operator_audit, false)
+	DirAccess.remove_absolute(operator_audit + ".tmp")
 	var scrubbed: Dictionary = Deletion.scrub_files([operator_audit, directory.path_join("operator-audit.jsonl.previous"), maintenance_audit], ready_job)
 	check(scrubbed.ok and scrubbed.rows == 4, "audit files rewritten: row about the victim, two reasons naming it and a broken line")
 	var rewritten := FileAccess.get_file_as_string(operator_audit) + FileAccess.get_file_as_string(maintenance_audit)
@@ -182,10 +184,10 @@ func _run() -> void:
 	var memory := [{"user_id": victim_id, "reason": "x"}, {"user_id": keeper_id, "reason": "for DQ_VICTIM01"}, {"user_id": keeper_id, "reason": "plain"}]
 	check(Deletion.scrub_rows(memory, ready_job) == 2 and not Deletion.mentions(JSON.stringify(memory), [victim_id, "dq_victim01"]) and memory[2].reason == "plain", "in-memory audit rows scrubbed the same way")
 	write_text(directory.path_join(Deletion.JOURNAL), "")
-	check(FileAccess.set_read_only_attribute(directory.path_join(Deletion.JOURNAL), true) == OK, "journal made read-only for the write-failure case")
+	check(read_only(directory.path_join(Deletion.JOURNAL), true) == OK, "journal made read-only for the write-failure case")
 	check(not Deletion.append_journal(directory, {"event": "done", "job_id": job.job_id, "subject": subject, "backups": ["backup-old"]}), "journal write failure detected")
 	check(Deletion.resume(accounts, repository).ready.size() == 1, "job still open after the failed close-out")
-	FileAccess.set_read_only_attribute(directory.path_join(Deletion.JOURNAL), false)
+	read_only(directory.path_join(Deletion.JOURNAL), false)
 	check(Deletion.append_journal(directory, {"event": "done", "job_id": job.job_id, "subject": subject, "backups": ["backup-old"]}), "journal entry written and read back")
 	check(Deletion.journal_marks(directory).get("backup-old", []) == [subject], "journal marks the backup that predates the deletion")
 	var closed := accounts.close_deletion(job.job_id)
@@ -257,14 +259,22 @@ func call_api(request: Dictionary) -> Dictionary:
 
 func fixture(mode: String, needles: String = "", copy: String = "") -> Dictionary:
 	var output: Array = []
-	var arguments := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ProjectSettings.globalize_path("res://tests/fixtures/deletion_database.ps1"), "-Directory", directory, "-Mode", mode]
+	# Linux: the installed pwsh named by ROOMKIT_PWSH (as for the storage helpers).
+	var linux := OS.get_name() == "Linux"
+	var arguments := ["-NoProfile", "-NonInteractive"] + ([] if linux else ["-ExecutionPolicy", "Bypass"]) + ["-File", ProjectSettings.globalize_path("res://tests/fixtures/deletion_database.ps1"), "-Directory", directory, "-Mode", mode]
 	if needles != "":
 		arguments.append_array(["-Needles", needles])
 	if copy != "":
 		arguments.append_array(["-Copy", copy])
-	var code := OS.execute("powershell.exe", arguments, output, true, false)
+	var code := OS.execute(OS.get_environment("ROOMKIT_PWSH") if linux else "powershell.exe", arguments, output, true, false)
 	var parsed: Variant = JSON.parse_string(str(output[0]).strip_edges()) if code == 0 and not output.is_empty() else null
 	return parsed if parsed is Dictionary else {"ok": false, "output": output}
+
+## Windows: the read-only attribute; Linux: mode 400 (and back to 600).
+func read_only(path: String, enabled: bool) -> int:
+	if OS.get_name() == "Linux":
+		return FileAccess.set_unix_permissions(path, 256 if enabled else 384)
+	return FileAccess.set_read_only_attribute(path, enabled)
 
 func check(value: bool, label: String) -> bool:
 	if value:

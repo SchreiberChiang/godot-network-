@@ -1,89 +1,134 @@
 {
-    "type":  "object",
-    "additionalProperties":  false,
-    "required":  [
-                     "version",
-                     "entries"
-                 ],
-    "properties":  {
-                       "version":  {
-                                       "const":  1
-                                   },
-                       "entries":  {
-                                       "type":  "object",
-                                       "maxProperties":  4096,
-                                       "additionalProperties":  {
-                                                                    "type":  "object",
-                                                                    "additionalProperties":  false,
-                                                                    "required":  [
-                                                                                     "port",
-                                                                                     "owned"
-                                                                                 ],
-                                                                    "properties":  {
-                                                                                       "port":  {
-                                                                                                    "type":  "integer",
-                                                                                                    "minimum":  1024,
-                                                                                                    "maximum":  65535
-                                                                                                },
-                                                                                       "owned":  {
-                                                                                                     "oneOf":  [
-                                                                                                                   {
-                                                                                                                       "type":  "object",
-                                                                                                                       "maxProperties":  0
-                                                                                                                   },
-                                                                                                                   {
-                                                                                                                       "additionalProperties":  false,
-                                                                                                                       "properties":  {
-                                                                                                                                          "pid":  {
-                                                                                                                                                      "maximum":  2147483647,
-                                                                                                                                                      "type":  "integer",
-                                                                                                                                                      "minimum":  1
-                                                                                                                                                  },
-                                                                                                                                          "verified":  {
-                                                                                                                                                           "type":  "boolean"
-                                                                                                                                                       },
-                                                                                                                                          "exited":  {
-                                                                                                                                                         "type":  "boolean"
-                                                                                                                                                     },
-                                                                                                                                          "launch_id":  {
-                                                                                                                                                            "type":  "string",
-                                                                                                                                                            "pattern":  "^[a-f0-9]{16,64}$"
-                                                                                                                                                        },
-                                                                                                                                          "created_filetime":  {
-                                                                                                                                                                   "maxLength":  32,
-                                                                                                                                                                   "pattern":  "^[0-9]*$",
-                                                                                                                                                                   "type":  "string"
-                                                                                                                                                               },
-                                                                                                                                          "executable":  {
-                                                                                                                                                             "maxLength":  4096,
-                                                                                                                                                             "minLength":  1,
-                                                                                                                                                             "type":  "string"
-                                                                                                                                                         },
-                                                                                                                                          "parent_pid":  {
-                                                                                                                                                             "maximum":  2147483647,
-                                                                                                                                                             "type":  "integer",
-                                                                                                                                                             "minimum":  1
-                                                                                                                                                         },
-                                                                                                                                          "termination_requested":  {
-                                                                                                                                                                        "type":  "boolean"
-                                                                                                                                                                    }
-                                                                                                                                      },
-                                                                                                                       "type":  "object",
-                                                                                                                       "required":  [
-                                                                                                                                        "pid",
-                                                                                                                                        "verified",
-                                                                                                                                        "exited",
-                                                                                                                                        "launch_id",
-                                                                                                                                        "created_filetime",
-                                                                                                                                        "executable",
-                                                                                                                                        "parent_pid",
-                                                                                                                                        "termination_requested"
-                                                                                                                                    ]
-                                                                                                                   }
-                                                                                                               ]
-                                                                                                 }
-                                                                                   }
-                                                                }
-                                   }
-                   }
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "entries"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "entries": {
+      "type": "object",
+      "maxProperties": 4096,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "port",
+          "owned"
+        ],
+        "properties": {
+          "port": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 65535
+          },
+          "owned": {
+            "oneOf": [
+              {
+                "type": "object",
+                "maxProperties": 0
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "pid": {
+                    "maximum": 2147483647,
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  },
+                  "exited": {
+                    "type": "boolean"
+                  },
+                  "launch_id": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{16,64}$"
+                  },
+                  "created_filetime": {
+                    "maxLength": 32,
+                    "pattern": "^[0-9]*$",
+                    "type": "string"
+                  },
+                  "executable": {
+                    "maxLength": 4096,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "parent_pid": {
+                    "maximum": 2147483647,
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "termination_requested": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "pid",
+                  "verified",
+                  "exited",
+                  "launch_id",
+                  "created_filetime",
+                  "executable",
+                  "parent_pid",
+                  "termination_requested"
+                ]
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "platform",
+                  "launch_id",
+                  "pid",
+                  "parent_pid",
+                  "executable",
+                  "start_time",
+                  "boot_id"
+                ],
+                "properties": {
+                  "platform": {
+                    "const": "linux"
+                  },
+                  "launch_id": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{16,64}$"
+                  },
+                  "pid": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "parent_pid": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "executable": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096
+                  },
+                  "start_time": {
+                    "type": "string",
+                    "pattern": "^[0-9]{1,20}$"
+                  },
+                  "boot_id": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9-]{16,64}$"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
 }

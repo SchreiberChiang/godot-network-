@@ -10,9 +10,10 @@ extends RefCounted
 ## keeps the room and its port (nothing is released for a child that may still
 ## run). Forced stops run on the calling thread (they are quick on Linux) and are
 ## retried every stop_timeout_ms until the owner confirms the exit or quarantines
-## the record; resources stay allocated until then. Not yet on Linux: the process
-## journal (recovery_guard.gd) and the per-room memory limit, which both rely on
-## Windows helpers; they are refused at initialize instead of silently skipped.
+## the record; resources stay allocated until then. The process journal keeps
+## a Linux record (pid, start time, boot id) that a later run checks read-only;
+## the per-room memory limit reads /proc through the owner after an identity
+## check (on the calling thread; Windows keeps its helper on a worker thread).
 const Registry = preload("res://host/core/game_registry.gd")
 const Ports = preload("res://host/core/port_allocator.gd")
 const Launcher = preload("res://host/platform/process_launcher.gd")
@@ -47,10 +48,6 @@ func initialize(settings: Dictionary, process_adapter = null) -> Dictionary:
 	ports = Ports.new(int(config.get("udp_first", 28100)), int(config.get("udp_last", 28131)))
 	runtime_root = preload("res://sdk/roomkit/shared/paths.gd").absolute("res://run")
 	if OS.get_name() == "Linux":
-		if config.has("process_journal"):
-			return {"ok": false, "code": "RECOVERY_UNSUPPORTED"}
-		if int(config.get("max_room_memory_mb", 0)) > 0:
-			return {"ok": false, "code": "RESOURCE_LIMIT_UNSUPPORTED"}
 		if not _protect_runtime_posix():
 			return {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}
 	elif OS.get_name() != "Windows":
@@ -139,7 +136,7 @@ func create_room(game_id: String, options: Dictionary) -> Dictionary:
 	_transition(row, "STARTING")
 	var started: Dictionary = launcher.launch(resolved.descriptor, launch_id, PackedStringArray(["--launch-id=" + launch_id, "--launch-config=" + row.config_path]))
 	row.pid = maxi(int(started.get("pid", 0)), 0)
-	if recovery_guard != null and not recovery_guard.confirm(launch_id, launcher.record(launch_id)):
+	if recovery_guard != null and not recovery_guard.confirm(launch_id, launcher.journal_record(launch_id)):
 		_fail(row, "PRIVATE_CONFIG_FAILED")
 	# Identity capture can block briefly; give the child its full readiness window afterwards.
 	row.created_at = Time.get_ticks_msec()
@@ -500,7 +497,7 @@ static func _start_worker(descriptor: Dictionary, bootstrap: Dictionary, path: S
 	# owned: an observation (journal, diagnostics). handoff: what moves the child
 	# to the main launcher (Windows: the same record; Linux: a single-use token that
 	# exists only in memory).
-	return {"started": started, "owned": isolated.record(bootstrap.launch_id), "handoff": isolated.handoff(bootstrap.launch_id), "grant": grant}
+	return {"started": started, "owned": isolated.journal_record(bootstrap.launch_id), "handoff": isolated.handoff(bootstrap.launch_id), "grant": grant}
 
 static func _terminate_worker(owned: Dictionary) -> bool:
 	if owned.is_empty():
@@ -555,6 +552,16 @@ func _poll_resources() -> void:
 	if int(config.get("max_room_memory_mb", 0)) <= 0 or resource_worker != null or Time.get_ticks_msec() < next_resource_check:
 		return
 	next_resource_check = Time.get_ticks_msec() + 1000
+	if OS.get_name() == "Linux":
+		# /proc reads through the owner: quick, so every READY room is checked here.
+		for row in rooms.values():
+			if row.state == "READY" and not row.cleaned:
+				var used: Dictionary = launcher.usage(row.launch_id)
+				if used.get("state", "unknown") == "running":
+					row.metrics = {"working_set_bytes": used.working_set_bytes, "cpu_ms": used.cpu_ms}
+					if float(used.working_set_bytes) > float(config.max_room_memory_mb) * 1048576:
+						_fail(row, "ROOM_MEMORY_LIMIT")
+		return
 	var live: Array = []
 	for row in rooms.values():
 		if row.state == "READY" and not row.cleaned:

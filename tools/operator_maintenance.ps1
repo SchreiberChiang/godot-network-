@@ -8,21 +8,35 @@ $lock=$null
 $journal=$null
 $staging=''
 $utf8=New-Object Text.UTF8Encoding($false)
+# Windows PowerShell 5.1 has no $IsLinux; there the separator is '\'.
+$posix=[IO.Path]::DirectorySeparatorChar -eq '/'
+$sep=[string][IO.Path]::DirectorySeparatorChar
+$pathComparison=if ($posix) { [StringComparison]::Ordinal } else { [StringComparison]::OrdinalIgnoreCase }
 $knownFiles=@('accounts.sqlite','assets.sqlite','config.json','server.crt','server.key')
 $swapFiles=$knownFiles+@('accounts.sqlite-wal','accounts.sqlite-shm','assets.sqlite-wal','assets.sqlite-shm')
 function Fail([string]$Code) { throw ('MAINTENANCE:'+$Code) }
 function SafePath([string]$Path,[string]$Boundary=$root) {
     $full=[IO.Path]::GetFullPath($Path).TrimEnd('\','/')
     $boundaryFull=[IO.Path]::GetFullPath($Boundary).TrimEnd('\','/')
-    if ($full -ne $boundaryFull -and -not $full.StartsWith($boundaryFull+'\',[StringComparison]::OrdinalIgnoreCase)) { Fail 'INVALID_DATA_PATH' }
+    if (-not $full.Equals($boundaryFull,$pathComparison) -and -not $full.StartsWith($boundaryFull+$sep,$pathComparison)) { Fail 'INVALID_DATA_PATH' }
     $cursor=$full
-    while ($cursor.Length -ge $boundaryFull.Length) {
+    while ($cursor -and $cursor.Length -ge $boundaryFull.Length) {
         if (Test-Path -LiteralPath $cursor) {
-            if ((Get-Item -LiteralPath $cursor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { Fail 'REPARSE_POINT_REFUSED' }
+            $item=Get-Item -LiteralPath $cursor -Force
+            # A symbolic link or junction (on Linux .NET also reports symbolic links
+            # as ReparsePoint; LinkTarget covers both where it exists).
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or ($null -ne $item.PSObject.Properties['LinkTarget'] -and $null -ne $item.LinkTarget)) { Fail 'REPARSE_POINT_REFUSED' }
         }
         $cursor=[IO.Path]::GetDirectoryName($cursor)
     }
     return $full
+}
+# Linux: owner-only mode on everything this script creates (folders 700, files
+# 600), set right after creation. Windows relies on the data root's ACL.
+function Private([string]$Path) {
+    if (-not $posix) { return }
+    $mode=if ([IO.Directory]::Exists($Path)) { [IO.UnixFileMode]'UserRead,UserWrite,UserExecute' } else { [IO.UnixFileMode]'UserRead,UserWrite' }
+    [IO.File]::SetUnixFileMode($Path,$mode)
 }
 function AtomicJson([string]$Path,$Object) {
     $destination=SafePath $Path
@@ -31,6 +45,7 @@ function AtomicJson([string]$Path,$Object) {
     $bytes=$utf8.GetBytes((ConvertTo-Json -InputObject $Object -Compress -Depth 16))
     $file=[IO.File]::Open($temp,[IO.FileMode]::Create,[IO.FileAccess]::Write,[IO.FileShare]::None)
     try { $file.Write($bytes,0,$bytes.Length); $file.Flush($true) } finally { $file.Dispose() }
+    Private $temp
     if ([IO.File]::Exists($destination)) { [IO.File]::Replace($temp,$destination,[System.Management.Automation.Language.NullString]::Value) }
     else { [IO.File]::Move($temp,$destination) }
 }
@@ -63,6 +78,7 @@ function Audit([string]$Stage,[string]$BackupId,[string]$BeforeId='', [string]$C
     $path=SafePath (Join-Path $root 'maintenance-audit.jsonl')
     $stream=[IO.File]::Open($path,[IO.FileMode]::Append,[IO.FileAccess]::Write,[IO.FileShare]::Read)
     try { $bytes=$utf8.GetBytes((ConvertTo-Json -InputObject $record -Compress)+"`n"); $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true) } finally { $stream.Dispose() }
+    Private $path
 }
 function BackupManifests {
     $folder=SafePath (Join-Path $root 'backups')
@@ -118,9 +134,11 @@ function CreateBackup([string]$Kind) {
     foreach($name in @('accounts.sqlite','assets.sqlite')) { CheckDatabase (SafePath (Join-Path $root $name)) $name }
     $backups=SafePath (Join-Path $root 'backups')
     [void][IO.Directory]::CreateDirectory($backups)
+    Private $backups
     $id='backup-'+[DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8)
     $stage=SafePath (Join-Path $backups ('.pending-'+[Guid]::NewGuid().ToString('N')))
     [void][IO.Directory]::CreateDirectory($stage)
+    Private $stage
     $files=@{}
     try {
         foreach($name in $knownFiles) {
@@ -132,6 +150,7 @@ function CreateBackup([string]$Kind) {
                 try { $db.Backup($target) } finally { $db.Dispose() }
                 CheckDatabase $target $name
             } else { [IO.File]::Copy($source,$target,$false) }
+            Private $target
             $files[$name]=@{sha256=(Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash;size=(Get-Item -LiteralPath $target).Length}
         }
         $manifest=@{format=1;backup_id=$id;created_at=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds();automatic=($Kind -eq 'automatic');kind=$Kind;files=$files}
@@ -193,10 +212,11 @@ function RestoreBackup([string]$Id) {
     $previous=SafePath (Join-Path $stage 'previous')
     [void][IO.Directory]::CreateDirectory($ready)
     [void][IO.Directory]::CreateDirectory($previous)
+    Private $stage; Private $ready; Private $previous
     $moving=$false
     $committed=$false
     try {
-        foreach($name in $manifest.files.PSObject.Properties.Name) { [IO.File]::Copy((Join-Path $backup $name),(Join-Path $ready $name),$false) }
+        foreach($name in $manifest.files.PSObject.Properties.Name) { [IO.File]::Copy((Join-Path $backup $name),(Join-Path $ready $name),$false); Private (Join-Path $ready $name) }
         $accountDb=New-Object RoomKitSqlite((Join-Path $ready 'accounts.sqlite'))
         try {
             [void]$accountDb.Query('BEGIN IMMEDIATE',@())
@@ -245,9 +265,27 @@ function RestoreBackup([string]$Id) {
         throw
     }
 }
+function LinuxCpuSample {
+    $fields=@((Get-Content -LiteralPath '/proc/stat' -TotalCount 1) -split '\s+' | Select-Object -Skip 1 | Where-Object { $_ -ne '' } | ForEach-Object { [long]$_ })
+    # idle + iowait are fields 4 and 5 of the aggregate cpu line.
+    return @{total=($fields | Measure-Object -Sum).Sum;idle=$fields[3]+$fields[4]}
+}
 function Metrics {
     $metrics=@{system_cpu_percent=$null;system_memory_used_bytes=$null;system_memory_total_bytes=$null;data_disk_free_bytes=$null;data_disk_total_bytes=$null}
+    if ($posix) {
+        try {
+            $info=@{}
+            foreach($line in Get-Content -LiteralPath '/proc/meminfo') { if ($line -match '^(MemTotal|MemAvailable):\s+(\d+)\s+kB') { $info[$Matches[1]]=[long]$Matches[2]*1024 } }
+            if ($info.ContainsKey('MemTotal') -and $info.ContainsKey('MemAvailable')) { $metrics.system_memory_total_bytes=$info.MemTotal; $metrics.system_memory_used_bytes=$info.MemTotal-$info.MemAvailable }
+        } catch {}
+        try {
+            $first=LinuxCpuSample; Start-Sleep -Milliseconds 250; $second=LinuxCpuSample
+            $total=$second.total-$first.total
+            if ($total -gt 0) { $metrics.system_cpu_percent=[math]::Round(100.0*($total-($second.idle-$first.idle))/$total,1) }
+        } catch {}
+    }
     try {
+        if ($posix) { throw 'skip' }
         $os=Get-CimInstance Win32_OperatingSystem
         $metrics.system_memory_total_bytes=[long]$os.TotalVisibleMemorySize*1024
         $metrics.system_memory_used_bytes=([long]$os.TotalVisibleMemorySize-[long]$os.FreePhysicalMemory)*1024
@@ -270,10 +308,15 @@ try {
     $root=SafePath $requestObject.root $data
     if ($root -eq $data -or -not [IO.Directory]::Exists($root)) { Fail 'INVALID_DATA_PATH' }
     [void](SafePath $Request)
-    $owner=[IO.Directory]::GetAccessControl($root).GetOwner([Security.Principal.SecurityIdentifier])
-    if ($owner -ne [Security.Principal.WindowsIdentity]::GetCurrent().User) { Fail 'PRIVATE_DATA_FAILED' }
-    foreach($rule in [IO.Directory]::GetAccessControl($root).GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])) {
-        if ($rule.AccessControlType -eq [Security.AccessControl.AccessControlType]::Allow -and $rule.IdentityReference -ne $owner) { Fail 'PRIVATE_DATA_FAILED' }
+    if ($posix) {
+        # Linux: the data root must be exactly 700 (only its owner can read it).
+        if ([IO.File]::GetUnixFileMode($root) -ne [IO.UnixFileMode]'UserRead,UserWrite,UserExecute') { Fail 'PRIVATE_DATA_FAILED' }
+    } else {
+        $owner=[IO.Directory]::GetAccessControl($root).GetOwner([Security.Principal.SecurityIdentifier])
+        if ($owner -ne [Security.Principal.WindowsIdentity]::GetCurrent().User) { Fail 'PRIVATE_DATA_FAILED' }
+        foreach($rule in [IO.Directory]::GetAccessControl($root).GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])) {
+            if ($rule.AccessControlType -eq [Security.AccessControl.AccessControlType]::Allow -and $rule.IdentityReference -ne $owner) { Fail 'PRIVATE_DATA_FAILED' }
+        }
     }
     $reason=if ($null -ne $requestObject.PSObject.Properties['reason']) { $requestObject.reason } else { '' }
     if ($reason -isnot [string] -or $reason.Length -gt 256 -or $reason -match '[\x00-\x1f]') { Fail 'INVALID_MAINTENANCE_REQUEST' }
@@ -282,6 +325,7 @@ try {
     } else {
         InitializeSqlite
         try { $lock=[IO.File]::Open((SafePath (Join-Path $root 'maintenance.lock')),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None) } catch { Fail 'MAINTENANCE_BUSY' }
+        Private (SafePath (Join-Path $root 'maintenance.lock'))
         RecoverJournal
         switch ($requestObject.op) {
             'backup.list' { $result=@{ok=$true;code='';backups=@(PublicBackups)} }

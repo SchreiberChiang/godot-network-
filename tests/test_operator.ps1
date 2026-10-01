@@ -3,17 +3,19 @@ param(
     [switch]$Lifecycle,
     [string]$GamesIndex = '',
     [string]$PublicClientDir = '',
-    [string]$Godot = 'D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe'
+    [string]$Godot = ''
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'support/portable.ps1')
+$Godot = Rk-Godot $Godot
 [Net.ServicePointManager]::Expect100Continue = $false
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $testId = [Guid]::NewGuid().ToString('N')
-$testRoot = Join-Path $project ('data\test-operator-' + $testId)
-$evidence = Join-Path $project ('logs\operator-' + $testId)
+$testRoot = Join-Path (Join-Path $project 'data') ('test-operator-' + $testId)
+$evidence = Join-Path (Join-Path $project 'logs') ('operator-' + $testId)
 New-Item -ItemType Directory -Path $evidence -Force | Out-Null
-& (Join-Path $project 'tools\protect_data.ps1') -ProjectRoot $project -DataRoot $testRoot | Out-Null
-& (Join-Path $project 'tools\protect_runtime.ps1') -ProjectRoot $project | Out-Null
+Rk-ProtectData $project $testRoot
+Rk-ProtectRuntime $project
 function Free-TcpPort {
     $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0)
     $listener.Start()
@@ -43,11 +45,13 @@ function Check($condition,$name) {
     else { $script:failed++; Write-Output ('FAIL ' + $name) }
 }
 $arguments = @('--headless','--path',$project,'--log-file',(Join-Path $evidence 'operator.log'),'--script','res://host/operator.gd','--',('--data-root=' + $testRoot),('--panel-port=' + $panelPort))
-if ($GamesIndex) { $arguments += ('--games=' + [IO.Path]::GetFullPath($GamesIndex)) }
-if ($PublicClientDir) { $arguments += ('--public-client-dir=' + [IO.Path]::GetFullPath($PublicClientDir)) }
-$quoted = foreach ($argument in $arguments) { '"' + ($argument -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"' }
-$process = Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $evidence 'console.log') -RedirectStandardError (Join-Path $evidence 'stderr.log')
-$ownedHandle = $process.Handle
+# The game index and the public client files stay inside this test's folder: a
+# copy of the shared index (read only) and a private public directory.
+if (-not $GamesIndex) { $GamesIndex = Join-Path $testRoot 'games.json'; Copy-Item -LiteralPath (Join-Path $project 'artifacts/framework-games.json') -Destination $GamesIndex }
+if (-not $PublicClientDir) { $PublicClientDir = Join-Path $testRoot 'public' }
+$arguments += ('--games=' + [IO.Path]::GetFullPath($GamesIndex))
+$arguments += ('--public-client-dir=' + [IO.Path]::GetFullPath($PublicClientDir))
+$process = Rk-StartHidden $Godot $arguments (Join-Path $evidence 'console.log') (Join-Path $evidence 'stderr.log')
 try {
     $deadline = [DateTime]::UtcNow.AddSeconds(45)
     $ready = $false
@@ -82,7 +86,7 @@ try {
     Check $invite.ok 'invite creation'
     $context = @{url=$baseUrl;panel_port=$panelPort;test_root=$testRoot;evidence=$evidence;operator_pid=$process.Id;username=$username;password=$password;token=$script:adminToken;invite_code=$invite.payload.invite_code;room_id=$roomId;connection=@{url=('wss://127.0.0.1:' + $settings.lobby_port);ca_certificate=(Join-Path $testRoot 'server.crt');server_hostname='localhost';secure_enet=$true;managed=$true}}
     Save-Json (Join-Path $testRoot 'test-context.json') $context
-    Save-Json (Join-Path $project 'run\operator-test-context.json') @{path=(Join-Path $testRoot 'test-context.json')}
+    Save-Json (Join-Path (Join-Path $project 'run') 'operator-test-context.json') @{path=(Join-Path $testRoot 'test-context.json')}
     Write-Output ('OPERATOR_INTEGRATION_READY context=' + (Join-Path $testRoot 'test-context.json'))
     if ($HoldForIntegration) {
         $deadline = [DateTime]::UtcNow.AddMinutes(40)
@@ -138,6 +142,11 @@ try {
         $deadline=[DateTime]::UtcNow.AddSeconds(40)
         do { Start-Sleep -Milliseconds 500; $crashRow=@((Api 'status').payload.rooms | Where-Object room_id -eq $crashRoom.payload.room_id)[0] } while($crashRow.state -ne 'READY' -and [DateTime]::UtcNow -lt $deadline)
         Check ($crashRow.state -eq 'READY') 'crash test room is actually bound and ready'
+        if ($script:RkPosix) {
+            # The crash injection below uses the Windows identity helper. On Linux an
+            # unexpected host exit is covered by tests/run_posix_operator.gd (owner).
+            Write-Output 'NOT RUN host crash injection (Windows identity helper; Linux: tests/run_posix_operator.gd)'
+        } else {
         $record=Get-Content -Raw -Encoding UTF8 (Join-Path $testRoot 'host-running.json') | ConvertFrom-Json
         $sameExecutable=[string]::Equals([IO.Path]::GetFullPath($record.executable),[IO.Path]::GetFullPath($Godot),[StringComparison]::OrdinalIgnoreCase)
         if(-not $record.verified -or $record.parent_pid -ne $process.Id -or -not $sameExecutable) { throw 'Refuse crash injection without this test parent, executable and captured ownership.' }
@@ -148,6 +157,7 @@ try {
         Check ($recovery.state -eq 'RUNNING' -and $recovery.pid -ne $record.pid) 'actual host crash reclaims orphan room then restarts'
         $journal=Get-Content -Raw -Encoding UTF8 (Join-Path $testRoot 'processes.json') | ConvertFrom-Json
         Check (@($journal.entries.PSObject.Properties).Count -eq 0) 'restarted host clears confirmed exited room journal'
+        }
         Check (Api 'server.stop' @{immediate=$true;reason='final lifecycle cleanup'}).ok 'final lifecycle host stop requested'
         $deadline=[DateTime]::UtcNow.AddSeconds(65)
         do { Start-Sleep -Milliseconds 500; $last=(Api 'status').payload.host } while($last.state -ne 'STOPPED' -and [DateTime]::UtcNow -lt $deadline)
@@ -163,6 +173,9 @@ try {
         if (-not $process.WaitForExit(65000)) { $process.Kill(); $process.WaitForExit(); $script:failed++; Write-Output 'FAIL operator graceful shutdown watchdog' }
     }
     Write-Output ('OPERATOR_PROCESS_EXIT=' + $process.ExitCode)
+    # The pointer to this run's context is only for drivers attached while it runs.
+    $pointerPath = Join-Path (Join-Path $project 'run') 'operator-test-context.json'
+    if ((Test-Path -LiteralPath $pointerPath) -and (Get-Content -Raw -Encoding UTF8 -LiteralPath $pointerPath).Contains($testId)) { Remove-Item -LiteralPath $pointerPath }
     if ($process.ExitCode -ne 0) { $script:failed++ }
     Get-Content -Encoding UTF8 (Join-Path $evidence 'stderr.log')
     Write-Output ('OPERATOR_RESULT passed=' + $script:passed + ' failed=' + $script:failed)

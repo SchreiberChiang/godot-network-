@@ -1,5 +1,12 @@
 extends RefCounted
 ## Persist reserved ports before spawning. Never adopt or kill previous-run PIDs.
+## A previous run's entry keeps its port quarantined until a read-only check
+## (ProcessLauncher.inspect_previous) reports the recorded process gone AND the
+## port can be bound again. Entries without a usable identity (a crash before
+## identity capture) stay quarantined. Linux: the journal folder is 700 and the
+## journal 600 (posix_data_root.gd); the check reads /proc and the boot id only.
+const DataRoot = preload("res://host/platform/posix_data_root.gd")
+const PrivatePath = preload("res://host/platform/posix_private_path.gd")
 const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Launcher = preload("res://host/platform/process_launcher.gd")
 var path := ""
@@ -16,7 +23,10 @@ func initialize(journal: String, allocator) -> bool:
 	path = preload("res://sdk/roomkit/shared/paths.gd").absolute(journal)
 	ports = allocator
 	var output: Array = []
-	if OS.execute("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://tools/protect_data.ps1"), "-ProjectRoot", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://"), "-DataRoot", path.get_base_dir()], output) != 0:
+	if OS.get_name() == "Linux":
+		if not DataRoot.prepare(path.get_base_dir()):
+			return false
+	elif OS.execute("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://tools/protect_data.ps1"), "-ProjectRoot", preload("res://sdk/roomkit/shared/paths.gd").absolute("res://"), "-DataRoot", path.get_base_dir()], output) != 0:
 		return false
 	if FileAccess.file_exists(path):
 		var record := Wire.decode(FileAccess.get_file_as_bytes(path), "res://schemas/process_journal.schema.json", 65536)
@@ -55,6 +65,10 @@ func save() -> bool:
 	file.store_string(JSON.stringify({"version": 1, "entries": entries}))
 	file.flush()
 	file.close()
+	if OS.get_name() == "Linux" and not PrivatePath.protect_file(path + ".tmp", path.get_base_dir()).ok:
+		DirAccess.remove_absolute(path + ".tmp")
+		healthy = false
+		return false
 	healthy = DirAccess.rename_absolute(path + ".tmp", path) == OK
 	return healthy
 
@@ -73,7 +87,7 @@ func poll() -> void:
 	var ids: Array = orphans.keys()
 	for offset in range(ids.size()):
 		var id: String = ids[(cursor + offset) % ids.size()]
-		if orphans[id].owned.get("verified", false):
+		if Launcher.inspectable(orphans[id].owned):
 			cursor = (cursor + offset + 1) % ids.size()
 			checking = id
 			worker = Thread.new()
@@ -82,7 +96,7 @@ func poll() -> void:
 			return
 
 static func _inspect(owned: Dictionary) -> Dictionary:
-	return Launcher.new()._inspect("inspect", owned)
+	return Launcher.inspect_previous(owned)
 
 func idle() -> bool:
 	return worker == null

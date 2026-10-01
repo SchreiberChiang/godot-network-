@@ -14,7 +14,8 @@
 | 旁路实验 | ~/roomkit/experiments/sqlite-import-lab/；另一 AI 负责，最新仅报告准备补丁、未编译；本轮未进入核查 |
 | Codex 独立复验 | codex-l2b1-7f1a0ba8-r2 已新建 incoming/src/runs 并完成；16 步失败 1 步（既有 unit），退出 1 |
 | SSH | 保留密码登录和主机指纹核验；此前探测及首次交互尝试失败；retry-02 经用户输入密码已成功认证并完成测试；不在聊天/文件保存密码 |
-| 尚不支持的结论 | 不能声称 Linux 完整后台、房间、联机或部署已通过；不能从旧进程快照推定实验现在已暂停 |
+| L3 同机验收（10-01，Claude） | `20261001060258-bdccea`：45 步失败 1 步（60 分钟耐久 75/78 周期）。运行前系统盘 439G 已用 46G、内存可用约 5.8 GB；耐久时 6–8 客户端 CPU 常 93–100%（同机另有 sunshine、ZCode 等）。正式入口 `tools/roomkit_linux.sh`，实例在源码快照 `data/instance-l3/`，只绑 127.0.0.1；每轮新源码目录带 `-r<后缀>`。只读辅助：`tools/linux_progress.sh`、`tools/linux_fetch_evidence.sh`（`ssh … "bash -s" < 脚本`） |
+| 尚不支持的结论 | 不能声称跨机联机、公网或部署已通过，也不能声称高负载下会话注销可靠（见 STATUS）；不能从旧进程快照推定实验现在已暂停 |
 
 现场核查按需集中一次完成，不反复让用户输密码。主线核查只读共享工具与本次快照、进程元数据；不扫描实验和用户配置目录。实验源码哈希/补丁需要另行明确只读范围，本次先标待核实。未授权安装、sudo、SSH/防火墙修改、主线与实验并跑。
 
@@ -154,6 +155,14 @@ Windows正式模板已经运行真实宿主/房间/客户端及十轮进程句�
 ## Linux 测试机：L2-B2 房间生命周期（2026-10-01，Claude）
 
 复用已安装的 Godot 4.7.2 official，没有安装、没有 sudo，也没有用 pwsh。新增源码快照 `~/roomkit/src/b9aa587e5a5d-worktree-3f6049b0471a/`（388 个文件）、传入包 `~/roomkit/incoming/20260930193037-54ca61/` 和运行目录 `~/roomkit/runs/20260930193037-54ca61/`（308 KB）。房间运行目录是快照里的 `run/`（700），测试结束后只剩 `.gdignore`。房间子进程只在本机回环地址和 28100–28199 端口段上绑定 UDP，运行前后本用户在这个端口段上都没有 UDP 套接字；没有改防火墙。环境核对使用收窄版本（不进入实验目录）；开跑时没有匹配的实验、编译、Godot 或 pwsh 进程，运行中没有持续监视。结果见 [docs/17](17_framework_shooter_plan.md#l2-b2-第一小项结果linux-房间生命周期claude2026-10-01未提交待-codex-复核)。
+
+## Linux 测试机：Operator 第一切片（2026-10-01，Claude）
+
+复用已安装的 Godot 4.7.2 official 和 pwsh 7.6.6，没有安装、没有 sudo、没有改防火墙。共两轮，每轮都用全新的源码快照、运行目录和隔离目录：
+- 第一轮 `~/roomkit/src/9d82d20b6e0f-worktree-78e346f46a6e/`、`~/roomkit/runs/20260930230000-20f6ae/`；
+- 第二轮 `~/roomkit/src/9d82d20b6e0f-worktree-b3eb1ca8dfe8/`、`~/roomkit/runs/20260930232030-ec349a/`。
+
+Operator 写出的所有内容（数据库、配置、TLS、游戏索引、宿主日志）都在快照的 `data/l2b3-<运行号>/` 里，目录 700、数据文件 600。管理面板只监听本机回环地址的 28391 端口；运行前后本用户在 28391、28300、28301 上都没有监听。启动方式为 `trap '' PIPE`、`umask 022`、`ROOMKIT_PWSH` 指向已装 pwsh，XDG 和 TMPDIR 指向运行目录。开跑时环境核对通过，没有实验、编译、Godot 或 pwsh 进程；运行中没有持续监视。结果见 [docs/17](17_framework_shooter_plan.md#linux-operator-第一切片结果claude2026-10-01未提交待-codex-复核)。
 
 ## Codex 独立 L2-B1 实机复验（2026-10-01）
 
