@@ -1,7 +1,8 @@
 param(
     [ValidateSet('Linux','Windows')][string]$ServerPlatform='Linux',
     [string]$Godot='D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe',
-    [string]$OutputDirectory=''
+    [string]$OutputDirectory='',
+    [switch]$NoOpen
 )
 # Build-machine entry only. Creates a fresh ordinary directory; never starts a
 # service, reads shared connection files, downloads dependencies or migrates data.
@@ -127,8 +128,13 @@ On Windows, CheckDeployment.cmd verifies the fresh delivery without services.
     $manifest=[ordered]@{format=1;build=$id;source_commit=$commit;source_files=$sourceFiles;engine='4.7.2.stable.official.ed1daf0bf';server=@{platform=$ServerPlatform.ToLowerInvariant()+'-x86_64';path='Server';identity=@{path=$identity;sha256=(Hash (Join-Path $server $identity))};checksums=@{path=$checksums;sha256=(Hash (Join-Path $server $checksums))};games=$serverGames;dependencies=$dependencies;entries=$entries};client=@{platform='windows-x86_64';path='PlayerClient';configured=$false;manifest=@{path='client-version.json';sha256=(Hash (Join-Path $client 'client-version.json'))};games=@{shooter=$serverGames.shooter}};files=$files}
     WriteUtf8 (Join-Path $delivery 'deployment.json') ($manifest|ConvertTo-Json -Depth 30)
     $null=RunScript 'check_deployment.ps1' @('-Root',$delivery)
+    $pointer=Join-Path $project 'artifacts/deployment-latest.json'
+    foreach($path in @($pointer,$pointer+'.tmp')){if(Test-Path -LiteralPath $path){$item=Get-Item -LiteralPath $path -Force;if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Refused linked latest deployment pointer.'}}}
+    WriteUtf8 ($pointer+'.tmp') (@{format=1;directory=$delivery.Substring($project.Length+1).Replace('\','/');manifest_sha256=(Hash (Join-Path $delivery 'deployment.json'))}|ConvertTo-Json)
+    Move-Item -LiteralPath ($pointer+'.tmp') -Destination $pointer -Force
     Write-Output ('DEPLOYMENT_READY '+$delivery)
     Write-Output ('DEPLOYMENT_BUILD '+$id+' server='+$ServerPlatform+' shooter='+$clientVersion.build_id+' player_configured=false')
+    if(-not $NoOpen){Invoke-Item -LiteralPath $delivery}
 }catch{
     # Preserve failed output for inspection; never recursively delete a directory
     # that might now contain user changes. It has no successful deployment marker.

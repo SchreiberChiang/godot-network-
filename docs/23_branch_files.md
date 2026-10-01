@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-10-02 Codex 配套部署与 Linux 离线更新（实施基准 `main / 8cddf26`）：新增 `PrepareDeployment.cmd`、`OpenDeployment.cmd`、`tools/prepare_deployment.ps1`、`tools/check_deployment.ps1`、`tools/open_deployment.ps1`、`tools/update_linux_package.sh`、`tools/update_linux_package.ps1`、`tests/test_deployment_pair.ps1`、`tests/test_linux_package_update.ps1`、`tests/test_linux_deployment_integration.ps1`；修改两个服务端构建脚本和 `tools/prepare_player_client.ps1`，同步 README、STATUS、CHANGELOG、docs/01、17、22、本清单、历史归档与路线图。阶段说明见 [交付记录](17_framework_shooter_plan.md#deployment-stage-result)。二进制、私有测试数据、依赖和证据在忽略目录；不更新正式实例，不删除清理候选、不发布 Release。
+
 2026-10-02 Codex 试玩反馈与后续规划（基准 `main / f132e4a`）：仅修改 CONTEXT、README、STATUS、docs/17、本清单和路线图；记录用户本机整体试玩正常、尚未分发他人，补充交付术语并规划部署/更新闭环。没有改功能、接触运行环境或实施更新，后续门槛见 [当前安排](17_framework_shooter_plan.md#next-delivery-stage)。
 
 2026-10-02 Codex 独立包真人入口（基准 `main / 4bbafc8`）：新增 `PlayLinuxPackage.cmd`、`StopLinuxPackage.cmd`、`tools/open_linux_package.ps1`、`tests/test_linux_package_entry.ps1`；管理转发脚本的管理员提示改为实例中性说明；更新 README、STATUS、docs/17、22、本清单及路线图。客户端、私有说明和目标清单只在忽略目录，服务器/客户端不重建，旧 LAN 与 Windows 真实数据保留。说明见 [独立包试玩](17_framework_shooter_plan.md#linux-package-playtest)。

@@ -20,6 +20,18 @@ foreach($file in $m.files){
     $path=SafePath ([string]$file.path)
     if(-not(Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Length -ne [long]$file.size -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine [string]$file.sha256){throw ('Deployment checksum mismatch: '+$file.path)}
 }
+# A package that has been run or configured is no longer a clean delivery.
+# Walk one level at a time, rejecting links before descending into directories.
+$directories=New-Object 'System.Collections.Generic.Stack[string]'
+$directories.Push($Root)
+while($directories.Count){
+    foreach($item in Get-ChildItem -LiteralPath $directories.Pop() -Force){
+        if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Refused linked deployment path.'}
+        if($item.PSIsContainer){$directories.Push($item.FullName);continue}
+        $relative=$item.FullName.Substring($Root.Length+1).Replace('\','/')
+        if($relative -ne 'deployment.json' -and -not $seen.ContainsKey($relative)){throw ('Deployment contains an unlisted file: '+$relative)}
+    }
+}
 foreach($descriptor in @(@{base=$m.server.path;value=$m.server.identity},@{base=$m.server.path;value=$m.server.checksums},@{base=$m.client.path;value=$m.client.manifest})){
     $path=SafePath ($descriptor.base+'/'+$descriptor.value.path)
     if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine [string]$descriptor.value.sha256){throw 'Deployment identity checksum mismatch.'}

@@ -1,19 +1,27 @@
 # 当前状态：RoomKit（2026-10-02）
 
 <a id="status-validation"></a>
-## 最新结论：Linux 独立服务器目录已实现
+## 最新结论：配套部署目录与 Linux 离线更新首版已验收
 
-已导出可复制的 Linux x86_64 普通目录，包含管理服务、宿主、两种房间程序、存储/维护脚本和校验入口；无需 Godot 编辑器，仍依赖已有 pwsh 7.6.6 与系统 SQLite。完整隔离验收 **64/0、退出 0**：Windows 源码 SDK 双人实战、击杀/复活、真实 300 秒签名结算、购买幂等、备份恢复、停止重启后资产保留；真实 Client.exe 单独验证双人注册与入退房。随后只补齐 Godot 随包版权文件的最终分发目录，基础复验 **54/0、退出 0**，不重复宣称五分钟已在最后二进制上跑过。服务端退出日志、程序路径、700/600 权限及停止后的无残留均核验，当前目录和证据见 [独立目录](docs/17_framework_shooter_plan.md#linux-server-directory)。
+**PrepareDeployment.cmd** 一次准备 Linux/Windows 对应的服务器与匹配的 Windows 玩家目录；**OpenDeployment.cmd** 打开最近的干净交付。Linux 可自己独立启动，不需要台式机一直开着；Linux 包仍需已有 pwsh 7.6.6 和系统 SQLite，任意全新电脑自动安装依赖尚未实现。
 
-本机已准备 **PlayLinuxPackage.cmd / StopLinuxPackage.cmd**：打开独立包后台、匹配客户端目录与私有登录说明；关闭入口只断开 SSH，停止入口才请求该实例退出。入口短时启动/重复打开/停止、哈希与证书、SSH 释放已实测；纯防护专项 **14/0**。用法及过程失败见 [独立包试玩](docs/17_framework_shooter_plan.md#linux-package-playtest)。
+Linux 新包已实际迁入隔离旧包的账号、资产、证书、端口与备份，原账号能登录、入退房，迁来的备份能恢复。更新工具只在停服后复制/校验/确认，不自动启停服务；撤销只取消未确认且未发生数据变化的候选。Windows 数据迁移、启动新版本失败后的自动回退、数据库格式升级尚未实现，见 [首版范围](docs/17_framework_shooter_plan.md#deployment-stage-result)。
 
-**用户反馈（2026-10-02）**：已在本机试玩，整体无明显问题；尚未把目录发给别人。不据此逐项确认所有画面/音效，也不扩展为朋友设备、真人多人或公网验收。原有自动测试范围仍按各自证据记录。
+| 验证层 | 结果 |
+|---|---|
+| Linux / Windows 配套目录与拒绝边界 | 各 **18/0**；新增文件、链接、错误版本与越界输出均拒绝 |
+| Linux 更新工具（假包） | 最终两轮各 **33/0**；失败记录和故障注入保留 |
+| 真实 Linux 包更新 | 旧包 **27/0**、更新后含迁入备份恢复 **27/0**；Windows SDK 业务驱动 |
+| Windows 导出包回归 | **44/0**；实际服务端程序、SDK 基础联机及退出 |
+| 独立 Client.exe 回归 | **28/0**；双人注册、入退房及错误版本拒绝；没有替用户验画面/听感 |
 
-**当前下一阶段：部署与更新闭环。** 先统一生成版本匹配的服务器目录、玩家目录和部署资料，再在新隔离实例验证更新保留账号/资产及开服前失败回退，最后整理固定入口和简短说明。当前数据保护仍限定版本包内 `data/`，不能直接换成版本外目录或链接；路线和验收门槛见 [下一阶段安排](docs/17_framework_shooter_plan.md#next-delivery-stage)。之后做 2–8 人同时登录、断线重连和朋友获取验证，再接赛车示例。暂由 Codex 负责，不新增云费用。
+以上命令实际退出码均为 0。最终打包目录、分项证据与过程失误在 [交付记录](docs/17_framework_shooter_plan.md#deployment-stage-result)；当前服务器/游戏协议、数据库格式和源码游戏身份不变。旧版 ZIP、仓库玩家副本和 Release 没有刷新或发布，本机原 PlayerClient 也不替换。本轮在新目录测试，Windows 真实数据与原 Linux LAN 实例不迁移；最后按用户授权正常停服、关机。
 
-本轮只记录反馈、术语和规划；没有更新服务器、重建客户端、连接设备或测试功能。原 LAN 试玩服务与 Windows 数据不操作，原 PlayerClient、仓库玩家副本和 Release 不替换、不发布。公网、其它发行版与导出包长期耐久仍未验收。
+收尾文档检查：路线图 49 个节点有效，479 处相对引用/锚点无失效，STATUS 搬迁的 8 行非空原文在历史中完整保留，`git diff --check` 通过。这里只核对路线图数据和引用，未再次做浏览器像素验收。
 
-文档检查：440 处相对引用与锚点有效，路线图 40 个节点的 ID、分类、阶段和状态一致，检查脚本退出 0；`git diff --check` 通过。未重新运行功能或浏览器验收。
+**项目地图**：根目录 ROADMAP.html 已同步本阶段能力、未实现项和明天讨论的候选，共 49 个节点；[20 个根文件夹说明](docs/01_scope_architecture.md#root-folders) 已按实际目录补齐。[清理候选](docs/17_framework_shooter_plan.md#cleanup-review-20261002) 只列不删。部署前的状态原文进入 [历史快照](docs/archive/status_history.md#status-20261002-deployment-plan)。
+
+**接下来**：明天先核对清理路径、大小与依赖，由用户决定；之后处理 2/4/8 人并发登录、断线重连与备份重叠，再安排朋友获取和赛车示例。用户此前仅反馈本机整体试玩正常，尚未给别人；不扩展为朋友设备、公网或长期耐久通过。
 
 ## 此前：Windows → Linux 局域网自动验收通过（2026-10-01）
 
@@ -47,6 +55,8 @@ Linux（笔记本，Godot 4.7.2 官方版 + pwsh 7.6.6）：源码完整服务�
 | 入口或产物 | 用法与限制 |
 |---|---|
 | StartManagement.cmd / StopManagement.cmd | Windows 源码后台启动/停止；当前推荐 |
+| PrepareDeployment.cmd / OpenDeployment.cmd | 准备配套服务器/玩家普通目录，或打开最近生成的干净交付；默认 Linux 服务端，Windows 用 -ServerPlatform Windows |
+| 新 Linux 包的 UpdateRoomKit.sh | 停服后的迁入、校验与确认；只撤销未确认且没变动的候选，详见首版交付 |
 | `tools/roomkit_linux.sh start\|stop\|status` | Linux 源码启动隔离实例；用法见 [README](README.md#linux-源码启动) |
 | `tools/build_linux_server.ps1` → Linux 普通目录 | 导出独立服务端；包内先 CheckPackage.sh，再 RoomKit.sh start/stop/status；当前目录及依赖见 docs/17 |
 | PlayLinuxPackage.cmd / StopLinuxPackage.cmd | 本机已准备的独立包试玩 / 正常停止；面板 28691，通过 SSH 打开 |

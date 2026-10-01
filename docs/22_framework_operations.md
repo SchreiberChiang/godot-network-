@@ -2,6 +2,12 @@
 
 当前主线为 main，规格见 docs/17，测试证据见 STATUS。这里说明现有入口，不把代码已编写等同于发布验收通过。
 
+## 配套交付与离线更新
+
+构建机的 `PrepareDeployment.cmd` 默认生成 Linux 服务端与匹配的 Windows 玩家目录；`-ServerPlatform Windows` 改为 Windows 服务端。`OpenDeployment.cmd` 打开最近的干净目录。目标机启动、玩家 `SetServer.cmd` 配置和 Linux `UpdateRoomKit.sh` 更新流程见 [首版交付](17_framework_shooter_plan.md#deployment-stage-result)；不自动安装依赖或操作运行服务。目录用途见 [根目录说明](01_scope_architecture.md#root-folders)。
+
+配对及拒绝专项：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_deployment_pair.ps1 -DeploymentDirectory <本机新生成的干净目录>`。仅接受本工作区 `artifacts` 中未运行的目录，用后恢复自己注入的文件；不运行服务。Linux 更新工具专项为 `tests/test_linux_package_update.ps1`（真实 pwsh/SQLite、假包）；真实导出包更新驱动 `tests/test_linux_deployment_integration.ps1 -Stage Seed|Verify -ContextPath <显式准备清单>` 只接受专用测试目录和端口，私有准备清单不随 Git 分发，不能对正式服务使用。
+
 ## 源码运行
 
 Linux 同机的最终结果、原始失败和退出补修见 [备份等待收尾](17_framework_shooter_plan.md#l3-backup-wait)；Windows → Linux 的独立局域网验收、专用客户端与端口见 [跨机试玩](17_framework_shooter_plan.md#linux-lan)。

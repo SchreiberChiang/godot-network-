@@ -4,6 +4,7 @@
 
 ## 2026-10-02 Linux 服务器目录候选
 
+- 新增配套普通目录的交付清单 `format=1` 与 Linux 离线更新作业 `format=1`；只接受当前账号库版本 1、资产库版本 2，不升级数据库格式。Windows 包仍使用各次构建的正式身份，Linux 包沿用源码内容摘要；两种包分别与同批 Windows 玩家配对。线上协议、SDK/框架版本不变，GitHub Release 未发布。
 - 新增 Linux x86_64 独立服务器目录构建；包含官方 Godot 4.7.2 程序，存储仍用外部 pwsh 7.6.6。SDK/框架版本继续为 **0.5.0**，线上协议与数据库格式不变。
 - 导出服务器沿用内容摘要身份 `shooter-dev-002-src-70b8f5366f78` / `turns-managed-dev-001-src-6c031a3e2b26`，可与同一清单的 Windows 玩家客户端配对。没有发布 GitHub Release 或更新旧发行包。
 

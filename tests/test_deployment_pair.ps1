@@ -56,6 +56,24 @@ try{
     Check ($r.code -ne 0 -and $r.text -match 'linked deployment path') 'linked delivery rejected by checksum entry'
 }finally{if(Test-Path -LiteralPath $link){[IO.Directory]::Delete($link)}}
 # Tamper a small player helper in the newly generated test-owned directory only.
+$extra=Join-Path $client 'acceptance-extra.txt'
+try{
+    [IO.File]::WriteAllText($extra,'test-owned extra file')
+    $r=InvokeTool 'check_deployment.ps1' @('-Root',$DeploymentDirectory)
+    Check ($r.code -ne 0 -and $r.text -match 'unlisted file') 'extra player or runtime data refused as a clean delivery'
+}finally{if(Test-Path -LiteralPath $extra){Remove-Item -LiteralPath $extra}}
+$link=Join-Path $DeploymentDirectory 'acceptance-linked-directory'
+try{
+    New-Item -ItemType Junction -Path $link -Target $real|Out-Null
+    $r=InvokeTool 'check_deployment.ps1' @('-Root',$DeploymentDirectory)
+    Check ($r.code -ne 0 -and $r.text -match 'linked deployment path') 'unlisted linked directory refused without following it'
+}finally{if(Test-Path -LiteralPath $link){[IO.Directory]::Delete($link)}}
+$extra=Join-Path $DeploymentDirectory 'Server/acceptance-runtime-data.txt'
+try{
+    [IO.File]::WriteAllText($extra,'test-owned simulated runtime data')
+    $r=InvokeTool 'check_deployment.ps1' @('-Root',$DeploymentDirectory)
+    Check ($r.code -ne 0 -and $r.text -match 'unlisted file') 'new server runtime file refused as a clean delivery'
+}finally{if(Test-Path -LiteralPath $extra){Remove-Item -LiteralPath $extra}}
 $helper=Join-Path $client 'CheckClient.cmd'
 $original=[IO.File]::ReadAllBytes($helper)
 try{

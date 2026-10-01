@@ -4,7 +4,17 @@
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
-下一阶段做 [部署与更新闭环](docs/17_framework_shooter_plan.md#next-delivery-stage)：配套交付 → 隔离更新保留数据 → 固定入口；后续再做小规模多人、朋友试玩和赛车接入。目前这些后续能力仍是规划。
+资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；[新增清理候选](docs/17_framework_shooter_plan.md#cleanup-review-20261002) 只列清单，明天讨论后再决定是否删除。
+
+配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。明天先讨论清理清单，再做小规模多人、朋友试玩和赛车接入。
+
+## 准备服务器和玩家目录
+
+在这台 Windows 构建机双击 **PrepareDeployment.cmd**，默认生成 Linux 服务器与匹配的 Windows 玩家客户端；Windows 服务器用 `PrepareDeployment.cmd -ServerPlatform Windows`。**OpenDeployment.cmd** 随时打开最近生成的干净目录，其中 `Server/` 给服务器机器，`PlayerClient/` 给玩家。各自的启动、配置和停止步骤都在目录说明里，不需要多层寻找包号。
+
+Linux 可以在本机独立启动，无需台式机保持开机；Windows SSH 入口仅用于远程管理。Windows 包带引擎，Linux 包仍需要已有 pwsh 7.6.6 和系统 SQLite，**尚无任意全新电脑自动安装全部依赖的通用入口**。
+
+Linux 换版本时先停止旧实例，再在新包用 **UpdateRoomKit.sh** 做离线复制、校验与确认，账号和资产保留；撤销仅适用于尚未确认且没有数据变化的候选。步骤及限制见 [更新说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。旧包和快照不自动删除，Windows 数据迁移与启动失败后的自动回退尚未实现。
 
 ## 环境
 
@@ -62,6 +72,8 @@ bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；仍需已有的 **pwsh 7.6.6** 和系统 **libsqlite3.so.0**，脚本不安装依赖。当前目录及实测范围见 [Linux 独立目录](docs/17_framework_shooter_plan.md#linux-server-directory)。
 
 在目录内依次运行 `bash CheckPackage.sh` → `bash RoomKit.sh start --instance demo`；状态用 `bash RoomKit.sh status --instance demo`，停止用 `bash RoomKit.sh stop --instance demo`。默认只绑定回环，新实例的端口与对外地址可在首次启动时设置；重启沿用保存配置。后台通过本机浏览器或同号 SSH 转发访问。玩家仍使用版本匹配的 Windows 客户端。
+
+**Linux 可以自己独立启动**，不用先开 Windows 台式机。复制干净普通包、依赖已准备好后，在 Linux 本机运行上面的命令，再用该 Linux 的浏览器打开打印的地址。台式机的 `PlayLinuxPackage.cmd` 只是当前测试实例的远程快捷方式。全新电脑需选自己的平台包：Windows 包自带引擎并使用系统 PowerShell/SQLite；Linux 包还需兼容的 pwsh 和系统库。当前没有自动安装全部依赖的通用入口，不能把现有笔记本通过当作任意全新电脑一键部署通过。
 
 运行会产生私有账号库、密钥与日志；给别人分发应使用 Windows 构建出的干净目录，不能复制已经运行过的目录。其它发行版、ARM、公网和开机服务另行验收。
 

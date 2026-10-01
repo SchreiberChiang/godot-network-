@@ -104,8 +104,13 @@ foreach($entry in @(@{name='Operator';script='res://host/operator.gd'},@{name='M
     Copy-Item -LiteralPath $template -Destination (Join-Path $bundle ($entry.name+'.x86_64'))
 }
 foreach($name in @('roomkit_linux.sh','linux_package_check.sh')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))}
+foreach($name in @('update_linux_package.sh','update_linux_package.ps1')){
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))
+    [void]$sourceFiles.Add(@{path=('tools/'+$name);sha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $name) -Algorithm SHA256).Hash.ToLowerInvariant()})
+}
 WriteUtf8 (Join-Path $bundle 'RoomKit.sh') "#!/usr/bin/env bash`nexec bash `"`$(dirname `"`$0`")/tools/roomkit_linux.sh`" `"`$@`"`n"
 WriteUtf8 (Join-Path $bundle 'CheckPackage.sh') "#!/usr/bin/env bash`nexec bash `"`$(dirname `"`$0`")/tools/linux_package_check.sh`" `"`$@`"`n"
+WriteUtf8 (Join-Path $bundle 'UpdateRoomKit.sh') "#!/usr/bin/env bash`nexec bash `"`$(dirname `"`$0`")/tools/update_linux_package.sh`" `"`$@`"`n"
 $base=(& git -C $project rev-parse HEAD).Trim();if($LASTEXITCODE){throw 'Cannot identify source commit.'}
 WriteUtf8 (Join-Path $bundle 'linux-package.json') (@{format=1;build=$id;source_commit=$base;engine='4.7.2.stable.official.ed1daf0bf';pwsh='external 7.6.6';games=@{shooter=$games.shooter.manifest.build_id;turns=$games.turns.manifest.build_id};source_files=@($sourceFiles)}|ConvertTo-Json -Depth 10)
 WriteUtf8 (Join-Path $bundle 'README.md') @'
@@ -131,6 +136,15 @@ The package also writes run/ and games/<game>/server.log; keep it writable.
 Godot runtime notices are in GODOT-LICENSE.txt and GODOT-COPYRIGHT.txt.
 Windows player clients are distributed separately and must match games.json.
 This candidate has not been proven on every Linux distribution or on ARM.
+
+Offline update (same supported database versions only): stop the old instance
+with its own RoomKit.sh first. In the new package run UpdateRoomKit.sh prepare
+--old-package ABS_OLD --new-package ABS_NEW --instance NAME. Then verify and seal
+with --new-package ABS_NEW --instance NAME, before RoomKit.sh start --instance NAME.
+status inspects the update journal; rollback only cancels an untouched unsealed
+candidate. All files and snapshots remain. It never restores old data over new
+writes, starts a service, upgrades database formats, or deletes the old package.
+Even startup writes prevent automatic rollback. Failed startup needs review.
 '@
 $checksums=foreach($file in Get-ChildItem -LiteralPath $bundle -Recurse -File | Sort-Object FullName){$relative=$file.FullName.Substring($bundle.Length+1).Replace('\','/');(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()+'  '+$relative}
 WriteUtf8 (Join-Path $bundle 'SHA256SUMS.txt') (($checksums -join "`n")+"`n")
