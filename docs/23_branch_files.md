@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-10-02 Codex 试玩反馈与后续规划（基准 `main / f132e4a`）：仅修改 CONTEXT、README、STATUS、docs/17、本清单和路线图；记录用户本机整体试玩正常、尚未分发他人，补充交付术语并规划部署/更新闭环。没有改功能、接触运行环境或实施更新，后续门槛见 [当前安排](17_framework_shooter_plan.md#next-delivery-stage)。
+
 2026-10-02 Codex 独立包真人入口（基准 `main / 4bbafc8`）：新增 `PlayLinuxPackage.cmd`、`StopLinuxPackage.cmd`、`tools/open_linux_package.ps1`、`tests/test_linux_package_entry.ps1`；管理转发脚本的管理员提示改为实例中性说明；更新 README、STATUS、docs/17、22、本清单及路线图。客户端、私有说明和目标清单只在忽略目录，服务器/客户端不重建，旧 LAN 与 Windows 真实数据保留。说明见 [独立包试玩](17_framework_shooter_plan.md#linux-package-playtest)。
 
 2026-10-02 Codex Linux 独立服务器目录（基准 `main / ae5225d`）：新增 `tools/build_linux_server.ps1`、`tools/linux_package_check.sh`、`tests/test_linux_server_package.ps1`；修改 `host/operator.gd` 的导出版宿主平台文件名、`tools/roomkit_linux.sh` 的包运行/端口保存/路径检查、`tests/run_operator_projection.gd` 与 `tests/support/client_harness.ps1` 的报告读取边界；更新 README、STATUS、CHANGELOG、docs/10、17、22、本清单和路线图。干净分发目录、Linux 隔离部署、假库、玩家客户端和失败证据仅在忽略目录，不把二进制或私有数据加入 Git。执行范围见 [独立目录](17_framework_shooter_plan.md#linux-server-directory)。
