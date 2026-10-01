@@ -169,6 +169,26 @@ binary_format/architecture="x86_64"
         WriteVersion $repoStage $base
     }
     Copy-Item -LiteralPath (Join-Path $helpers 'PLAYER_README.md') -Destination (Join-Path $stage 'README.md')
+    if($Unconfigured) {
+        [IO.File]::WriteAllText((Join-Path $stage 'README.md'),@'
+# RoomKit shooter player - server not configured yet
+
+This is a complete Windows player program; no Godot editor is required.
+It deliberately does NOT contain connection.json or server.crt. The build
+machine has not started your target server or created a certificate for it.
+
+1. Ask the actual server host for its PUBLIC connection.json and server.crt.
+2. Drag their containing folder onto SetServer.cmd. Never accept a private key.
+3. Double-click Client.exe (StartGame.cmd is also available), then register with
+   an invitation from the host, log in, and create/join a shooter room.
+
+Keep the whole folder together when giving it to a player. CheckClient.cmd
+checks the executable/pack hashes and reports whether a server is configured.
+client-version.json must match the server build; admission checks are unchanged.
+Server updates may need a matching fresh player folder. Do not give players
+server databases, private certificates, administrator credentials or backups.
+'@,$utf8)
+    }
     # SetServer validates the public files (wss url, allowed fields, no private key).
     if(-not $Unconfigured) {
         $set=& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $stage 'SetServer.ps1') $ConnectionDirectory

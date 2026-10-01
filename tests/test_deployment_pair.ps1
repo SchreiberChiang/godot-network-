@@ -27,6 +27,7 @@ Check ($r.code -eq 0 -and $r.text -match 'DEPLOYMENT_VALID') 'all immutable hash
 $manifest=Get-Content -LiteralPath (Join-Path $DeploymentDirectory 'deployment.json') -Encoding UTF8 -Raw|ConvertFrom-Json
 $client=Join-Path $DeploymentDirectory $manifest.client.path
 Check (-not(Test-Path -LiteralPath (Join-Path $client 'connection.json')) -and -not(Test-Path -LiteralPath (Join-Path $client 'server.crt'))) 'fresh player has no invented connection or certificate'
+Check ([IO.File]::ReadAllText((Join-Path $client 'README.md')) -match 'server not configured yet') 'player instructions clearly require actual target public configuration'
 Check ((Test-Path -LiteralPath (Join-Path $client 'Client.exe')) -and (Test-Path -LiteralPath (Join-Path $client 'SetServer.cmd')) -and (Test-Path -LiteralPath (Join-Path $client 'CheckClient.cmd'))) 'player is a complete ordinary Windows folder'
 $r=InvokeTool 'prepare_deployment.ps1' @('-OutputDirectory',$DeploymentDirectory)
 Check ($r.code -ne 0 -and $r.text -match 'already exists') 'existing delivery refused before export'
