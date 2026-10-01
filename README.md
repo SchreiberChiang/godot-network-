@@ -51,6 +51,8 @@ bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 
 本机专用的 Linux 联机客户端：双击 **`OpenLinuxPlayerClient.cmd`** 打开独立目录，再双击其中的 `Client.exe`。它连接笔记本测试实例，保留原 `PlayerClient`；生成的程序和连接配置不进入 Git。邀请码、启停和复验说明见 [Linux 跨机试玩](docs/17_framework_shooter_plan.md#linux-lan)。
 
+**从台式机打开 Linux 后台：双击根目录 `OpenLinuxManagement.cmd`，保持窗口打开。** 入口建立 SSH 转发，再在浏览器打开 <http://127.0.0.1:28491/>；按回车或关闭入口窗口只断开这次转发，不停 Linux 服务。后台只监听笔记本自己的回环地址，不能直接打开 `http://192.168.10.105:28491/`。网址填在浏览器地址栏，不是 SSH 终端命令；测试管理员与 Windows 管理员不同，信息在本机私有 `data/codex-linux-lan-20261001224135-8dd5ca/admin.json`。入口不启动远程服务，SSH 认证不可用时明确报错，不修改 SSH 配置。说明见 [后台访问与下一阶段](docs/17_framework_shooter_plan.md#linux-management-entry)。
+
 ## 独立 Windows 包（无需 Godot 编辑器）
 
 运行 `tools/build_framework_release.ps1` 构建。最新 ZIP 和解压位置记录在 `artifacts/framework-release.json`。解压后按顺序：`CheckFramework.cmd` 校验 → `StartPanel.cmd` 打开管理后台 → 玩家用 `StartShooter.cmd` / `StartTurns.cmd` → 全部关闭用 `StopFramework.cmd`；`PublishClients.cmd` 生成给玩家的公开连接配置。只分发构建时的干净 ZIP，不要分发跑过测试的解压目录。

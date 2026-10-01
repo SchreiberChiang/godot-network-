@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-10-01 Codex Linux 后台入口（基准 `main / 7d5594e`）：新增 `OpenLinuxManagement.cmd`、`tools/open_linux_management.ps1`；更新 README、STATUS、docs/10、17 和本清单。仅建立自持有的回环 SSH 转发，保留原服务与真实数据；补记 Linux 分发目录的资源调查与下一阶段任务，尚未修改导出或服务器代码。
+
 2026-10-01 Codex 局域网跨机验收（基准 `main / 572c356`）：新增 `tests/test_linux_lan.ps1`、`OpenLinuxPlayerClient.cmd`、`tools/open_linux_player_client.ps1`；更新 README、STATUS、docs/10、17、22、本清单及路线图数据。生产服务器、SDK、协议和构建规则未改；源码快照、假数据库、私有测试说明、公开连接配置和新导出的客户端仅在忽略目录。说明见 [Windows → Linux](17_framework_shooter_plan.md#linux-lan)。
 
 2026-10-01 Codex 备份等待收尾（基准 `main / b177e3f`）：新增 `tests/run_operator_backup_wait.gd`、`tests/run_local_rpc_cancel.gd`、`tests/test_operator_backup_login.ps1`、`tests/run_managed_reference_lifetime.gd`；修改 Operator、大厅及内部 LocalRPC、客户端/后台维护提示、协议例子及对应检查、`host/core/remote_results.gd` 的弱回引用；补严 Linux C/D/E 驱动和客户端退出码核对；同步 README、STATUS、CHANGELOG、docs/10、17、21、22、本清单与路线图数据。说明与证据见 [docs/17](17_framework_shooter_plan.md#l3-backup-wait)，稳定语义见 [docs/21](21_managed_protocol.md#玩家账号)。本地运行目录、设备快照及失败启动输出不纳入 Git；玩家副本和旧发行产物未重建。

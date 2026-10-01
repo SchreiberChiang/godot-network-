@@ -7,6 +7,8 @@
 
 本机入口：`OpenLinuxPlayerClient.cmd` 打开独立客户端目录；真人画面/听感、公网、Linux 导出服务器包、其它发行版仍未验收。
 
+**Linux 后台访问已补入口**：`OpenLinuxManagement.cmd` 建立同号回环 SSH 转发并打开台式机浏览器的 `http://127.0.0.1:28491/`；Linux 后台不能直接用笔记本 IP 访问。真实面板 API/HTML、监听进程归属、占用端口拒绝和强制关闭入口后的 SSH 清理已检查。Linux 原 Operator 保持运行，Windows 真实数据与公开配置 5/5 不变；未重新验收后台登录。下一阶段为 Linux 服务器分发目录：构建资源调查已完成，尚未实施导出/部署。边界与任务顺序见 [后台入口与分发计划](docs/17_framework_shooter_plan.md#linux-management-entry)。
+
 ### 此前同机收尾结果（保留证据边界）
 
 用户授权提交推送，后续暂由 Codex 负责。当前独立结果见 [备份等待与收尾](docs/17_framework_shooter_plan.md#l3-backup-wait)，此前 Claude 的失败和未运行项保留在 [历史收尾结果](docs/17_framework_shooter_plan.md#l3-closeout-result)。以下是功能门槛与补充复验，不把原始非零汇总改写为全绿。
@@ -35,6 +37,7 @@ Linux（笔记本，Godot 4.7.2 官方版 + pwsh 7.6.6）：同机从源码启�
 | PreparePlayerClient.cmd → PlayerClient/ | 生成完整玩家目录，直接双击 Client.exe；源码更新后需重新生成并与服务配对 |
 | StartPlayerClient.cmd / StartShooterClient.cmd | 已生成客户端入口 / 源码客户端入口 |
 | OpenLinuxPlayerClient.cmd | 打开本机单独准备的 Linux 联机客户端；无需替换原 PlayerClient，详见 docs/17 |
+| OpenLinuxManagement.cmd | SSH 转发后打开 Linux 后台；保持入口窗口打开，关闭不停止远程服务 |
 | clients/shooter-windows/、旧 Release 附件、独立 ZIP | 未随 Linux 工作重新生成；不作为最新源码交付，Release 仍暂缓 |
 | ROADMAP.html | 离线项目地图；执行状态以本文及 docs/17 顶部为准 |
 
