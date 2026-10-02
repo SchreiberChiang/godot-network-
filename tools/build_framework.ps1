@@ -22,7 +22,7 @@ foreach($item in @(@{id='shooter';source='shooter'},@{id='turns';source='turn_ba
     $destination=Join-Path $buildRoot $item.id
     New-Item -ItemType Directory -Force -Path (Join-Path $destination 'game'),(Join-Path $destination 'schemas') | Out-Null
     Copy-Item -LiteralPath (Join-Path $projectRoot 'sdk') -Destination $destination -Recurse
-    foreach($name in @('game.gd','adapter.gd','room.gd','asset_policy.gd','rewards.gd','game_config.json')) {
+    foreach($name in @('game.gd','adapter.gd','room.gd','asset_policy.gd','rewards.gd','snapshot_codec.gd','game_config.json')) {
         $source=Join-Path $projectRoot ('examples\'+$item.source+'\'+$name)
         if(Test-Path -LiteralPath $source -PathType Leaf) { Copy-Item -LiteralPath $source -Destination (Join-Path $destination 'game') }
     }

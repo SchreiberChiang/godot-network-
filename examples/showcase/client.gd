@@ -37,6 +37,7 @@ func _run() -> void:
 	world = World.new()
 	world.name = "GameWorld"
 	root.add_child(world)
+	client.room_left.connect(_reset_world_network_state)
 	display_name = "玩家一" if args.get("--role", "one") == "one" else "玩家二"
 	root.title = "RoomKit · " + world.title() + " · " + display_name
 	view = View.new()
@@ -69,8 +70,10 @@ func _run() -> void:
 func _join() -> void:
 	busy = true
 	message = "认证并加载游戏中"
-	world.latest.clear()
+	_reset_world_network_state()
 	var joined: Dictionary = await client.join_room(args["--room"])
+	if not joined.ok:
+		_reset_world_network_state()
 	busy = false
 	message = "已返回大厅" if joined.ok else "入房失败：" + str(joined.code)
 	if not joined.ok and automated:
@@ -82,7 +85,7 @@ func toggle_room() -> void:
 	if client.state == "IN_ROOM":
 		busy = true
 		await client.leave_room()
-		world.latest.clear()
+		_reset_world_network_state()
 		message = "已返回大厅，身份保持不变"
 		busy = false
 	elif client.state == "LOBBY":
@@ -91,6 +94,14 @@ func toggle_room() -> void:
 func choose(take: int) -> void:
 	if client.state == "IN_ROOM" and world.has_method("choose"):
 		world.choose(take)
+
+func _reset_world_network_state() -> void:
+	if world == null:
+		return
+	if world.has_method("reset_network_state"):
+		world.reset_network_state()
+	else:
+		world.latest.clear()
 
 func _process(delta: float) -> bool:
 	if finishing or client == null:

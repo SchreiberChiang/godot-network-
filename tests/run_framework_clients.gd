@@ -168,8 +168,10 @@ func _run_command(command: Dictionary, path: String) -> void:
 			# The SDK returns reservation failures directly; last_error only tracks
 			# the subsequent ENet handshake. Preserve the actual public API reply.
 			if client.state == "LOBBY":
-				world.latest.clear()
+				_reset_world_network_state()
 			response = await client.join_room(str(command.room_id))
+			if not response.ok:
+				_reset_world_network_state()
 			result = _safe_result(response)
 		"leave":
 			await leave_room()

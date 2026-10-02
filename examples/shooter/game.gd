@@ -1,6 +1,7 @@
 extends Node
 ## This game owns movement, life states and firearms. The SDK never imports it.
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
+const SnapshotCodec = preload("snapshot_codec.gd")
 const SIZE := Vector2(960, 540)
 const HALF := Vector2(14, 22)
 const SPEED := 235.0
@@ -47,6 +48,10 @@ var snapshot_age := 0.0
 var _diagnostic_tick := -1
 var _diagnostic_received_ms := -1
 var _diagnostic_interval_ms := -1
+var _snapshot_decoder := SnapshotCodec.new()
+var _snapshot_stream := 0
+var _snapshot_serial := 0
+var _snapshot_send_failed := false
 const BLEND_SECONDS := 0.05
 # Body-only arrival smoothing: steady 20 Hz stays at 50 ms. Recent jitter can
 # extend a new transition to at most 100 ms, at the cost of extra display lag.
@@ -403,7 +408,17 @@ func respawn_command(value: int) -> void:
 	player.respawn_sequence = value
 	request_respawn(player.user_id)
 
-@rpc("authority", "call_remote", "unreliable_ordered", 1)
+## Each bounded fragment is unordered: ENet must not discard an earlier fragment
+## merely because a later fragment of the same snapshot arrived first.
+@rpc("authority", "call_remote", "unreliable", 1)
+func world_chunk(packet: PackedByteArray) -> void:
+	if server:
+		return
+	var value: Dictionary = _snapshot_decoder.feed(packet, Time.get_ticks_msec())
+	if not value.is_empty():
+		world_state(value)
+
+## Local semantic application only. The wire entry point is world_chunk in v3.
 func world_state(value: Dictionary) -> void:
 	if not server and Validator.validate_file(value, "res://schemas/shooter_state.schema.json") == "" and int(value.tick) >= int(latest.get("tick", -1)):
 		var cues: Array = [] if latest.is_empty() else presentation_cues(latest, value, last_visual_shot)
@@ -430,6 +445,25 @@ func world_state(value: Dictionary) -> void:
 		snapshot_age = 0.0
 		for cue in cues:
 			presentation_cue.emit(cue.cue, cue)
+
+## The client shell calls this before joining and after leaving a room. Keeping
+## a previous room's stream/partial snapshot would otherwise block the next one.
+func reset_network_state() -> void:
+	_snapshot_decoder.reset()
+	latest.clear()
+	render_tracks.clear()
+	aim_tracks.clear()
+	visual_shots.clear()
+	last_visual_shot = 0
+	snapshot_age = 0.0
+	set_local_aim("", Vector2.ZERO, false)
+	_diagnostic_tick = -1
+	_diagnostic_received_ms = -1
+	_diagnostic_interval_ms = -1
+	_position_intervals.clear()
+	_position_arrival_age = 0.0
+	_position_tick = -1
+	_position_blend_seconds = BLEND_SECONDS
 
 ## Client reception gaps/progress age only. No remote clock or packet-loss claim.
 func snapshot_diagnostics() -> Dictionary:
@@ -594,8 +628,24 @@ func _publish() -> void:
 	latest = state_snapshot()
 	if not is_inside_tree() or not multiplayer.has_multiplayer_peer():
 		return
+	if _snapshot_serial >= 0xffffffff:
+		if not _snapshot_send_failed:
+			push_error("SHOOTER_SNAPSHOT_SERIAL_EXHAUSTED")
+		_snapshot_send_failed = true
+		return
+	if _snapshot_stream == 0:
+		_snapshot_stream = maxi(1, Crypto.new().generate_random_bytes(4).decode_u32(0))
+	_snapshot_serial += 1
+	var packets: Array[PackedByteArray] = SnapshotCodec.encode(latest, _snapshot_serial, _snapshot_stream)
+	if packets.is_empty():
+		if not _snapshot_send_failed:
+			push_error("SHOOTER_SNAPSHOT_ENCODE_FAILED")
+		_snapshot_send_failed = true
+		return
+	_snapshot_send_failed = false
 	for peer in peers:
-		world_state.rpc_id(peer, latest)
+		for packet in packets:
+			world_chunk.rpc_id(peer, packet)
 
 func _reject() -> bool:
 	rejected += 1

@@ -307,12 +307,13 @@ func join_selected() -> void:
 	busy = true
 	inventory_open = false
 	account_open = false
-	world.latest.clear()
+	_reset_world_network_state()
 	var result: Dictionary = await client.join_room(selected_room)
 	if result.ok:
 		current_room = selected_room
 		message = "已进入房间"
 	else:
+		_reset_world_network_state()
 		message = "入房失败：" + explain(result.get("code", "UNKNOWN"))
 	busy = false
 
@@ -333,6 +334,7 @@ func _room_joined(_snapshot: Dictionary) -> void:
 	inventory_open = false
 
 func _room_left() -> void:
+	_reset_world_network_state()
 	inventory_open = false
 	current_room = ""
 	last_life = ""
@@ -472,7 +474,14 @@ func _reset_session() -> void:
 	pending_asset.clear()
 	pending_warning = ""
 	current_room = ""
-	if world != null:
+	_reset_world_network_state()
+
+func _reset_world_network_state() -> void:
+	if world == null:
+		return
+	if world.has_method("reset_network_state"):
+		world.reset_network_state()
+	else:
 		world.latest.clear()
 
 func _pending_server() -> String:
