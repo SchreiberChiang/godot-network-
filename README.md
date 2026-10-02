@@ -1,12 +1,12 @@
 # RoomKit：独立的本地房间框架
 
-从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能与 Linux 源码服务已有验收；Linux 独立服务器普通目录也已构建和隔离运行。跨机完整对局用源码 SDK 客户端验证，真实 Client.exe 的双人入退房另列结果；用户已反馈本机试玩整体正常，朋友设备、公网、其它发行版和导出包长期耐久仍未验收。
+从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能与 Linux 源码服务已有验收；Linux 独立服务器普通目录也已构建和隔离运行。跨机完整对局用源码 SDK 客户端验证，真实 Client.exe 的双人入退房另列结果；用户已反馈本机与朋友公网试玩可用，但移动和枪口卡顿待定位。其它发行版、云端与导出包长期耐久仍未验收。
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
-配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环。[朋友公网试玩](docs/17_framework_shooter_plan.md#friends-public-preparation) 的新实例、配套玩家目录和远程入口已准备；外部玩家连接尚待验收，随后再做赛车接入。
+配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环。[朋友公网试玩](docs/17_framework_shooter_plan.md#friends-public-preparation) 已收到人工通过反馈；先补客户端诊断定位卡顿，再安排赛车接入。
 
 ## 准备服务器和玩家目录
 

@@ -174,6 +174,15 @@ Linux C/D/E 驱动 [linux_l3_slice.sh](../tools/linux_l3_slice.sh) 同样先跑�
 
 ### 账号、管理、射击与托管专项
 
+客户端网络诊断专项只用回环临时 ENet 端口和本机呈现对象，不启动 Operator 或使用真实账号。每次用新的隔离目录：
+
+```powershell
+$diagnosticRun = Join-Path (Get-Location).Path ('data/test-client-network-' + [Guid]::NewGuid().ToString('N'))
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_isolated_test.ps1 -Script tests/run_client_network_stats.gd -Isolation $diagnosticRun -Log (Join-Path $diagnosticRun 'result')
+```
+
+以 `CLIENT_NETWORK_STATS_RESULT passed=... failed=0`、实际退出 0 和无脚本错误为准；检查未知 RTT、真实 ENet 统计、严格状态推进、单调帧间停顿和字体布局。该结果不代表公网延迟、真人流畅度或卡顿修复。新增指标的定义与配套更新限制见 [客户端诊断](25_shooter_room_rules.md#client-diagnostics)。
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode accounts

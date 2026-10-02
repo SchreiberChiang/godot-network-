@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-10-02 Codex 公网试玩反馈与客户端诊断（基准 `main / fbf999e`）：修改 `sdk/roomkit/client/room_client.gd`、`examples/framework/view.gd`、`examples/shooter/game.gd`，新增 `tests/run_client_network_stats.gd`；只增加房间 RTT 与呈现时序/帧间停顿的只读显示，不改玩法或线协议。同步 README、STATUS、SDK README、docs/10、17、22、25、本清单和路线图。诊断最终30/0、真实渲染31/0、反馈8/0、射击83/0，退出0、stderr空；失败夹具和字体布局记录保留。用户观察FPS约120仍感移动/旋转卡，未认定根因；当前Linux服务与配套包不更新，新版人工短验待安排。见 [本轮结果](17_framework_shooter_plan.md#friends-public-preparation)。
+
 2026-10-02 Codex 朋友公网试玩准备（基准 `main / c261fe2`）：修改 `tools/open_linux_package.ps1` 和 `tests/test_linux_package_entry.ps1`，支持已准备配套 Server 的受限路径、公开 IPv4 与大厅端口，启动前核对远端保存网络，旧指针兼容。入口替身 41/0；新 Linux 实例包检查、权限/网络、客户端文件和真实 SSH 后台入口通过。同步 README、STATUS、docs/10、17、22、本清单和路线图。复用同版导出，真实账号和原玩家/交付不变；新配置/程序/证据只在忽略目录。用户反馈路由器已设置，授权的两组 UFW allow 命令退出0，前后状态均为inactive、未改变启用状态；外部朋友试玩未运行，见 [准备结果](17_framework_shooter_plan.md#friends-public-preparation)。
 
 2026-10-02 Codex 阶段 6（基准 `main / 3be2438`，运行源码 `ef0aeb4`）：新增 `CheckEnvironment.cmd`、`PrepareEnvironment.sh`、`tools/check_environment.ps1`、`prepare_environment.sh`、`runtime_paths.sh`、`artifact_retention.ps1`；接入 Linux/配套/玩家构建和隔离测试入口。修改 ResultService、RemoteResults、RoomManager、RecoveryGuard、托管宿主/Operator 与 sqlite_store，新增七天回收和控制断联恢复专项、SQLite 夹具、依赖/保留专项；同步 process_journal、result_ack、结果例子及相关旧测试。共 32 项运行/契约/测试改动，详见 `git diff --name-status 3be2438..ef0aeb4`；文档和路线图随后收尾。WSL 源码/Mint 导出包各一次 29/0，授权两平台 50/0；原真实文件 6/6 不变。三实施工作树已移除，二进制/私有数据不入 Git，Release 未发布；临时归档清理被自动审批拒绝，未执行。完整结果和限制见 [阶段交付](17_framework_shooter_plan.md#stage6-result)。

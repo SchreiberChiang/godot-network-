@@ -8,7 +8,7 @@
 | 项目 | 当前记录与证据边界 |
 |---|---|
 | 设备 | zhao@192.168.10.105；Mint 22.3、x86_64、i5-5200U（2 核 4 线程）、7.7 GB RAM；IP/负载/空闲磁盘需运行前复查 |
-| 朋友公网试玩准备（10-02） | 新导出目录 `~/roomkit/releases/linux-20261002054746-b5777ad3/`，实例 `export-b5777ad3`；使用现有官方 pwsh 7.6.6，未安装新工具。后台仅回环 28691/SSH，大厅 TCP 28300、房间 UDP 28400–28431，双绑定 0.0.0.0、对外 IPv4 在忽略配置。新实例网络、700/600 权限、公开配置与 SSH 后台入口已核对，正常停止后自有残留为 0。未设置管理员；用户反馈路由器已设置，sudo 允许两组 IPv4 游戏端口的命令退出0，UFW前后均为inactive、未改变启用状态。此处比历史“ufw在运行”的环境摘要更直接，不证明其它过滤或公网连通；外网朋友未验收。见 [准备结果](17_framework_shooter_plan.md#friends-public-preparation) |
+| 朋友公网试玩（10-02） | 新导出目录 `~/roomkit/releases/linux-20261002054746-b5777ad3/`，实例 `export-b5777ad3`；使用现有官方 pwsh 7.6.6。后台仅回环 28691/SSH，大厅 TCP 28300、房间 UDP 28400–28431，监听 0.0.0.0、对外 IPv4 在忽略配置。准备时核对权限、网络、公开配置并正常停止，由用户设置管理员并开服试玩。用户报告公网测试通过，同时朋友与本人单人入房都感觉移动卡，本人还报告枪口旋转卡；未采集真人 FPS/RTT 或确认完整对局。此前两组 IPv4 UFW allow 命令退出0，前后 inactive；未改变启用状态，不证明其它过滤。见 [阶段结果](17_framework_shooter_plan.md#friends-public-preparation) |
 | 阶段 6 依赖与业务（10-02） | 运行源码 ef0aeb4。WSL2 在 `~/roomkit/stage6/source-ef0aeb4/` 实际离线准备项目内 Godot 4.7.2/pwsh 7.6.6，真实 SQLite 授权 50/0、源码短验 29/0；Mint `~/roomkit/stage6/server-ef0aeb4/` 使用随包引擎并准备项目内 pwsh，导出服务器短验 29/0。两处只绑回环、使用新假数据，均已正常停止；空 HOME 验证不借旧工具发现路径，但系统库已经具备，不等于全新 OS 安装通过 |
 | 项目内工具选择 | 显式 ROOMKIT_GODOT/ROOMKIT_PWSH → 本项目 `artifacts/environment/tools` → 原 `~/roomkit/tools`。prepare 只安装缺少且哈希匹配的官方包，不升级/覆盖共享工具、不装系统包；源码/导出包依赖不同，详见 [阶段结果](17_framework_shooter_plan.md#stage6-result) |
 | 本轮证据/传输 | 笔记本 `~/roomkit/stage6/proof-mint-b47aa6e4/`；WSL `proof-wsl-b47aa6e4/` 为首次驱动拒绝，`proof-wsl-r2-b47aa6e4/` 为成功短验。轻量证据已取回本机 logs/stage6-20261002-b47aa6e4；临时归档暂留，每类一份，清理阻断见专题，不删除原下载包 |
@@ -26,7 +26,7 @@
 | Windows → Linux LAN（10-01，Codex） | 同一提交 `572c356`，Windows 192.168.10.100（以太网）直连 Linux 192.168.10.105（wlp3s0）；最终 38/0、退出 0，含源码 SDK 与导出的 Client.exe 双人 WSS/DTLS 入退房；详细边界见 docs/17 的 linux-lan。未改防火墙或 TUN |
 | Linux 管理入口（10-01，Codex） | `OpenLinuxManagement.cmd` 建立 Windows 127.0.0.1:28491 → Linux 127.0.0.1:28491 SSH 转发；当时服务运行中，后已停止，本轮旧账号/配置已清除。它不指向新短验的 29191；笔记本 IP:28491 不作为管理入口，未改监听/防火墙 |
 | Linux 导出目录（10-02，Codex） | 四个 ELF/PCK 从官方 release 模板导出，包内程序在新 releases/ 目录实际运行；完整业务 64/0（源码 SDK 的五分钟结算、真实 Client.exe 入退房分列），末次停止无进程/监听/启动文件残留，权限 700/600。包内仍使用现有 pwsh 7.6.6；当前干净目录及版权补齐后的复验见 docs/17 的 linux-server-directory |
-| 尚不支持的结论 | 不能声称公网、其它发行版、ARM或导出包长期耐久通过；跨机完整五分钟结算仅源码 SDK 客户端，真实 Client.exe 不扩大为完整实战验收；不代表突发并发登录或长期部署可靠性 |
+| 尚不支持的结论 | 公网只有本次人工试玩通过的反馈，卡顿与性能仍待定位；不能声称其它发行版、ARM或导出包长期耐久通过。跨机完整五分钟结算仅源码 SDK 客户端，真实 Client.exe 不扩大为完整实战验收；不代表突发并发登录或长期部署可靠性 |
 
 现场核查按需集中一次完成，不反复让用户输密码。主线核查只读共享工具与本次快照、进程元数据；不扫描实验和用户配置目录。实验源码哈希/补丁需要另行明确只读范围，本次先标待核实。未授权安装、sudo、SSH/防火墙修改、主线与实验并跑。
 

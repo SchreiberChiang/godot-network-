@@ -158,6 +158,16 @@ func leave_room() -> void:
 	state = "LOBBY" if not identity.is_empty() else "CLOSED"
 	room_left.emit()
 
+## ENet's mean reliable-packet round trip time, not a one-way or lobby delay.
+## A closed/connecting room has no useful measurement; never display fake zero.
+func room_round_trip_ms() -> float:
+	if state != "IN_ROOM" or enet == null or enet.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return -1.0
+	var peer := enet.get_peer(1)
+	if peer == null or not peer.is_active() or peer.get_state() != ENetPacketPeer.STATE_CONNECTED:
+		return -1.0
+	return peer.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME)
+
 func close() -> void:
 	_clear_game()
 	socket.close()

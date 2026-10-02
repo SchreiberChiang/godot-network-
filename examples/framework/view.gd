@@ -42,6 +42,9 @@ var server_notice: Label
 var game_status: Label
 var scoreboard: Label
 var help_text: Label
+var diagnostics_text: Label
+var _frame_samples: Array[Dictionary] = []
+var _previous_frame_at_usec := -1
 var own_notice: Label
 var pending_label: Label
 var asset_hint: Label
@@ -90,7 +93,7 @@ func _ready() -> void:
 	add_child(volume_slider)
 	header_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	server_notice = _label(self, "", Vector2(28, 88), Vector2(1184, 45), 16, Color("ffd293"))
-	permanent_message = _label(self, "", Vector2(44, 752), Vector2(1148, 54), 16, Color("c2d5df"))
+	permanent_message = _label(self, "", Vector2(44, 764), Vector2(1148, 54), 16, Color("c2d5df"))
 	permanent_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_build_login()
 	_build_lobby()
@@ -218,7 +221,11 @@ func _build_game() -> void:
 	scoreboard = _label(side, "", Vector2(18, 206), Vector2(172, 208), 14, Color("a6bccb"))
 	scoreboard.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	leave_button = _button(side, "返回大厅", Vector2(16, 468), Vector2(172, 46), func(): app.leave_room())
-	help_text = _label(game_panel, "", Vector2(28, 709), Vector2(965, 27), 14, Color("8fa6b7"))
+	help_text = _label(game_panel, "", Vector2(28, 709), Vector2(965, 22), 14, Color("8fa6b7"))
+	diagnostics_text = _label(game_panel, "", Vector2(28, 733), Vector2(1184, 18), 12, Color("91b2c6"))
+	diagnostics_text.clip_text = true
+	diagnostics_text.mouse_filter = Control.MOUSE_FILTER_PASS
+	diagnostics_text.tooltip_text = "FPS：画面帧率；最慢帧：最近 1 秒客户端帧间隔最大值，非 GPU 耗时。\nRTT：房间 ENet 估算往返时间，非单程延迟。\n更新间隔 / 未更新：新快照到达间隔 / 距上次新快照；非丢包率。"
 	own_notice = _label(game_panel, "", Vector2(1026, 568), Vector2(172, 57), 13, Color("ffdca1"))
 	own_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
@@ -277,6 +284,7 @@ var ui_elapsed := 0.1
 func _process(delta: float) -> void:
 	if app == null or login_panel == null:
 		return
+	_observe_frame()
 	# Arena redraw follows the display; text, lists and forms need only 10 Hz.
 	queue_redraw()
 	ui_elapsed += delta
@@ -322,7 +330,8 @@ func _process(delta: float) -> void:
 	if in_room and app.world != null:
 		game_status.text = app.world.status_text(app.client.identity.get("user_id", ""))
 		help_text.text = app.world.instructions()
-		help_text.text += "  ·  %d FPS" % Engine.get_frames_per_second()
+		var update_stats: Dictionary = app.world.snapshot_diagnostics() if app.world.has_method("snapshot_diagnostics") else {}
+		diagnostics_text.text = diagnostics_line(Engine.get_frames_per_second(), worst_frame_ms(), app.client.room_round_trip_ms(), update_stats)
 		var own: Dictionary = app.world.player_view(app.client.identity.get("user_id", "")) if app.world.has_method("player_view") else {}
 		own_notice.text = str(own.get("notice", ""))
 		gameplay_buttons[0].visible = app.game_id == "shooter"
@@ -342,6 +351,35 @@ func _process(delta: float) -> void:
 	if inventory_panel.visible:
 		_update_inventory()
 	queue_redraw()
+
+func _observe_frame(now_usec: int = -1) -> void:
+	if now_usec < 0:
+		now_usec = Time.get_ticks_usec()
+	# Engine delta may be capped/smoothed during stalls. Measure actual successive
+	# presentation callbacks instead; the first callback has no interval sample.
+	if _previous_frame_at_usec >= 0:
+		_frame_samples.append({"at": now_usec, "ms": float(now_usec - _previous_frame_at_usec) / 1000.0})
+	_previous_frame_at_usec = now_usec
+	_trim_frames(now_usec)
+
+func _trim_frames(now_usec: int) -> void:
+	while not _frame_samples.is_empty() and int(_frame_samples[0].at) < now_usec - 1000000:
+		_frame_samples.pop_front()
+
+func worst_frame_ms(now_usec: int = -1) -> float:
+	if now_usec < 0:
+		now_usec = Time.get_ticks_usec()
+	_trim_frames(now_usec)
+	var worst := -1.0
+	for sample in _frame_samples:
+		worst = maxf(worst, float(sample.ms))
+	return worst
+
+static func diagnostics_line(fps: int, worst_ms: float, rtt_ms: float, updates: Dictionary) -> String:
+	return "%d FPS  ·  最慢帧 %s  ·  RTT %s  ·  更新间隔 %s  ·  未更新 %s" % [fps, _diagnostic_ms(worst_ms), _diagnostic_ms(rtt_ms), _diagnostic_ms(float(updates.get("interval_ms", -1))), _diagnostic_ms(float(updates.get("age_ms", -1)))]
+
+static func _diagnostic_ms(value: float) -> String:
+	return "—" if value < 0 or not is_finite(value) else "%d ms" % roundi(value)
 
 func _selected_ready() -> bool:
 	for row in app.rooms:
@@ -432,7 +470,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _draw() -> void:
 	draw_rect(Rect2(0, 0, 1240, 820), Color("0c1724"))
 	draw_line(Vector2(28, 77), Vector2(1212, 77), Color("243a4c"), 1)
-	draw_rect(Rect2(28, 746, 1184, 61), Color("142434"))
+	draw_rect(Rect2(28, 758, 1184, 61), Color("142434"))
 	if app == null or app.client == null or app.world == null:
 		return
 	if app.authenticated and app.client.state == "IN_ROOM" and not app.inventory_open and not app.account_open:

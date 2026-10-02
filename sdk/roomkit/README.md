@@ -10,6 +10,8 @@
 
 客户端将 RoomClient 加入 SceneTree，调用 `configure({url, game_id, build_id, compatibility_id, game_protocol})`，然后依次 `await open_session(display_name)`、`await create_room(options, idempotency_key)` / `await list_rooms()`、等待 READY、`await join_room(room_id)`、`await leave_room()`。退出时 `close()`。网络请求返回 `{ok, payload, code?}`；退出房间保留当前大厅会话。
 
+可选诊断 `room_round_trip_ms()` 读取已连接房间 ENet 的可靠包往返时间估计，单位毫秒；未正式入房、正在连接或连接已关闭时返回 `-1`，界面应显示未知。它不发送新 RPC，不测大厅、资产请求或单程延迟。游戏自己的状态更新间隔由游戏呈现层记录，不加入通用协议。
+
 可选 `prepare_scene` Callable 接收初始快照，允许异步加载并返回 bool。`join_progress` 报告 CONNECTING→AUTHENTICATING→LOADING→SYNCHRONIZING→IN_ROOM；只有 `room_joined` 才表示正式入房。`roster_changed` 提供新名单，`room_left` 表示离房。当前快照只含成员身份，不含装备或玩法状态。
 
 单个客户端进程使用一个 RoomClient；SDK 设置 SceneTree 的默认 SceneMultiplayer、关闭自动 poll，并建立 `/root/NetRoom` 共享 RPC 节点，项目需保留该路径。不得同时添加第二套默认 MultiplayerAPI。当前 URL 支持本机开发 `ws://127.0.0.1:<port>` 和安全 `wss://localhost:<port>`。后者必须配置 ca_certificate、secure_enet=true 和预配 credential；SDK验证证书并为ENet启用DTLS。凭据不能经明文WS发送。

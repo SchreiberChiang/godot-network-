@@ -1,8 +1,16 @@
 # 当前状态：RoomKit（2026-10-02）
 
-**阶段 7 已准备，朋友公网试玩待验收**：新的 Linux 导出实例、匹配的 Windows 玩家目录与 `PlayLinuxPackage.cmd` 已就绪；管理员由用户首次设置。用户已反馈路由器转发设置完成；sudo 允许规则命令成功，UFW 前后均为 `inactive`，保持未启用。下一步让 1–2 位朋友从外网短验，再做赛车；合作种田和云端后置。详见 [准备结果](docs/17_framework_shooter_plan.md#friends-public-preparation) 与 [后续路线](docs/17_framework_shooter_plan.md#forward-route-20261002)。
+**阶段 7 公网试玩已获人工通过反馈，移动卡顿待定位**：用户转述朋友移动像掉帧，本人单人入房也发现人物移动与枪口旋转略卡，观察 FPS 约 120、感觉没有下降。更偏向显示同步问题；没有连续帧时间或网络时序数据，不将基本可玩扩大为性能达标。先补诊断与显示平滑，再安排赛车；合作种田和云端后置。详见 [阶段 7](docs/17_framework_shooter_plan.md#friends-public-preparation) 与 [指标定义](docs/25_shooter_room_rules.md#client-diagnostics)。
 
-## 本轮：朋友试玩准备
+## 本轮：客户端只读诊断
+
+基准 `main / fbf999e`。源码已加入独立的 FPS、最近一秒最慢帧、房间 ENet RTT、更新间隔和未更新时长；帧间隔用单调时间，不受引擎 delta 截顶或平滑影响。无样本显示“—”，重复/旧/非法状态不掩盖断流。没有改移动、旋转、射击、认证或线协议。
+
+最终本机诊断 **30/0**、真实 OpenGL 离屏界面 **31/0**（截图已查看）、射击规则 **83/0**，客户端反馈回归 **8/0**；实际退出均 **0**、错误输出为空。首轮 26/2 的等待/字体布局问题、渲染夹具的处理回调与节点泄漏失败均保留轻量记录；修正后通过。证据 `logs/client-network-20261002/`，命令见 [专项入口](docs/22_framework_operations.md#账号管理射击与托管专项)。
+
+真实 Windows 文件哈希/时间 **6/6 不变**。没有 SSH、重启 Linux 服务或重新导出；当前试玩包仍为 `427e6a0cf8a8`，尚不显示新指标。新源码需重新生成配套服务器/客户端后再短验，不能只换一侧。公网 RTT/更新时序、显示平滑修复与新版真人体验均未验收；下一检查点优先枪口呈现与移动时序。
+
+## 朋友试玩目录与此前准备证据
 
 基准 `main / c261fe2`，复用运行源码 `ef0aeb4` 的配套导出，射击版本仍为 `427e6a0cf8a8`；没有再次构建或变更游戏协议。入口替身边界 **41/0、退出 0**；真实 Linux 包检查、启动、已保存网络/700/600 权限核对、公开配置/客户端校验与 SSH 后台转发通过。首次设置状态为未初始化，Operator 错误输出为空。以上只证明准备和管理入口，不证明公网或朋友试玩通过。证据在 `logs/friends-public-20261002/`。
 
@@ -12,7 +20,7 @@
 
 网络准备：用户本人输入 sudo 密码后，只执行 TCP 28300、UDP 28400–28431 的 IPv4 UFW allow 命令，脚本退出 **0**；源脚本两端哈希一致。取回的 `ufw-before.txt` / `ufw-after.txt` 均为 **inactive**，未启用防火墙、未修改其它端口；没有单独读取持久化规则，也不代表其它过滤或公网连通已通过。首次 `sudo -n` 因需密码返回 1，之后窗口操作成功，输出分别保留。
 
-未运行：外部朋友注册/同房互见/购买/退房重登、GitHub 发布与下载。一次准备脚本因 UTF-8 无 BOM 被 PowerShell 5.1 解析失败，未执行任何步骤；补 BOM 后成功，失败输出保留。用户自报路由器设置完成，不算外部连通证据。
+真人反馈：用户在网络准备后报告公网“测试通过”，并描述自己与朋友的卡顿；没有逐项操作、人数和耗时记录，不单列注册/购买/完整结算/退房重登为人工已验收。GitHub 发布与下载仍未运行。一次准备脚本因 UTF-8 无 BOM 被 PowerShell 5.1 解析失败，未执行任何步骤；补 BOM 后成功，失败输出保留。路由器设置和 UFW 命令本身仍不算公网证据。
 
 ## 此前：新机准备与持续开房
 
@@ -63,13 +71,13 @@ Linux 新包已实际迁入隔离旧包的账号、资产、证书、端口与�
 
 收尾文档检查：路线图 49 个节点有效，479 处相对引用/锚点无失效，STATUS 搬迁的 8 行非空原文在历史中完整保留，`git diff --check` 通过。这里只核对路线图数据和引用，未再次做浏览器像素验收。
 
-**项目地图**：根目录 ROADMAP.html 当前共 54 个节点，阶段 6/7/8 的后续路线已加入，未实施节点保持规划状态；[20 个根文件夹说明](docs/01_scope_architecture.md#root-folders) 已按实际目录补齐。[清理候选](docs/17_framework_shooter_plan.md#cleanup-review-20261002) 已记录执行与保留边界。部署前的状态原文进入 [历史快照](docs/archive/status_history.md#status-20261002-deployment-plan)。
+**项目地图**：根目录 ROADMAP.html 当前共 57 个节点，阶段 6/7/8、客户端诊断与显示平滑的后续路线已加入；新配套包观察待验证，平滑优化保持规划状态。[20 个根文件夹说明](docs/01_scope_architecture.md#root-folders) 已按实际目录补齐。[清理候选](docs/17_framework_shooter_plan.md#cleanup-review-20261002) 已记录执行与保留边界。部署前的状态原文进入 [历史快照](docs/archive/status_history.md#status-20261002-deployment-plan)。
 
 **清理收尾**：五轮累计净释放约 **21.93 GiB**，项目约 **5.12 GiB**；Git 跟踪的 435 个文件仅约 **5.93 MiB**。当前交付、真实数据及备份保留；重复程序、过期附件、旧包和未用 iOS 库已清理或转为压缩恢复输入。当前 Linux/Windows 交付再次校验通过，真实文件哈希/时间 5/5 不变，程序/库/TAR 恢复抽测通过；没有运行玩法回归。具体边界和恢复映射见 [第五轮记录](docs/17_framework_shooter_plan.md#第五轮执行结果不参与当前开发的依赖与旧包)；此前摘要原文保存在 [历史](docs/archive/status_history.md#cleanup-before-round5-summary)。
 
-**接下来**：阶段 7 只安排一次 10–15 分钟、1–2 位朋友 Windows 电脑试玩：同房互见/对战/购买、退房注销重登；先准备匹配的普通目录和真实局域网公开配置。GitHub 下载、公网与 Linux 严格 8 人另列门槛。不发起关机，暂不让 Claude 并行实施。
+**接下来**：阶段 7 已收到公网试玩人工反馈，先加入并观察客户端诊断，决定移动/瞄准呈现的改善范围，再推进赛车。GitHub 下载、Linux 严格 8 人和公网性能仍另列门槛。不发起关机，暂不让 Claude 并行实施。
 
-**服务状态**：本轮隔离实例及原 Linux LAN 实例已正常停止，相关监听释放；Windows 无项目引擎进程。下次开机需明确启动服务，后台入口不代替开服。两台关机已获用户授权；Linux 系统要求本人在交互 SSH 窗口验证 sudo，未绕过。
+**此前部署收尾时的服务状态**：当时隔离实例及原 Linux LAN 实例已正常停止，相关监听释放；Windows 无项目引擎进程。该条是历史记录，不代表朋友试玩后的当前服务状态。本轮诊断工作不操作试玩服务或发起关机。
 
 ## 此前：Windows → Linux 局域网自动验收通过（2026-10-01）
 
@@ -108,7 +116,7 @@ Linux（笔记本，Godot 4.7.2 官方版 + pwsh 7.6.6）：源码完整服务�
 | 新 Linux 包的 UpdateRoomKit.sh | 停服后的迁入、校验与确认；只撤销未确认且没变动的候选，详见首版交付 |
 | `tools/roomkit_linux.sh start\|stop\|status` | Linux 源码启动隔离实例；用法见 [README](README.md#linux-源码启动) |
 | `tools/build_linux_server.ps1` → Linux 普通目录 | 导出独立服务端；包内先 CheckPackage.sh，再 RoomKit.sh start/stop/status；当前目录及依赖见 docs/17 |
-| PlayLinuxPackage.cmd / StopLinuxPackage.cmd | 历史独立包快捷方式；面板 28691，旧账号和 TLS 已清除，须重新准备 |
+| PlayLinuxPackage.cmd / StopLinuxPackage.cmd | 当前朋友试玩独立包入口；面板 28691，精确实例/玩家路径见阶段 7；采用新源码须重新生成配套交付 |
 | PreparePlayerClient.cmd → PlayerClient/ | 生成完整玩家目录，直接双击 Client.exe；源码更新后需重新生成并与服务配对 |
 | StartPlayerClient.cmd / StartShooterClient.cmd | 已生成客户端入口 / 源码客户端入口 |
 | OpenLinuxPlayerClient.cmd | 历史客户端目录；旧连接配置须重新生成，不替换原 PlayerClient |

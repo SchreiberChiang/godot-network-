@@ -40,6 +40,10 @@ var render_tracks: Dictionary = {}
 var visual_shots: Array = []
 var last_visual_shot := 0
 var snapshot_age := 0.0
+# Diagnostic reception times are independent of interpolation/sound acceptance.
+var _diagnostic_tick := -1
+var _diagnostic_received_ms := -1
+var _diagnostic_interval_ms := -1
 const BLEND_SECONDS := 0.05
 const TRACER_SPEED := 7000.0
 const TRACER_LENGTH := 18.0
@@ -394,11 +398,24 @@ func world_state(value: Dictionary) -> void:
 			render_tracks.clear()
 			visual_shots.clear()
 			last_visual_shot = 0
+			_diagnostic_tick = -1
+			_diagnostic_received_ms = -1
+			_diagnostic_interval_ms = -1
+		if int(value.tick) > _diagnostic_tick:
+			var now := Time.get_ticks_msec()
+			if _diagnostic_received_ms >= 0:
+				_diagnostic_interval_ms = now - _diagnostic_received_ms
+			_diagnostic_tick = int(value.tick)
+			_diagnostic_received_ms = now
 		_update_visual_targets(value)
 		latest = value
 		snapshot_age = 0.0
 		for cue in cues:
 			presentation_cue.emit(cue.cue, cue)
+
+## Client reception gaps/progress age only. No remote clock or packet-loss claim.
+func snapshot_diagnostics() -> Dictionary:
+	return {"interval_ms": _diagnostic_interval_ms, "age_ms": Time.get_ticks_msec() - _diagnostic_received_ms if _diagnostic_received_ms >= 0 else -1}
 
 ## Sound cues between two accepted snapshots. Shots are server-confirmed and
 ## new by id (one cue per trigger pull, so a shotgun's pellets play once); a hit
