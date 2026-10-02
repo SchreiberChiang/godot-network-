@@ -79,8 +79,7 @@ if($meta.instance -cne ('export-'+$meta.build.Substring(15))){
        $update.new_instance -cne ($absoluteRemote+'/data/instance-'+$meta.instance) -or
        $update.journal -cne ($absoluteRemote+'/data/update-'+$meta.instance+'/journal.json') -or
        $update.old_package -isnot [string] -or $update.old_package -cnotmatch '\A/home/zhao/roomkit/releases/linux-[0-9]{14}-[0-9a-f]{8}\z' -or
-       $update.old_package -ceq $absoluteRemote -or
-       $update.old_instance -cne ($update.old_package+'/data/instance-'+$meta.instance)){
+       $update.old_package -ceq $absoluteRemote){
         throw 'Migrated Linux package update status does not match the sealed prepared instance.'
     }
 }

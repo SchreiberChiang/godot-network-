@@ -193,10 +193,23 @@ $migrated=@{};foreach($key in $valid.Keys){$migrated[$key]=$valid[$key]}
 $migrated.instance='export-ffffffff'
 $absoluteRemote='/home/zhao/'+$remote
 $oldPackage='/home/zhao/roomkit/releases/linux-20190101000000-ffffffff'
-$sealed=@{ok=$true;state='SEALED';instance=$migrated.instance;new_package=$absoluteRemote;
-    new_instance=($absoluteRemote+'/data/instance-'+$migrated.instance);
-    journal=($absoluteRemote+'/data/update-'+$migrated.instance+'/journal.json');
-    old_package=$oldPackage;old_instance=($oldPackage+'/data/instance-'+$migrated.instance);rollback_allowed=$false;code=''}
+# Derive the status fixture from the production Emit assignment itself. This
+# executes only its metadata hashtable expression, never updater entry flow.
+$updaterAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $project 'tools/update_linux_package.ps1'),[ref]$tokens,[ref]$parseErrors)
+if($parseErrors.Count){throw 'Updater metadata contract parse failed.'}
+$emit=$updaterAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Emit'},$true)
+if($null -eq $emit){throw 'Production update Emit function missing.'}
+$outputAssignment=$emit.Body.Find({param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left -is [Management.Automation.Language.VariableExpressionAst] -and $node.Left.VariablePath.UserPath -eq 'object'},$true)
+if($null -eq $outputAssignment){throw 'Production update Emit metadata assignment missing.'}
+$script:journal=@{state='SEALED';instance=$migrated.instance;new_package=$absoluteRemote;
+    new_instance=($absoluteRemote+'/data/instance-'+$migrated.instance);old_package=$oldPackage}
+$script:journalPath=$absoluteRemote+'/data/update-'+$migrated.instance+'/journal.json'
+$canRollback=$false
+$sealed=& ([scriptblock]::Create($outputAssignment.Extent.Text+'; $object'))
+if(($sealed.Keys|Sort-Object) -join ',' -cne 'code,instance,journal,new_instance,new_package,ok,old_package,rollback_allowed,state'){
+    throw 'Production update status field contract changed.'
+}
+$count++;Write-Output 'PASS migrated fixture uses the exact production Emit fields'
 Json $pointer $migrated;Json 'tools/remote-update-status.json' $sealed
 foreach($action in @('Check','Start','Stop')){
     [IO.File]::WriteAllText((Join-Path $fake 'tools/ssh-commands.txt'),'',$utf8)
@@ -217,7 +230,7 @@ foreach($case in @(
     @{name='forged journal outside update directory';field='journal';value=($absoluteRemote+'/journal.json')},
     @{name='arbitrary old package';field='old_package';value='/tmp/other-package'},
     @{name='old package traversal';field='old_package';value='/home/zhao/roomkit/releases/../linux-20190101000000-ffffffff'},
-    @{name='mismatched old instance path';field='old_instance';value=($oldPackage+'/data/instance-export-12345678')}
+    @{name='old package equals new package';field='old_package';value=$absoluteRemote}
 )){
     $copy=@{};foreach($key in $sealed.Keys){$copy[$key]=$sealed[$key]};$copy[$case.field]=$case.value
     Json 'tools/remote-update-status.json' $copy
