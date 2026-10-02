@@ -1,5 +1,49 @@
 # 通用框架与横版射击分支实施计划
 
+<a id="framework-closeout-20261002"></a>
+## 首版框架收束与本轮并行任务（2026-10-02 夜间）
+
+用户要求利用剩余约两小时并行推进。本轮以 `0e33fa6` 固定外部基准；不是两小时内承诺“所有平台彻底完善”。账号、资产、管理后台、房间生命周期、Windows/Linux 服务、射击/取石子和新游戏模板已存在，当前主要差距是最终交付、当前 Linux 多人证据、朋友网络证据与第二种实时玩法的复用体验。
+
+| 路线 | 负责人和本轮终点 | 并行边界 |
+|---|---|---|
+| N2 最终诊断包 | 本地主线：最终 `56f4b235deea` 配套包跨机短验，核对本地报告，再用正式更新器保留账号/资产/配置换包；沿用唯一 PlayLinuxPackage 入口 | 新实例和预留端口先验收，不占正式端口；通过后再停止并更新正式实例。由主线维护状态和路线图、提交推送。 |
+| D1 离线报告查看器 | 10x dot：双击页面，选 JSONL，查看 RTT、画面慢帧、快照停顿及卡顿标记 | 只新增页面/资源和对应测试；不改 N1 生产文件/字段、服务器或主线文档。固定分支 `codex/network-report-viewer`。 |
+| F1 Linux 严格多人 | Linux dot 派笔记本本地 5x Codex：便携 4/8 人驱动，各一次严格全员验收、退出清理与重新登录 | 独立源码与假数据；先准备驱动，主线写入 N2-heavy-finished 标记才跑真实负载；不改生产认证、超时或重试。源码证据不冒充导出包。 |
+| V1 收件 | Linux dot 云端已有车模交回；主线独立结构检查和看图后保存能力样本 | 不新增赛道/玩法，不占多人测试设备负载。模型问题见下节。 |
+
+完整任务单在本机 `logs/parallel-handoffs/20261002-closeout/`。F1 已送至 `/home/zhao/Desktop/RoomKit-closeout-20261002/5x-F1-linux-concurrency.txt`，两端 SHA256 `b1f9a729df39716277a295d775974e16f261d7865f890f33f42a180568e10e11`；送达不代表已开工。D1 交付路径明确为台式机 `artifacts/dot-network-viewer-candidate/RoomKit-D1-candidate.zip`；F1 交付 Linux 同一桌面目录的 `RoomKit-F1-candidate.zip` 和报告。跨端保存失败即返回准确错误并给附件，不重复建任务。外部不推 main，主线验收后整合。
+
+完成首版按三个终点推进，不按虚构百分比计算：
+
+1. **当前交付可排障**：最终包跨机通过；朋友拿到同版客户端，卡顿能对应本地报告；当前 Linux 严格 4/8 人和覆盖备份的一轮持续运行补齐。今天不为耗额度重跑旧耐久。
+2. **接入可复用**：用模板完成赛车双人起终点/成绩闭环，账号共享、游戏资产隔离，提炼实际重复步骤；不先整体重构。车模可先用占位体，不阻塞玩法验证。
+3. **首版发行收束**：固定支持系统/架构、人数与升级限制；从实际分发渠道获取干净版本并独立启动。GitHub Release 仍待单独发布安排，不把目录可运行说成下载已通过。
+
+Windows 服务端数据迁移、启动失败自动回退、数据库格式升级、ARM/任意发行版/云端容量均另有范围，不能由现有 Mint/WSL 证据推出。原生 SQLite 候选与磁盘清理不阻塞当前首版。先交可用检查点，最后留整合余量，不承诺在额度重置前必然全部完成。
+
+<a id="car-v1-acceptance"></a>
+### V1 车模收件与独立检查
+
+作者工作位为 **5x Linux dot 的云端 Blender 4.3.2**；笔记本本地 Codex 做的是 U1，不是模型。用户提供 Linux 桌面 ZIP 后主线取回，两端 SHA256 均为 `179b2612559b2fbf7f99a4f85b28185afd768e0d592a7bef98032ab4e792581b`。9 文件约 3.29 MiB，已收为 [视觉能力样本](../prototypes/racing_visual/v1/ACCEPTANCE.md)，`.gdignore` 防止主工程自动导入 Blender 场景；没有接入运行时或构建清单。
+
+独立解析 GLB：1792 三角面、4 材质、车身及四独立轮网格、约 4.05×1.849×1.370 米、无外部资源；两张 PNG 已实际查看。车身发现 **16 个零/近零面积三角面**，接游戏前应清理；不将原报告 PASS 视为该项通过。Blender 重新编辑/重导入、Godot 导入渲染、轮转与驾驶均未复验；原创与 CC0 为交付者声明，保留原文，不作来源鉴定。原包与本机检查器/结构结果留在 `artifacts/dot-car-v1-20261002/`、`logs/car-v1-20261002/`。
+
+<a id="n2-final-delivery"></a>
+### N2：最终诊断包跨机与保留数据换包完成
+
+最终成品射击版本 `shooter-dev-002-src-56f4b235deea`；Linux 包 `20261002150342-90e43f24`，Windows EXE/PCK 从同源配套目录逐字节复制，未重新导出替代。验收驱动支持第二组预留端口 28991/28900/28901/29040–29055，明确拒绝正式指针的实例或面板；指针存在但读取失败也拒绝。PreparedPlayer 必须与服务器在同一部署父目录，清单哈希与版本匹配，不接受链接。
+
+真实命令：`powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_linux_server_package.ps1 -ContextPath logs/network-cross-review-20261002/package-context-r2.json -PreparedPlayer artifacts/deployments/network-20261002/PlayerClient`，**65/0、退出 0**。独立实例 `export-90e43f25`：注册登录、资产购买/重放/默认武器、射击与取石子房间、双真实 Client.exe 互见并退房、两份独立 JSONL 的 IN_ROOM 样本/版本/会话/脱敏、备份后修改与恢复、正常重启后账户资产保留通过。7份实际 stderr/err 文本日志为空；两轮实例最终均停止，不占用正式端口。
+
+首轮 **60/1、退出 1** 保留：PowerShell 5.1 下 `Get-ChildItem -LiteralPath -Recurse -Include` 意外包括 Client.exe，收尾把引擎内置错误字串当成运行错误；7份实际错误日志全空。改为显式文件名/扩展名筛选，再用全新假数据实例复跑，不修改第一次的退出码和结果。第二轮增加报告会话/版本和成品哈希断言。没有为本阶段跑五分钟结算或长耐久。
+
+正式迁移前只读确认原 `export-b5777ad3` 已停止；官方更新器 PREPARED → VERIFIED → SEALED 成功，复制并核验原账号、资产、配置、证书/密钥和备份，旧包和旧数据保留。新包管理服务启动，原入口指针检查退出 0，仍使用 **PlayLinuxPackage.cmd**。本地新玩家路径 `artifacts/linux-package-player-20261002150342-90e43f24/shooter-windows/`；旧目录没有运行中的客户端，旧 data/client-operations 是空目录，按正式校验规则保留到 client-data/legacy-client-operations；未声称迁移用户级旧音效设置。
+
+另准备朋友干净目录 `artifacts/friend-clients/network-20261002/shooter-windows/`，12 个文件/109,716,240 字节，同一 Client.exe/PCK、公网公开连接配置及证书，没有 client-data 或数据库；自检退出 0。朋友应换整个新目录，不能只覆盖旧 PCK。卡顿时点“标记刚才卡顿”，退出后提供 `client-data/reports/` 对应 JSONL；不用发整个 client-data，里面还可能有设置和待确认交易。
+
+轻量证据 `logs/network-cross-review-20261002/` 包含两轮真实输出/退出码、配对上下文、总结、迁移状态、入口/客户端检查与前后指针；敏感验收数据在私有 `data/codex-linux-package-…/`。只保留本轮两份验收目录。尚未验新包朋友公网、地区延迟原因、受控真实UDP丢包、长时间运行或Linux严格4/8人。主线重任务结束标记已送Linux桌面，F1可开始；这不代表F1已执行。
+
 <a id="network-portable-next"></a>
 ## 当前执行安排：网络诊断、客户端本地数据与统一入口（2026-10-02）
 

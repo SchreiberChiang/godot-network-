@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$ContextPath,[switch]$FullRound)
+param([Parameter(Mandatory=$true)][string]$ContextPath,[switch]$FullRound,[string]$PreparedPlayer='')
 # A scoped exported-server fixture. Never adopts the existing source/LAN service.
 $ErrorActionPreference='Stop'
 [Net.ServicePointManager]::Expect100Continue=$false
@@ -8,7 +8,15 @@ $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
 $ctx=Rk-ReadJson $ContextPath
 if($null -eq $ctx -or $ctx.build -notmatch '^[0-9]{14}-[0-9a-f]{8}$' -or $ctx.release -ne ('linux-'+$ctx.build) -or
    $ctx.instance -notmatch '^export-[0-9a-f]{8}$' -or $ctx.ssh_target -ne 'zhao@192.168.10.105' -or
-   $ctx.panel -ne 28691 -or $ctx.lobby -ne 28700 -or $ctx.control -ne 28701 -or $ctx.server -ne '192.168.10.105'){throw 'Explicit isolated exported-package context required.'}
+   $ctx.server -ne '192.168.10.105'){throw 'Explicit isolated exported-package context required.'}
+$legacyPorts=($ctx.panel -eq 28691 -and $ctx.lobby -eq 28700 -and $ctx.control -eq 28701)
+$reviewPorts=($ctx.panel -eq 28991 -and $ctx.lobby -eq 28900 -and $ctx.control -eq 28901)
+if(-not($legacyPorts -or $reviewPorts)){throw 'Only reserved acceptance port sets are supported.'}
+$pointerPath=Join-Path $project 'artifacts/linux-package-playtest.json'
+$livePointer=Rk-ReadJson $pointerPath
+if((Test-Path -LiteralPath $pointerPath) -and $null -eq $livePointer){throw 'Active playtest pointer cannot be read safely.'}
+if($null -ne $livePointer -and ($ctx.instance -eq $livePointer.instance -or $ctx.panel -eq $livePointer.panel)){throw 'Acceptance must not use the active playtest instance or panel.'}
+$panelUrl='http://127.0.0.1:'+([int]$ctx.panel)
 $package=[IO.Path]::GetFullPath([string]$ctx.package)
 if(-not(Rk-Inside $package (Join-Path $project 'artifacts'))){throw 'Package must be an ignored build in this repository.'}
 $metadata=Rk-ReadJson (Join-Path $package 'linux-package.json')
@@ -19,6 +27,22 @@ if($sourceIndex -ne [IO.Path]::GetFullPath($expectedIndex)){throw 'Prepared sour
 foreach($path in @($package,$sourceIndex)){
     $cursor=$path
     while($cursor){$item=Get-Item -LiteralPath $cursor -Force -ErrorAction SilentlyContinue;if($null -ne $item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Linked acceptance input rejected.'};$parent=[IO.Path]::GetDirectoryName($cursor);if($parent -eq $cursor){break};$cursor=$parent}
+}
+if($PreparedPlayer){
+    $prepared=[IO.Path]::GetFullPath($PreparedPlayer).TrimEnd('\','/')
+    $paired=[IO.Path]::GetFullPath((Join-Path ([IO.Path]::GetDirectoryName($package)) 'PlayerClient')).TrimEnd('\','/')
+    if($prepared -ne $paired -or -not(Rk-Inside $prepared (Join-Path $project 'artifacts/deployments'))){throw 'Prepared client must be paired with this exact server directory.'}
+    $cursor=$prepared
+    while($cursor){$item=Get-Item -LiteralPath $cursor -Force -ErrorAction SilentlyContinue;if($null -ne $item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Linked prepared client rejected.'};$parent=[IO.Path]::GetDirectoryName($cursor);if($parent -eq $cursor){break};$cursor=$parent}
+    $versionPath=Join-Path $prepared 'client-version.json'
+    if((Get-Item -LiteralPath $versionPath).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Linked client version rejected.'}
+    $preparedVersion=Rk-ReadJson $versionPath
+    if($null -eq $preparedVersion -or $preparedVersion.build_id -cne $metadata.games.shooter){throw 'Prepared client build does not match server.'}
+    foreach($name in @('Client.exe','Client.pck')){
+        $entry=@($preparedVersion.generated_files | Where-Object {$_.path -ceq $name})
+        $source=Join-Path $prepared $name
+        if($entry.Count -ne 1 -or $entry[0].sha256 -cnotmatch '^[0-9a-f]{64}$' -or ((Get-Item -LiteralPath $source).Attributes -band [IO.FileAttributes]::ReparsePoint) -or (Get-FileHash -LiteralPath $source).Hash.ToLowerInvariant() -cne $entry[0].sha256){throw 'Prepared client checksum mismatch.'}
+    }
 }
 $root=Join-Path $project ('data/codex-linux-package-'+$ctx.build+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8))
 Rk-ProtectData $project $root
@@ -49,14 +73,14 @@ function SaveServerLogs([string]$Phase){
 }
 try{
     $status=Remote ('bash '+$remote+'/RoomKit.sh status --instance '+$ctx.instance)
-    Check (($status -join "`n") -match 'ROOMKIT_RUNNING.*panel=http://127.0.0.1:28691/') 'fresh exported Operator is running on its isolated panel'
+    Check (($status -join "`n") -match ('ROOMKIT_RUNNING.*panel='+[regex]::Escape($panelUrl+'/'))) 'fresh exported Operator is running on its isolated panel'
     $reservation=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,[int]$ctx.panel)
     try{$reservation.Start()}finally{$reservation.Stop()}
-    $tunnel=Rk-StartHidden ssh.exe @('-N','-T','-o','BatchMode=yes','-o','ExitOnForwardFailure=yes','-o','ConnectTimeout=10','-L','127.0.0.1:28691:127.0.0.1:28691',$ctx.ssh_target) (Join-Path $root 'ssh.out') (Join-Path $root 'ssh.err')
+    $tunnel=Rk-StartHidden ssh.exe @('-N','-T','-o','BatchMode=yes','-o','ExitOnForwardFailure=yes','-o','ConnectTimeout=10','-L',('127.0.0.1:'+([int]$ctx.panel)+':127.0.0.1:'+([int]$ctx.panel)),$ctx.ssh_target) (Join-Path $root 'ssh.out') (Join-Path $root 'ssh.err')
     $heldTunnel=$tunnel.Handle
-    $script:RkApiUrl='http://127.0.0.1:28691'
+    $script:RkApiUrl=$panelUrl
     Check (Rk-WaitApi 20) 'exported management HTTP responds through SSH only'
-    $listeners=@(Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 28691 -State Listen)
+    $listeners=@(Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort ([int]$ctx.panel) -State Listen)
     Check ($listeners.Count -eq 1 -and $listeners[0].OwningProcess -eq $tunnel.Id) 'forwarded panel belongs to this test SSH process'
     $setup=Rk-Api 'setup.status' @{} -Anonymous
     Check (FreshSetup $setup) 'fixture contains no previous administrator/data'
@@ -74,7 +98,7 @@ try{
     Check ([bool]$metrics.available) 'exported maintenance helper supplies actual metrics'
     foreach($name in @('connection.json','server.crt')){& scp -o BatchMode=yes ($ctx.ssh_target+':'+$remoteInstance+'/public/'+$name) (Join-Path $public $name);if($LASTEXITCODE){throw 'Public configuration transfer failed.'}}
     $connection=Rk-Connection $public
-    Check ($connection.url -eq 'wss://192.168.10.105:28700') 'players connect directly to isolated Linux LAN lobby'
+    Check ($connection.url -eq ('wss://192.168.10.105:'+([int]$ctx.lobby))) 'players connect directly to isolated Linux LAN lobby'
     $index=Rk-ReadJson (Join-Path $package 'games.json')
     foreach($game in @('shooter','turns')){Check ($index.$game.manifest.build_id -eq $metadata.games.$game) ($game+' identity preserved in exported package')}
     $invite=Rk-Api 'invite.create' @{uses=4;expires_hours=1;reason='exported Linux package acceptance'}
@@ -139,8 +163,24 @@ try{
     WaitClean
     # Export actual production Client.exe from the same prepared game manifest.
     $playerRoot=Join-Path $project ('artifacts/linux-package-player-'+$ctx.build)
-    & (Join-Path $project 'tools/prepare_player_client.ps1') -IndexPath $ctx.source_index -ConnectionDirectory $public -OutputRoot $playerRoot | Out-File -LiteralPath (Join-Path $root 'player-export.out') -Encoding utf8
-    $player=Join-Path $playerRoot 'shooter-windows'
+    if($PreparedPlayer){
+        $prepared=[IO.Path]::GetFullPath($PreparedPlayer)
+        if(-not(Rk-Inside $prepared (Join-Path $project 'artifacts/deployments'))){throw 'Prepared client must come from a local paired deployment.'}
+        $cursor=$prepared
+        while($cursor){$item=Get-Item -LiteralPath $cursor -Force -ErrorAction SilentlyContinue;if($null -ne $item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Linked prepared client rejected.'};$parent=[IO.Path]::GetDirectoryName($cursor);if($parent -eq $cursor){break};$cursor=$parent}
+        $player=Join-Path $root 'prepared-player'
+        [void][IO.Directory]::CreateDirectory($player)
+        foreach($name in @('Client.exe','Client.pck','client-version.json')){
+            $source=Join-Path $prepared $name
+            if((Get-Item -LiteralPath $source).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Linked prepared client file rejected.'}
+            Copy-Item -LiteralPath $source -Destination (Join-Path $player $name)
+            Check ((Get-FileHash -LiteralPath $source).Hash -eq (Get-FileHash -LiteralPath (Join-Path $player $name)).Hash) ('final prepared '+$name+' copied byte-for-byte')
+        }
+        foreach($name in @('connection.json','server.crt')){Copy-Item -LiteralPath (Join-Path $public $name) -Destination (Join-Path $player $name)}
+    }else{
+        & (Join-Path $project 'tools/prepare_player_client.ps1') -IndexPath $ctx.source_index -ConnectionDirectory $public -OutputRoot $playerRoot | Out-File -LiteralPath (Join-Path $root 'player-export.out') -Encoding utf8
+        $player=Join-Path $playerRoot 'shooter-windows'
+    }
     $version=Rk-ReadJson (Join-Path $player 'client-version.json')
     Check ($version.build_id -eq $index.shooter.manifest.build_id) 'actual Windows Client.exe matches Linux package build'
     $invite=Rk-Api invite.create @{uses=2;expires_hours=1;reason='actual Windows exports against Linux package'}
@@ -155,6 +195,21 @@ try{
     foreach($item in $exports){$report=Rk-ReadJson $item.report;Check ($item.process.HasExited -and $item.process.ExitCode -eq 0 -and $report.ok -and $report.stage -eq 'left_room' -and $report.left_state -eq 'LOBBY') ('actual exported client '+$item.n+' registers, joins and leaves')}
     $one=Rk-ReadJson $exports[0].report;$two=Rk-ReadJson $exports[1].report
     Check ($one.players -contains $two.user_id -and $two.players -contains $one.user_id) 'actual exported clients see each other over direct LAN UDP'
+    if($PreparedPlayer){
+        $reports=@(Get-ChildItem -LiteralPath (Join-Path $player 'client-data/reports') -Filter '*.jsonl' -File)
+        Check ($reports.Count -eq 2) 'two actual exported clients keep separate local network reports'
+        $sessionIds=@()
+        foreach($journal in $reports){
+            $journalText=[IO.File]::ReadAllText($journal.FullName)
+            $samples=@($journalText -split "`r?`n" | Where-Object {$_} | ForEach-Object { $_ | ConvertFrom-Json })
+            Check (@($samples | Where-Object { $_.phase -eq 'IN_ROOM' -and $_.kind -eq 'sample' }).Count -gt 0) 'exported local report contains real Linux room samples'
+            $ids=@($samples.session_id | Select-Object -Unique)
+            Check ($ids.Count -eq 1 -and $ids[0] -and @($samples | Where-Object {$_.build -cne $index.shooter.manifest.build_id}).Count -eq 0) 'report session and build identify the tested client'
+            $sessionIds+=$ids
+            Check ($journalText -notmatch '"(password|token|ticket|username|user_id|invite_code)"\s*:' -and $journalText -notmatch [regex]::Escape($invite.payload.invite_code)) 'network report omits account and invitation secrets'
+        }
+        Check (@($sessionIds | Select-Object -Unique).Count -eq 2) 'simultaneous clients have distinct report sessions'
+    }
     WaitClean
     Check (Rk-Api server.stop @{immediate=$true;reason='package persistence acceptance'}).ok 'native managed host accepts immediate stop'
     Check ((Rk-WaitHost STOPPED).host.state -eq 'STOPPED') 'native host stops while panel remains available'
@@ -167,7 +222,7 @@ try{
     Check (((Remote ('bash '+$remote+'/RoomKit.sh stop --instance '+$ctx.instance)) -join "`n") -match 'ROOMKIT_STOPPED') 'official exported entry stops its own Operator without signals'
     SaveServerLogs 'first-stop'
     # No repeated ports: this checks persisted panel + config preflight on restart.
-    Check (((Remote ('bash '+$remote+'/RoomKit.sh start --instance '+$ctx.instance)) -join "`n") -match 'ROOMKIT_PANEL http://127.0.0.1:28691/') 'official entry restarts with saved ports without disturbing old service'
+    Check (((Remote ('bash '+$remote+'/RoomKit.sh start --instance '+$ctx.instance)) -join "`n") -match ('ROOMKIT_PANEL '+[regex]::Escape($panelUrl+'/'))) 'official entry restarts with saved ports without disturbing old service'
     Check (Rk-WaitApi 20) 'restarted native panel is available'
     Check (Rk-AdminLogin $adminFile) 'administrator survives native Operator restart'
     $after=Rk-Coins $clients[0].user_id shooter
@@ -175,7 +230,9 @@ try{
 }catch{if($failed -eq 0){$failed++};Write-Output ('PACKAGE_ERROR '+$_.Exception.Message);Write-Output ('PACKAGE_ERROR_LOCATION '+$_.ScriptStackTrace)}finally{
     foreach($item in $exports){if(-not $item.process.HasExited){$item.process.Kill();[void]$item.process.WaitForExit(5000);$failed++};Remove-Item -LiteralPath $item.plan -ErrorAction SilentlyContinue}
     foreach($client in $clients){try{if(-not $client.process.HasExited){[void](Rk-StopClient $client)}}catch{$failed++}}
-    foreach($file in Get-ChildItem -LiteralPath $root -Recurse -File -Include '*.err','stderr.log'){if(Select-String -LiteralPath $file.FullName -Pattern 'SCRIPT ERROR|Parse Error|Compile Error' -Quiet){$failed++;Write-Output 'FAIL client runtime script error'}}
+    # PowerShell 5.1 ignores -Include with some -LiteralPath/-Recurse forms.
+    # Select log names explicitly: Client.exe contains engine error messages as data.
+    foreach($file in Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {$_.Extension -eq '.err' -or $_.Name -eq 'stderr.log'}){if(Select-String -LiteralPath $file.FullName -Pattern 'SCRIPT ERROR|Parse Error|Compile Error' -Quiet){$failed++;Write-Output ('FAIL client runtime script error: '+$file.Name)}}
     try{if($ownedFixture){[void](Remote ('bash '+$remote+'/RoomKit.sh stop --instance '+$ctx.instance));if($started -and $rooms.Count -eq 2){SaveServerLogs 'final-stop'}}}catch{$failed++;Write-Output ('FAIL scoped package shutdown/log collection: '+$_.Exception.Message)}
     if($null -ne $tunnel){if(-not $tunnel.HasExited){$tunnel.Kill();[void]$tunnel.WaitForExit(5000)};$tunnel.Dispose()}
     Rk-SaveJson (Join-Path $root 'result.json') @{passed=$passed;failed=$failed;full_round=[bool]$FullRound;exported_server=$true;business_clients='source SDK fixture';native_clients='production Client.exe autoplay'}

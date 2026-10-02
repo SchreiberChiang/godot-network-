@@ -1,0 +1,72 @@
+{
+  "status": "PASS",
+  "checks": {
+    "exactly_one_body_and_four_wheels": true,
+    "distinct_wheel_meshes": true,
+    "finite_nonzero_bounds": true,
+    "approximately_four_meters": true,
+    "ground_contact": true,
+    "triangle_budget": true,
+    "material_budget": true,
+    "nonzero_glb": true,
+    "wheel_pivots": true,
+    "no_external_assets": true
+  },
+  "reimport_meshes": [
+    "Body",
+    "Wheel_Front_Left",
+    "Wheel_Front_Right",
+    "Wheel_Rear_Left",
+    "Wheel_Rear_Right"
+  ],
+  "bounds_xyz_m": [
+    [
+      -2.0199999809265137,
+      2.0299999713897705
+    ],
+    [
+      -0.9244999885559082,
+      0.9244999885559082
+    ],
+    [
+      0.0,
+      1.370294451713562
+    ]
+  ],
+  "dimensions_xyz_m": [
+    4.049999952316284,
+    1.8489999771118164,
+    1.370294451713562
+  ],
+  "triangles": 1792,
+  "materials": [
+    "01_Petrol_Teal",
+    "02_Smoked_Glass",
+    "03_Graphite",
+    "04_Satin_Alloy"
+  ],
+  "wheel_centers_blender_xyz": {
+    "Wheel_Front_Left": [
+      1.2000000476837158,
+      0.800000011920929,
+      0.3199999928474426
+    ],
+    "Wheel_Front_Right": [
+      1.2000000476837158,
+      -0.800000011920929,
+      0.3199999928474426
+    ],
+    "Wheel_Rear_Left": [
+      -1.2000000476837158,
+      0.800000011920929,
+      0.3199999928474426
+    ],
+    "Wheel_Rear_Right": [
+      -1.2000000476837158,
+      -0.800000011920929,
+      0.3199999928474426
+    ]
+  },
+  "glb_bytes": 119260,
+  "blender_version": "4.3.2"
+}

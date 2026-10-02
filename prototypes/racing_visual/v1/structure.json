@@ -1,0 +1,589 @@
+{
+  "archive_sha256": "179b2612559b2fbf7f99a4f85b28185afd768e0d592a7bef98032ab4e792581b",
+  "archive_bytes": 3322617,
+  "zip_safe": true,
+  "zip_entries": [
+    {
+      "name": "prototypes/racing_visual/create_car.py",
+      "bytes": 8082,
+      "compressed_bytes": 3355
+    },
+    {
+      "name": "prototypes/racing_visual/source_stats.json",
+      "bytes": 380,
+      "compressed_bytes": 202
+    },
+    {
+      "name": "prototypes/racing_visual/street_car_v1.blend",
+      "bytes": 111265,
+      "compressed_bytes": 110663
+    },
+    {
+      "name": "prototypes/racing_visual/street_car_v1.glb",
+      "bytes": 119260,
+      "compressed_bytes": 14626
+    },
+    {
+      "name": "prototypes/racing_visual/three_quarter.png",
+      "bytes": 1584243,
+      "compressed_bytes": 1581316
+    },
+    {
+      "name": "prototypes/racing_visual/top.png",
+      "bytes": 1610598,
+      "compressed_bytes": 1607820
+    },
+    {
+      "name": "prototypes/racing_visual/validate_glb.py",
+      "bytes": 1920,
+      "compressed_bytes": 987
+    },
+    {
+      "name": "prototypes/racing_visual/validation.json",
+      "bytes": 1457,
+      "compressed_bytes": 538
+    },
+    {
+      "name": "prototypes/racing_visual/说明.txt",
+      "bytes": 2656,
+      "compressed_bytes": 1694
+    }
+  ],
+  "files": [
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\create_car.py",
+      "bytes": 8082,
+      "sha256": "f5fba3b16be1acacf7653a0107725149255f06605b12ed99c5ed4a329e2f9363"
+    },
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\source_stats.json",
+      "bytes": 380,
+      "sha256": "58866ab25c7dc3b6950d0be4a31d0063ec4ee3588b99464de199abf62dd41abe"
+    },
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\street_car_v1.blend",
+      "bytes": 111265,
+      "sha256": "6f429f994e9391c2ea3582a189ba14834e9d78ae7135a98b46304e5f24eda64b"
+    },
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\street_car_v1.glb",
+      "bytes": 119260,
+      "sha256": "8f08bb51813802b1103b74c5be379ee2d66180a66e00fd4cc58b2f478d4a6169"
+    },
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\three_quarter.png",
+      "bytes": 1584243,
+      "sha256": "9ad5426e58b0eb1c84109367741239ca3daf7a7f1423ad03a0687040b7b3f0c0"
+    },
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\top.png",
+      "bytes": 1610598,
+      "sha256": "04815a715e27d3aeaeb986a129a77060511b091675df8342be689763cc0f264c"
+    },
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\validate_glb.py",
+      "bytes": 1920,
+      "sha256": "10381271f96ab90b6974123e65dd401868d5666f4ba03beaf89dfe8f5bef25a8"
+    },
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\validation.json",
+      "bytes": 1457,
+      "sha256": "999b70f468831ec4327ac78d67633e2f31fe770f1f13de6a74c20d2d23f52669"
+    },
+    {
+      "path": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\dot-car-v1-20261002\\extracted\\prototypes\\racing_visual\\说明.txt",
+      "bytes": 2656,
+      "sha256": "af1392baee3e66e7220c072cde5308f88ea7b1ac3a04e4e1be1bbc185201a7fd"
+    }
+  ],
+  "glb": {
+    "version": 2,
+    "generator": "Khronos glTF Blender I/O v4.3.47",
+    "triangles": 1792,
+    "meshes": [
+      {
+        "index": 0,
+        "name": "Sculpted body with wheel arches",
+        "triangles": 832,
+        "degenerate_triangles": 16,
+        "materials": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "index": 1,
+        "name": "Cylinder.004",
+        "triangles": 240,
+        "degenerate_triangles": 0,
+        "materials": [
+          2,
+          3
+        ]
+      },
+      {
+        "index": 2,
+        "name": "Cylinder",
+        "triangles": 240,
+        "degenerate_triangles": 0,
+        "materials": [
+          2,
+          3
+        ]
+      },
+      {
+        "index": 3,
+        "name": "Cylinder.012",
+        "triangles": 240,
+        "degenerate_triangles": 0,
+        "materials": [
+          2,
+          3
+        ]
+      },
+      {
+        "index": 4,
+        "name": "Cylinder.008",
+        "triangles": 240,
+        "degenerate_triangles": 0,
+        "materials": [
+          2,
+          3
+        ]
+      }
+    ],
+    "materials": [
+      {
+        "doubleSided": true,
+        "name": "01_Petrol_Teal",
+        "pbrMetallicRoughness": {
+          "baseColorFactor": [
+            0.017999999225139618,
+            0.36000001430511475,
+            0.3400000035762787,
+            1
+          ],
+          "metallicFactor": 0.550000011920929,
+          "roughnessFactor": 0.28999999165534973
+        }
+      },
+      {
+        "doubleSided": true,
+        "name": "02_Smoked_Glass",
+        "pbrMetallicRoughness": {
+          "baseColorFactor": [
+            0.02199999988079071,
+            0.041999999433755875,
+            0.06300000101327896,
+            1
+          ],
+          "metallicFactor": 0.25,
+          "roughnessFactor": 0.1899999976158142
+        }
+      },
+      {
+        "doubleSided": true,
+        "name": "03_Graphite",
+        "pbrMetallicRoughness": {
+          "baseColorFactor": [
+            0.017999999225139618,
+            0.02199999988079071,
+            0.02800000086426735,
+            1
+          ],
+          "metallicFactor": 0,
+          "roughnessFactor": 0.7200000286102295
+        }
+      },
+      {
+        "doubleSided": true,
+        "name": "04_Satin_Alloy",
+        "pbrMetallicRoughness": {
+          "baseColorFactor": [
+            0.699999988079071,
+            0.7599999904632568,
+            0.800000011920929,
+            1
+          ],
+          "metallicFactor": 0.6499999761581421,
+          "roughnessFactor": 0.25
+        }
+      }
+    ],
+    "nodes": [
+      {
+        "index": 5,
+        "name": "Street_Car_V1",
+        "mesh": null,
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "world_matrix": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "children": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "index": 0,
+        "name": "Body",
+        "mesh": 0,
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "world_matrix": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "children": [],
+        "world_min": [
+          -2.0199999809265137,
+          0.3075000047683716,
+          -0.9099999666213989
+        ],
+        "world_max": [
+          2.0299999713897705,
+          1.370294451713562,
+          0.9099999666213989
+        ]
+      },
+      {
+        "index": 1,
+        "name": "Wheel_Front_Left",
+        "mesh": 1,
+        "translation": [
+          1.2000000476837158,
+          0.3199999928474426,
+          -0.800000011920929
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "world_matrix": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            1.2000000476837158
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.3199999928474426
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            -0.800000011920929
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "children": [],
+        "world_min": [
+          0.8800000548362732,
+          0.0,
+          -0.92450001090765
+        ],
+        "world_max": [
+          1.5200000405311584,
+          0.6399999856948853,
+          -0.6755000129342079
+        ]
+      },
+      {
+        "index": 2,
+        "name": "Wheel_Front_Right",
+        "mesh": 2,
+        "translation": [
+          1.2000000476837158,
+          0.3199999928474426,
+          0.800000011920929
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "world_matrix": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            1.2000000476837158
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.3199999928474426
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.800000011920929
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "children": [],
+        "world_min": [
+          0.8800000548362732,
+          0.0,
+          0.6755000129342079
+        ],
+        "world_max": [
+          1.5200000405311584,
+          0.6399999856948853,
+          0.92450001090765
+        ]
+      },
+      {
+        "index": 3,
+        "name": "Wheel_Rear_Left",
+        "mesh": 3,
+        "translation": [
+          -1.2000000476837158,
+          0.3199999928474426,
+          -0.800000011920929
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "world_matrix": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            -1.2000000476837158
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.3199999928474426
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            -0.800000011920929
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "children": [],
+        "world_min": [
+          -1.5200000405311584,
+          0.0,
+          -0.92450001090765
+        ],
+        "world_max": [
+          -0.8800000548362732,
+          0.6399999856948853,
+          -0.6755000129342079
+        ]
+      },
+      {
+        "index": 4,
+        "name": "Wheel_Rear_Right",
+        "mesh": 4,
+        "translation": [
+          -1.2000000476837158,
+          0.3199999928474426,
+          0.800000011920929
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "world_matrix": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            -1.2000000476837158
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.3199999928474426
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.800000011920929
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "children": [],
+        "world_min": [
+          -1.5200000405311584,
+          0.0,
+          0.6755000129342079
+        ],
+        "world_max": [
+          -0.8800000548362732,
+          0.6399999856948853,
+          0.92450001090765
+        ]
+      }
+    ],
+    "scene_bounds_min": [
+      -2.0199999809265137,
+      0.0,
+      -0.92450001090765
+    ],
+    "scene_bounds_max": [
+      2.0299999713897705,
+      1.370294451713562,
+      0.92450001090765
+    ],
+    "scene_dimensions": [
+      4.049999952316284,
+      1.370294451713562,
+      1.8490000218153
+    ],
+    "external_dependencies": [],
+    "extensions_used": [],
+    "extensions_required": [],
+    "animations": 0,
+    "skins": 0
+  },
+  "not_verified": [
+    "Blender reopening/source editability",
+    "Godot import/render/runtime",
+    "Live wheel steering/spinning",
+    "Physics/collision/driving",
+    "Preview provenance relative to GLB"
+  ]
+}
