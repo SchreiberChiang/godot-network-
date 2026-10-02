@@ -33,13 +33,9 @@ set -u
 umask 077
 trap '' PIPE
 PROJECT="$(cd "$(dirname "$0")/.." && pwd -P)"
-GODOT="${ROOMKIT_GODOT:-$HOME/roomkit/tools/godot/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64}"
-PWSH="${ROOMKIT_PWSH:-$HOME/roomkit/tools/pwsh/7.6.6/pwsh}"
-EXPORTED=0
-if [ -f "$PROJECT/linux-package.json" ]; then
-  EXPORTED=1
-  GODOT="$PROJECT/Operator.x86_64"
-fi
+. "$PROJECT/tools/runtime_paths.sh"
+rk_runtime_paths "$PROJECT"
+GODOT="$RK_GODOT" PWSH="$RK_PWSH" EXPORTED="$RK_EXPORTED"
 command="${1:-}"; [ $# -gt 0 ] && shift
 NAME=l3 PANEL=28491 LOBBY=28500 CONTROL=28501 UDP=28540-28555 BIND=127.0.0.1
 PANEL_EXPLICIT=0

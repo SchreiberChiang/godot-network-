@@ -22,7 +22,9 @@ for file in Operator.x86_64 ManagedHost.x86_64 games/shooter/Server.x86_64 games
   version="$("$ROOT/$file" --headless --version)" || fail "cannot read engine identity $file"
   [ "$version" = 4.7.2.stable.official.ed1daf0bf ] || fail "unexpected engine identity $file"
 done
-PWSH="${ROOMKIT_PWSH:-$HOME/roomkit/tools/pwsh/7.6.6/pwsh}"
+. "$ROOT/tools/runtime_paths.sh"
+rk_runtime_paths "$ROOT"
+PWSH="$RK_PWSH"
 [[ "$PWSH" = /* ]] && [ -x "$PWSH" ] || fail "set ROOMKIT_PWSH to the existing absolute pwsh executable"
 [ ! -L "$ROOT/data" ] || fail "linked package data directory"
 umask 077

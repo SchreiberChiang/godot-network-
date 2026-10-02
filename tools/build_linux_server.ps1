@@ -77,7 +77,7 @@ foreach($notice in @('LICENSE.txt','COPYRIGHT.txt')){
     if(-not(Test-Path -LiteralPath $noticeSource -PathType Leaf)){throw 'Godot runtime copyright notices are required for distribution.'}
     Copy-Item -LiteralPath $noticeSource -Destination (Join-Path $bundle ('GODOT-'+$notice))
 }
-foreach($inputFile in @('project.godot','LICENSE','tools/build_linux_server.ps1','tools/build_framework.ps1','tools/content_digest.ps1','tools/roomkit_linux.sh','tools/linux_package_check.sh')){
+foreach($inputFile in @('project.godot','LICENSE','PrepareEnvironment.sh','tools/prepare_environment.sh','tools/runtime_paths.sh','tools/build_linux_server.ps1','tools/build_framework.ps1','tools/content_digest.ps1','tools/roomkit_linux.sh','tools/linux_package_check.sh')){
     [void]$sourceFiles.Add(@{path=$inputFile;sha256=(Get-FileHash -LiteralPath (Join-Path $project $inputFile) -Algorithm SHA256).Hash.ToLowerInvariant()})
 }
 foreach($helper in @('sqlite_store.ps1','account_store.ps1','storage_worker.ps1','operator_maintenance.ps1')){
@@ -103,7 +103,8 @@ foreach($entry in @(@{name='Operator';script='res://host/operator.gd'},@{name='M
     ExportPack $hostProject (Join-Path $bundle ($entry.name+'.pck')) $entry.name
     Copy-Item -LiteralPath $template -Destination (Join-Path $bundle ($entry.name+'.x86_64'))
 }
-foreach($name in @('roomkit_linux.sh','linux_package_check.sh')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))}
+foreach($name in @('roomkit_linux.sh','linux_package_check.sh','prepare_environment.sh','runtime_paths.sh')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))}
+Copy-Item -LiteralPath (Join-Path $project 'PrepareEnvironment.sh') -Destination (Join-Path $bundle 'PrepareEnvironment.sh')
 foreach($name in @('update_linux_package.sh','update_linux_package.ps1')){
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))
     [void]$sourceFiles.Add(@{path=('tools/'+$name);sha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $name) -Algorithm SHA256).Hash.ToLowerInvariant()})
@@ -117,9 +118,14 @@ WriteUtf8 (Join-Path $bundle 'README.md') @'
 # RoomKit Linux x86_64 server candidate
 
 This is a normal server directory, not a source checkout. Keep all files together.
-Godot is included; pwsh 7.6.6 and system libsqlite3.so.0 must already be available.
-Set ROOMKIT_PWSH to the absolute installed pwsh path if its default differs.
-Run as an ordinary user in a writable directory. Nothing installs packages.
+Godot is included. Run bash PrepareEnvironment.sh check first (read-only).
+bash PrepareEnvironment.sh prepare downloads the missing tested pwsh 7.6.6 from
+official GitHub into artifacts/environment/tools, without sudo/global changes.
+If GitHub is unavailable, import the official archive with --offline and
+--pwsh-archive /ABS/powershell-7.6.6-linux-x64.tar.gz; its SHA256 is fixed.
+System SQLite, ICU and OpenSSL must be present; missing libraries are reported,
+not installed. Set ROOMKIT_PWSH for another tested absolute pwsh path.
+Run as an ordinary user in a writable directory. Preparation starts no service.
 
 1. bash CheckPackage.sh (hashes, engine identity, native libraries; no service).
 2. bash RoomKit.sh start (creates an isolated instance; defaults to loopback).
@@ -151,3 +157,10 @@ WriteUtf8 (Join-Path $bundle 'SHA256SUMS.txt') (($checksums -join "`n")+"`n")
 WriteUtf8 (Join-Path $work 'build-result.json') (@{bundle=$bundle;work=$work;source_index=$sourceIndex;build=$id;source_commit=$base;files=@($checksums).Count;shooter=$games.shooter.manifest.build_id;turns=$games.turns.manifest.build_id}|ConvertTo-Json)
 Write-Output ('LINUX_SERVER_DIRECTORY '+$bundle)
 Write-Output ('LINUX_BUILD_EVIDENCE '+$work)
+# Retention is available when integrated with the project artifact manager.
+$retention=Join-Path $PSScriptRoot 'artifact_retention.ps1'
+if(Test-Path -LiteralPath $retention -PathType Leaf){
+    . $retention
+    Register-RoomKitArtifact -ProjectRoot $project -Category 'linux-server-build' -Paths @($work) -Outcome success -Summary @{bundle=$bundle;build=$id;source_commit=$base}
+    Invoke-RoomKitArtifactRetention -ProjectRoot $project -Category 'linux-server-build' -ProtectedPaths @($bundle,$sourceIndex)
+}
