@@ -1,11 +1,14 @@
-param([string]$Godot='',[int]$Clients=6,[int]$PanelPort=28695)
-# Diagnostic: $Clients real headless clients log in at the same moment against an
+param([string]$Godot='',[ValidateRange(2,8)][int]$Clients=6,[ValidateRange(1024,65495)][int]$PanelPort=28695,[switch]$RequireAll)
+# Diagnostic: $Clients real headless clients are started in a burst against an
 # isolated Operator (data/concurrent-login-<id>, its own ports, index copy and
 # public folder). Records each login's outcome, the Operator's storage refusals
 # and session clean-up, then checks that no session is left behind: after all
 # clients closed, every account logs in once more, one after another. A refused
 # login is never repeated blindly. Expected refusals (capacity) are reported, not
-# hidden; they do not mean every simultaneous login passed. Fake accounts only.
+# hidden; they do not mean every simultaneous login passed. -RequireAll makes
+# any refused/missing burst login fail the run. after_ms is the time when the
+# driver observes a report, not a measurement of that client's login latency.
+# Fake accounts only.
 $ErrorActionPreference='Stop'
 [Net.ServicePointManager]::Expect100Continue=$false
 . (Join-Path $PSScriptRoot 'support/portable.ps1')
@@ -24,7 +27,7 @@ $arguments=@('--headless','--path',$project,'--log-file',(Join-Path $root 'logs/
 $console=Join-Path $root 'logs/console.log'
 $operator=$null
 $script:RkApiUrl='http://127.0.0.1:'+$PanelPort
-$passed=0; $failed=0
+$passed=0; $failed=0; $outcomes=@(); $okCount=0
 function Check([bool]$Condition,[string]$Name) { if ($Condition) { $script:passed++; Write-Output ('PASS '+$Name) } else { $script:failed++; Write-Output ('FAIL '+$Name) } }
 $burst=New-Object Collections.ArrayList
 try {
@@ -67,6 +70,7 @@ try {
     Write-Output ('INFO operator storage refusals during the burst: '+$refusals.Count)
     $refusals | Group-Object | ForEach-Object { Write-Output ('INFO   '+$_.Count+' x '+$_.Name) }
     Check (@($outcomes | Where-Object { $_ -notin @('OK','STORAGE_UNAVAILABLE','RATE_LIMITED') }).Count -eq 0) 'every simultaneous login either succeeded or was refused with a capacity/storage code (no other failure)'
+    if($RequireAll){Check ($okCount -eq $Clients) ('strict acceptance: all burst logins succeed: '+$okCount+' of '+$Clients)}
     foreach($client in $burst) { [void](Rk-StopClient $client) }
     $burst.Clear()
     $deadline=[DateTime]::UtcNow.AddSeconds(45)
@@ -94,6 +98,9 @@ try {
         if (-not $operator.WaitForExit(120000)) { $operator.Kill(); $failed++; Write-Output 'FAIL Operator did not stop on request' }
     }
     Remove-Item -LiteralPath (Join-Path $root 'admin.json') -ErrorAction SilentlyContinue
+    if($null -ne $operator -and $operator.HasExited){Check ($operator.ExitCode -eq 0) 'isolated Operator exits cleanly'}
+    if(Test-Path -LiteralPath (Join-Path $root 'logs/stderr.log')){Check ((Get-Item -LiteralPath (Join-Path $root 'logs/stderr.log')).Length -eq 0) 'isolated Operator has no error output'}
+    Rk-SaveJson (Join-Path $root 'logs/result.json') @{passed=$passed;failed=$failed;clients=$Clients;successful=$okCount;outcomes=$outcomes;require_all=[bool]$RequireAll}
 }
 Write-Output ('CONCURRENT_LOGIN_RESULT passed='+$passed+' failed='+$failed+' clients='+$Clients+' evidence='+$root)
 if ($failed -gt 0) { exit 1 }

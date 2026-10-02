@@ -4,9 +4,9 @@
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
-资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；[新增清理候选](docs/17_framework_shooter_plan.md#cleanup-review-20261002) 只列清单，明天讨论后再决定是否删除。
+资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
-配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。明天先讨论清理清单，再做小规模多人、朋友试玩和赛车接入。
+配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。当前开始 [2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-stability)，朋友试玩和赛车随后。
 
 ## 准备服务器和玩家目录
 

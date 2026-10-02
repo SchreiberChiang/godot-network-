@@ -78,6 +78,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_framework.ps1 -M
 
 每条命令都要检查真实退出码。`tools/run.ps1` 的模式除了成功标记，还必须输出 `ROOMKIT_EXIT mode=<模式> code=0`；脚本会检查退出码、脚本错误和成功标记，并设置整体超时。日志写入 `logs/<模式>-console.log`、`*-stderr.log`、`*-godot.log`。`-Godot '完整路径'` 可指定引擎，换版本需要重新验收。
 
+<a id="small-group-login"></a>
+### 2–8 人突发登录（隔离数据）
+
+`tests/test_concurrent_login.ps1 -RequireAll` 在全新的私有 `data/concurrent-login-*` 目录里准备游戏索引并启动真实 Operator、宿主和无窗口客户端。按 2、4、8 人顺序运行，不能把允许部分拒绝的默认诊断模式记为全员登录通过：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_concurrent_login.ps1 -Clients 2 -PanelPort 29291 -RequireAll
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_concurrent_login.ps1 -Clients 4 -PanelPort 29391 -RequireAll
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_concurrent_login.ps1 -Clients 8 -PanelPort 29491 -RequireAll
+```
+
+每组必须全员成功，退出后清理队列归零、无清理失败，每个账号还能逐一重新登录。分项结果保存在该隔离目录的 `logs/result.json`；总退出码非零就不算通过。`after_ms` 是驱动看到结果的时间，不能当作各玩家的独立登录延迟；这些是同机真实 WSS 突发登录，不代替 Linux、朋友设备或压力下的长期验收。
+
 ### 基础回归（`tools/run.ps1`）
 
 备份期间的账号等待与玩家退出取消，分别由 [run_operator_backup_wait.gd](../tests/run_operator_backup_wait.gd) 和 [run_local_rpc_cancel.gd](../tests/run_local_rpc_cancel.gd) 检查。前者使用生产 Operator 处理器加替身，包含实际 10 秒截止与结果 outbox 保留；后者使用真实认证回环 TCP，不启动数据库或管理服务。Windows 通过隔离入口执行：

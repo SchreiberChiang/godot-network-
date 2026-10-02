@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-10-02 Codex 小规模联机稳定性启动（基准 `main / 1198ecb`）：修改 `tests/test_concurrent_login.ps1`，增加严格全员成功模式、私有分项结果和 Operator 退出检查；同步 README、STATUS、docs/17、22、本清单及路线图。2 人、4 人通过；8 人两轮均只成功 5 人，失败保留，下一步处理写锁竞争与工作名额满。生产代码、协议、数据库格式和玩家交付未改；新源码副本中的固定错误码探针仅在忽略目录，不进入提交。见 [首轮基线](17_framework_shooter_plan.md#small-group-stability)。
+
 2026-10-02 Codex 配套部署与 Linux 离线更新（实施基准 `main / 8cddf26`）：新增 `PrepareDeployment.cmd`、`OpenDeployment.cmd`、`tools/prepare_deployment.ps1`、`tools/check_deployment.ps1`、`tools/open_deployment.ps1`、`tools/update_linux_package.sh`、`tools/update_linux_package.ps1`、`tests/test_deployment_pair.ps1`、`tests/test_linux_package_update.ps1`、`tests/test_linux_deployment_integration.ps1`；修改两个服务端构建脚本和 `tools/prepare_player_client.ps1`，同步 README、STATUS、CHANGELOG、docs/01、17、22、本清单、历史归档与路线图。阶段说明见 [交付记录](17_framework_shooter_plan.md#deployment-stage-result)。二进制、私有测试数据、依赖和证据在忽略目录；不更新正式实例，不删除清理候选、不发布 Release。
 
 2026-10-02 Codex 试玩反馈与后续规划（基准 `main / f132e4a`）：仅修改 CONTEXT、README、STATUS、docs/17、本清单和路线图；记录用户本机整体试玩正常、尚未分发他人，补充交付术语并规划部署/更新闭环。没有改功能、接触运行环境或实施更新，后续门槛见 [当前安排](17_framework_shooter_plan.md#next-delivery-stage)。

@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "部署阶段首版，实施基准 main @ 8cddf26；当前提交用 git log -1 核实；验收范围以 STATUS 和 docs/17 顶部为准",
+  baseline: "小规模联机稳定性推进，基准 main @ 1198ecb；当前提交用 git log -1 核实；验收范围以 STATUS 和 docs/17 顶部为准",
   statuses: {
     verified:    { label: "已验证", hint: "在条目注明的环境通过指定自动验收；不等于所有平台或场景通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -28,9 +28,17 @@ window.ROADMAP_DATA = {
     { id: 2, label: "阶段 2：主线与试玩体验", hint: "GitHub 主线、按清单清理、独立射击客户端、后台 UI、基础音效" },
     { id: 3, label: "阶段 3：跨平台完整服务器", hint: "Linux 完整后台与服务器，Windows 仍可一键运行" },
     { id: 4, label: "阶段 4：部署与更新", hint: "配套目录和 Linux 离线更新已验证；自动安装、Windows 迁移和启动失败自动回退另排" },
+    { id: 5, label: "阶段 5：小规模联机稳定性", hint: "当前推进 2/4/8 人登录、掉线重连与备份重叠；Windows 基线先行" },
     { id: 9, label: "以后 / 未排期", hint: "已记录边界，未安排阶段" }
   ],
   nodes: [
+    { id: "small-group-stability", area: "account", phase: 5, status: "pending",
+      title: "2–8 人突发登录与会话稳定性",
+      summary: "先补严格并发登录验收，再验证掉线重连和真实备份重叠。",
+      details: "每组全部成功才算通过，容量拒绝如实记失败；退出后会话须清理，每个账号可重新登录。先用全新 Windows 隔离环境，Linux 与朋友设备复验另列，不放宽认证、不扩大登录重试。",
+      files: ["tests/test_concurrent_login.ps1", "tests/test_operator_backup_login.ps1", "tests/test_asset_response_loss.ps1"],
+      docs: ["docs/17_framework_shooter_plan.md#small-group-stability"],
+      evidence: "Windows 严格基线：2/2、4/4 成功，各检查 8/0；8 人两轮均 5/8、7/1，写锁竞争和工作名额满待修；退出清理及 8/8 逐一重登通过，Linux/重连/备份重叠本轮未复验" },
     // ---------- 账号 ----------
     { id: "acc-register", area: "account", phase: 0, status: "verified",
       title: "邀请码注册与登录",
