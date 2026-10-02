@@ -79,7 +79,21 @@ bash NEW/RoomKit.sh start --instance demo
 | `artifacts/deployments/` 的旧试制目录、`linux-server-build-*` 和本轮隔离包副本 | 本阶段反复导出，留下多份临时工程和试制交付 | 最新 `deployment-latest.json` 指向的干净目录、运行实例、源码清单和验收证据 | 按清单保留当前交付和有效回退，讨论其余重复副本；不删除仍在运行的远端目录 |
 | `artifacts/worktree-deployment-*` 两个实施工作树 | 子任务已合并，证据已复制到主树 | 核对提交已包含、工作树干净、没有唯一未保存文件 | 明天通过 Git 工作树管理命令收尾，不用普通递归删除 |
 
-目前实施用的独立 Git 工作树位于 `artifacts/worktree-deployment-*`；不能用普通递归删除清理。完成合并、检查干净并保留所需证据后，使用 Git 的工作树管理命令单独收尾。
+以上为执行前的候选快照；两份实施工作树已按下面记录收尾，其余候选继续保留。
+
+<a id="cleanup-round1-result"></a>
+### 第一轮清理结果（2026-10-02）
+
+用户回复“ok”后执行保守范围：只处理两份已合并、干净的实施工作树及测试日志中的重复 EXE。执行前核对 `git cherry main` 无未合并补丁、无相关运行进程，并对全部文件建立哈希归档；删除前再次核对原文件。没有删除旧框架包、PCK、原始验收报告、实际账号资产、事件副本、冷导入失败基线或当前客户端。
+
+- 移除 `artifacts/worktree-deployment-pair` 和 `artifacts/worktree-deployment-update`；Git 现在只登记主工作区。
+- 移除日志目录中 47 个重复 EXE；报告及 PCK 留在原位置。原路径到 SHA256 的映射保存在归档，重放这些历史测试前可恢复程序。
+- 保留工作树里的独有 Windows 交付到 `artifacts/deployments/windows-retained-20261002`，校验 **50 文件通过**；当前 Linux 交付 **40 文件通过**，最近交付索引未修改。
+- 私有归档 `data/cleanup-history-20261002-62b7f4fcdbc7/`：`objects.zip` 约 72 MiB，映射 4,756 个文件、816 个唯一对象；每个压缩对象都已解压计算哈希。扣除归档和保留 Windows 副本后，按文件长度净释放约 **8.43 GiB**，不等同于文件系统实际分配空间。
+- `manifest.json`、`result.json`、`restore.ps1` 在归档内。恢复单文件需指定清单里的原相对路径及项目内尚不存在的目标路径；拒绝覆盖、链接和项目外目标。README 抽样恢复通过。命令形如 `powershell.exe -NoProfile -File data/cleanup-history-20261002-62b7f4fcdbc7/restore.ps1 -RelativePath <清单中的原路径> -Destination <项目内绝对目标路径>`。归档不随 Git 克隆，勿把 Git 推送视为归档备份。
+- 真实 `accounts.sqlite`、`assets.sqlite`、`operator.json`、公开 `connection.json` 和 `server.crt` 的哈希与修改时间 **5/5 不变**。没有连接或清理 Linux 笔记本。
+
+过程失败保留：首次清单生成遇到 PowerShell 泛型数组转换错误，未删除文件；改为 `ToArray()` 后复用并校验同一归档。Git 移除第一份工作树时遇到 Windows 长路径错误，Git 已注销登记但留下目录；核对剩余文件全部匹配归档后，用 PowerShell 7 清除已注销残留。第二份通过命令级 `core.longpaths=true` 的 Git 工作树命令正常移除，没有改全局 Git 设置。证据在 `logs/cleanup-round1/` 与归档清单。本轮只做清理和文档检查，不重跑玩法测试。
 
 <a id="linux-package-playtest"></a>
 ## Linux 独立包真人试玩入口（Codex，2026-10-02）

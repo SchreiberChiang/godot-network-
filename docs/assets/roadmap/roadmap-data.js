@@ -372,8 +372,8 @@ window.ROADMAP_DATA = {
       evidence: "只列候选" },
     { id: "clean-log-copies", area: "cleanup", phase: 4, status: "candidate",
       title: "日志目录里可重建的重复副本",
-      summary: "重复源码包、临时驱动及已用完的安装下载。",
-      details: "先保留有效通过、失败、源码清单及冷导入证据；仅无引用且可重建的副本可以讨论清理。",
+      summary: "已归档移除 47 个重复测试 EXE；其它副本仍待讨论。",
+      details: "报告与 PCK 留在原位置，重复 EXE 可按私有归档清单恢复；源码包、驱动、安装下载与冷导入证据没有删除。",
       files: ["logs/"],
       docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002"],
       evidence: "只列候选" },
@@ -384,12 +384,12 @@ window.ROADMAP_DATA = {
       files: ["tools/prepare_deployment.ps1"],
       docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002"],
       evidence: "只列候选，本轮不清理" },
-    { id: "clean-implementation-worktrees", area: "cleanup", phase: 4, status: "candidate",
+    { id: "clean-implementation-worktrees", area: "cleanup", phase: 4, status: "verified",
       title: "已合并的实施工作树",
-      summary: "两份 deployment 工作树需按 Git 规则收尾。",
-      details: "提交已合并、证据已复制到主树；明天核对干净和没有唯一文件后，用 Git 工作树命令移除，不普通递归删除。",
+      summary: "两份已合并工作树已归档并移除。",
+      details: "提交补丁已合并、工作树干净；全部文件哈希归档，独有 Windows 交付另存并校验。Git 长路径失败留下的已注销残留核验后清除，当前只登记主树。",
       files: [],
       docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002"],
-      evidence: "只列候选，本轮保留" }
+      evidence: "归档完整校验、恢复抽测及 Git 登记核对通过；见 docs/17 第一轮清理结果" }
   ]
 };
