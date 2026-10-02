@@ -2,8 +2,8 @@
 // 维护规则：状态与结论引用 STATUS / 专题文档，这里不另写测试数字以外的第三套结论；
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
-  checkedAt: "2026-10-02",
-  baseline: "U1、N1已接入。N2最终56f4b235deea跨机65/0，已保留数据换上Linux，PlayLinuxPackage入口不变，朋友干净目录已准备。D1离线查看器、F1 Linux严格4/8人待外部回报。V1样本已收，16退化面待修。首版按稳定试玩、玩法复用、发行收束推进；C盘/WSL清理暂停。",
+  checkedAt: "2026-10-03",
+  baseline: "U1、N1、D1已接入。N2最终56f4b235deea跨机65/0并保留数据换包，入口不变。D1 Edge离线验收10/10，真实双客户端42采样可查看。F1外部仅准备，主线接手严格4/8人，尚未实跑。V1样本16退化面待修；C盘/WSL清理暂停。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -40,13 +40,13 @@ window.ROADMAP_DATA = {
       summary: "稳定试玩能排障、接游戏可复用、干净交付可获取。",
       details: "已有账号资产、房间、后台、Windows/Linux、射击/取石子与模板。剩余先验最终诊断包、当前Linux严格多人及朋友日志；再接赛车最小闭环，最后固定支持矩阵与获取/更新边界。不以虚构完成百分比或任意平台全通过作承诺。",
       files: ["STATUS.md"], docs: ["docs/17_framework_shooter_plan.md#framework-closeout-20261002"],
-      evidence: "N2最终成品跨机65/0、正式迁移SEALED、原入口检查0；D1/F1任务及F1负载放行标记送达，待外部回报" },
-    { id: "network-report-viewer", area: "ops", phase: 7, status: "planned",
+      evidence: "N2跨机65/0、正式迁移SEALED；D1核心+Edge真实file验收10/10；F1因本地Codex执行受阻由主线接手，尚未实跑" },
+    { id: "network-report-viewer", area: "ops", phase: 7, status: "verified",
       title: "离线网络报告查看器 D1",
       summary: "选取客户端JSONL，查看延迟、停顿和卡顿标记。",
-      details: "10x dot独立新增离线页面；不上传、不修改N1字段。未知样本不当0，可靠发送丢包估计不冒充所有UDP丢包，跨机器时钟不假定同步；尚未收到候选。",
-      files: ["examples/framework/client_data.gd"], docs: ["docs/17_framework_shooter_plan.md#framework-closeout-20261002"],
-      evidence: "固定基准0e33fa6，任务已备好，待交付" },
+      details: "双击NETWORK_REPORT.html选JSONL，比较摘要、会话时间线及卡顿前后15秒。未知不当0，可靠发送丢包估计不代表所有UDP，跨机不对时。10x dot候选经主线修计数字段并验Windows Edge。朋友公网/真人及其它浏览器待验。",
+      files: ["NETWORK_REPORT.html", "docs/assets/network-report/core.js", "docs/assets/network-report/app.js"], docs: ["docs/17_framework_shooter_plan.md#d1-mainline-acceptance", "docs/assets/network-report/README.md"],
+      evidence: "最终核心+真实file://浏览器10/10、退出0无跳过；2份实际隔离报告42采样；1360/760/390截图已看、零远程请求/控制台错误" },
     { id: "project-space-check", area: "ops", phase: 7, status: "verified",
       title: "只读项目空间体检",
       summary: "双击 CheckProjectSpace.cmd，查看项目、工作树、RoomKit 用户目录及磁盘余量。",

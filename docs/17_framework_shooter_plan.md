@@ -1,5 +1,16 @@
 # 通用框架与横版射击分支实施计划
 
+<a id="d1-mainline-acceptance"></a>
+## D1 离线报告查看器主线验收（2026-10-03）
+
+10x dot 的候选已接收，主线补齐 Windows 浏览器缺口。入口 [NETWORK_REPORT.html](../NETWORK_REPORT.html)，用法与精确口径见 [说明](assets/network-report/README.md)，候选失败尝试和最终命令见 [完整记录](assets/network-report/VALIDATION.md)。不用启动服务，不上传文件，不改 N1 日志、游戏或服务器版本。
+
+ZIP 50924 字节，SHA256 `75e552cc099da35ca6c8c0d136847d3a1900595f6b4f37a6cc4e482d5d5996df`，路径安全与包内清单一致；固定基准 `0e33fa6` 的 F 盘独立树接收。独立解析审查 **12/12、退出 0**；主线补修小数 `snapshot_samples` 被当有效计数的问题，并加回归。
+
+最终 `node --test tests/test_network_report.cjs tests/test_network_report_browser.cjs`：**10/10、退出 0、跳过 0**。现有 Edge 143.0.3650.96 以全新临时配置离线打开 file://，真实选文件/Canvas 图像、标记导航、未知与恶意输入、限量读取、清空/重复选择、1360/760/390 宽度均通过；截图已查看，零远程请求与控制台错误。第二个浏览器用例读 N2 真实 Windows 客户端连接 Linux 的 2 份隔离报告，2 会话/42 采样全部接受，无警告/拒绝。样本短，RTT 中位数和可靠丢包成熟度不足时仍为未知；包含启动阶段，不将最低 FPS 当房间内帧率。
+
+轻量证据在 `logs/d1-review-20261002/`，只保留原候选与最终两轮浏览器结果。没有安装、启动游戏/测试服务器、重建客户端或动真实数据；浏览器临时文件在 F 盘。未验真人双击/屏幕阅读器/其它浏览器与朋友公网日志，不据此判断青岛、重庆或广州线路原因。
+
 <a id="framework-closeout-20261002"></a>
 ## 首版框架收束与本轮并行任务（2026-10-02 夜间）
 
@@ -13,6 +24,8 @@
 | V1 收件 | Linux dot 云端已有车模交回；主线独立结构检查和看图后保存能力样本 | 不新增赛道/玩法，不占多人测试设备负载。模型问题见下节。 |
 
 完整任务单在本机 `logs/parallel-handoffs/20261002-closeout/`。F1 已送至 `/home/zhao/Desktop/RoomKit-closeout-20261002/5x-F1-linux-concurrency.txt`，两端 SHA256 `b1f9a729df39716277a295d775974e16f261d7865f890f33f42a180568e10e11`；送达不代表已开工。D1 交付路径明确为台式机 `artifacts/dot-network-viewer-candidate/RoomKit-D1-candidate.zip`；F1 交付 Linux 同一桌面目录的 `RoomKit-F1-candidate.zip` 和报告。跨端保存失败即返回准确错误并给附件，不重复建任务。外部不推 main，主线验收后整合。
+
+**10-03 实际进度修正**：D1 已按上节接入；N2 已完成下文交付。用户确认笔记本本地 Codex 执行通道正在修复，F1 仅完成源码准备与前期审查，没有驱动、4/8 人结果或补丁。主线接手，在 F 盘独立树实现测试，再通过已有 SSH 到笔记本验收；用户侧暂不重复启动 F1。只读核查远端目录干净、HEAD 为 `0e33fa6`、分支 `codex/linux-concurrency-acceptance`，放行标记存在；正式管理服务仍在 28691，F1 预留端口未监听。开跑前再次检查实例、端口和负载，严格区分全员登录与同房互见。
 
 完成首版按三个终点推进，不按虚构百分比计算：
 

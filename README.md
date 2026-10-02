@@ -4,6 +4,8 @@
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
+**看玩家卡顿报告：双击 [NETWORK_REPORT.html](NETWORK_REPORT.html)**，选择玩家客户端 `client-data/reports/` 中的一至八个 JSONL，比较延迟、快照停顿和慢帧，查看卡顿标记前后 15 秒。完全离线，不上传；只分享 reports，不要分享整个 client-data。Windows Edge 真实 file:// 和两份隔离联机报告已验，口径与限制见 [使用说明](docs/assets/network-report/README.md)。
+
 **离线比较人物移动：双击 `PreviewMovement.cmd`**，旧版和新版同屏显示；TAB 切换稳定更新、抖动和断流，Space / B 切换强调行，ESC 退出。它使用固定旧提交与当前游戏的真实显示算法、同一合成轨迹，不启动服务器。新版减少快照抖动造成的短暂停顿，会增加少量显示落后；机制及测量见 [移动比较](docs/25_shooter_room_rules.md#movement-candidate-result)。
 
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
@@ -16,7 +18,7 @@
 
 **统一管理入口已接入**：Windows 用 `RoomKit.cmd start|status|stop|check`，Linux 用 `bash RoomKit.sh start|status|stop|check`（每次选一个动作）。入口自动识别源码/对应系统的导出包；不带动作只显示帮助。原有双击快捷入口继续可用，当前 Linux 试玩仍用 `PlayLinuxPackage.cmd`。默认实例、状态判断和验证范围见 [统一入口](docs/22_framework_operations.md#unified-entry)。
 
-**新客户端网络诊断已接入源码**：底部显示可靠发送丢包估计，右下角“网络详情 / 报告”查看 RTT、波动、收发与快照时序，并标记卡顿。导出版设置/报告保存在旁边的 `client-data/`，更新时保留；只分享 `reports` 里的脱敏日志。新同源目录已生成，现有试玩仍是旧版，需服务器与玩家一起更新。见 [诊断说明](docs/25_shooter_room_rules.md#client-diagnostics)。
+**新客户端网络诊断已交付**：底部显示可靠发送丢包估计，右下角“网络详情 / 报告”查看 RTT、波动、收发与快照时序，并标记卡顿。导出版设置/报告保存在旁边的 `client-data/`，更新时保留；只分享 `reports` 里的脱敏日志。Linux 试玩已换为配套版本 `56f4b235deea`，仍用 PlayLinuxPackage.cmd；给朋友也需发新目录，详见 [N2 交付](docs/17_framework_shooter_plan.md#n2-final-delivery) 与 [诊断说明](docs/25_shooter_room_rules.md#client-diagnostics)。
 
 在这台 Windows 构建机双击 **PrepareDeployment.cmd**，默认生成 Linux 服务器与匹配的 Windows 玩家客户端；Windows 服务器用 `PrepareDeployment.cmd -ServerPlatform Windows`。**OpenDeployment.cmd** 随时打开最近生成的干净目录，其中 `Server/` 给服务器机器，`PlayerClient/` 给玩家。各自的启动、配置和停止步骤都在目录说明里，不需要多层寻找包号。
 

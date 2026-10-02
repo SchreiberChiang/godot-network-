@@ -1,8 +1,10 @@
-# 当前状态：RoomKit（2026-10-02）
+# 当前状态：RoomKit（2026-10-03）
+
+**D1 离线网络报告已接入。** 双击根目录 [NETWORK_REPORT.html](NETWORK_REPORT.html)，选择玩家 `client-data/reports/` 中的 JSONL，即可比较 RTT、可靠发送丢包估计、画面慢帧和卡顿前后时间线。主线补完 Edge 真实 file://：最终核心与浏览器 **10/10、退出 0、无跳过**，2 份 N2 实际报告共 42 采样全部读入；截图已查看，零远程请求/控制台错误。未知值不当成零，不自动判断网络根因。详见 [D1 验收](docs/17_framework_shooter_plan.md#d1-mainline-acceptance)。
 
 **N2 最终诊断包已换上 Linux，跨机 65/0。** 真实 Windows 成品直接连接 Linux，双人互见、各自网络报告、购买幂等、备份恢复、重启保留通过；正式实例经 PREPARED → VERIFIED → SEALED 保留账号/资产/配置/证书，旧包保留。仍双击 **PlayLinuxPackage.cmd**；版本 `56f4b235deea`。朋友干净目录 `artifacts/friend-clients/network-20261002/shooter-windows/`（12 文件，约104.63 MiB，不含本地运行数据）已配置公网，直接发整个目录。新包朋友实测与公网日志仍待反馈。详见 [N2 交付](docs/17_framework_shooter_plan.md#n2-final-delivery)。
 
-**夜间后续并行**：10x dot 做 D1 离线日志查看器，Linux dot 派本地 5x Codex 做 F1 严格多人；外部固定 `0e33fa6`，任务已备好，F1 和 N2-heavy-finished 放行标记已送桌面。未收到回报前不算外部任务已开工。首版剩余门槛见 [收束路线](docs/17_framework_shooter_plan.md#framework-closeout-20261002)。
+**F1 由主线接手推进**：用户确认 Linux 本地 Codex 暂不能执行，dot 仅完成源码准备和前期审查，尚无驱动或 4/8 人结果。主线已核对笔记本 `linux-concurrency-20261002` 为干净的固定 `0e33fa6`；新建 F 盘独立工作树编写便携验收，再通过现有 SSH 在笔记本跑，各一次严格全员验收。应用修复不作为代码进度，未运行项不计通过。首版剩余门槛见 [收束路线](docs/17_framework_shooter_plan.md#framework-closeout-20261002)。
 
 **车模 V1 已收到并收为能力样本**：5x dot 云端 Blender 制作，ZIP 两端哈希一致；本机核实 1792 三角面/4 材质/四独立轮并查看两张图。车身 16 个退化面待修，尚未验 Godot 导入/驾驶；详见 [模型验收](docs/17_framework_shooter_plan.md#car-v1-acceptance)。
 
