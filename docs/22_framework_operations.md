@@ -4,9 +4,45 @@
 
 ## 配套交付与离线更新
 
-构建机的 `PrepareDeployment.cmd` 默认生成 Linux 服务端与匹配的 Windows 玩家目录；`-ServerPlatform Windows` 改为 Windows 服务端。`OpenDeployment.cmd` 打开最近的干净目录。目标机启动、玩家 `SetServer.cmd` 配置和 Linux `UpdateRoomKit.sh` 更新流程见 [首版交付](17_framework_shooter_plan.md#deployment-stage-result)；不自动安装依赖或操作运行服务。目录用途见 [根目录说明](01_scope_architecture.md#root-folders)。
+构建机的 `PrepareDeployment.cmd` 默认生成 Linux 服务端与匹配的 Windows 玩家目录；`-ServerPlatform Windows` 改为 Windows 服务端。`OpenDeployment.cmd` 打开最近的干净目录。目标机启动、玩家 `SetServer.cmd` 配置和 Linux `UpdateRoomKit.sh` 更新流程见 [首版交付](17_framework_shooter_plan.md#deployment-stage-result)；准备依赖需显式使用下面的入口，构建和更新不会操作运行服务。目录用途见 [根目录说明](01_scope_architecture.md#root-folders)。
 
 配对及拒绝专项：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_deployment_pair.ps1 -DeploymentDirectory <本机新生成的干净目录>`。仅接受本工作区 `artifacts` 中未运行的目录，用后恢复自己注入的文件；不运行服务。Linux 更新工具专项为 `tests/test_linux_package_update.ps1`（真实 pwsh/SQLite、假包）；真实导出包更新驱动 `tests/test_linux_deployment_integration.ps1 -Stage Seed|Verify -ContextPath <显式准备清单>` 只接受专用测试目录和端口，私有准备清单不随 Git 分发，不能对正式服务使用。
+
+<a id="environment-and-retention"></a>
+## 依赖准备与生成物保留（2026-10-02）
+
+Windows 源码用 `CheckEnvironment.cmd` 只读检查；导出 Windows 包用自己的 `CheckFramework.cmd`。Linux 源码或导出包在各自根目录执行：
+
+```bash
+bash PrepareEnvironment.sh check                 # 默认行为；不联网、不安装、不启动服务
+bash PrepareEnvironment.sh prepare               # 显式下载固定官方归档，验证哈希后准备
+```
+
+源码需要编辑器 Godot 4.7.2 和 pwsh 7.6.6；Linux 导出服务器已经带引擎，只补缺少的 pwsh。检测先用显式 ROOMKIT_GODOT/ROOMKIT_PWSH，再用项目 `artifacts/environment/tools`，最后兼容原 `~/roomkit/tools`。显式路径不兼容时拒绝，不悄悄替换。系统 SQLite/ICU/OpenSSL 不由脚本安装，缺少则报告；需要系统安装时另按机器环境处理。
+
+不能联网时，从官方取得以下归档，在目标机用绝对路径导入；源码同时给两个，导出包只给 pwsh：
+
+```bash
+bash PrepareEnvironment.sh prepare --offline \
+  --godot-archive /绝对路径/Godot_v4.7.2-stable_linux.x86_64.zip \
+  --pwsh-archive /绝对路径/powershell-7.6.6-linux-x64.tar.gz
+# 导出包：去掉 --godot-archive 那一行，再运行 CheckPackage.sh
+```
+
+脚本内固定官方 SHA256，校验全部所需原包后才安装到项目目录；错误哈希、链接/越界、重复参数或覆盖已存在的不兼容目标拒绝。Mint 导出包和 WSL2 源码的实际离线准备已通过；在线下载和任意新系统没有因此被算通过。
+
+生成物保留由 `tools/artifact_retention.ps1` 登记，默认 **每个用途最近两份**。清除大目录后轻量记录仍在 `artifacts/retention-ledger/`，包含结果、文件清单/大小/哈希与删除或跳过原因。最新成功交付、当前指针和必要输入保护；两个失败版本不会挤掉最后可用版本。内容改变、链接、活跃进程、Git 源文件或无法确认安全时跳过。旧未登记目录不自动接管，真实账号库、业务备份及测试源码/夹具不删。
+
+隔离入口只自动管理 `data/` 直属、名字以 `test-`、`isolated-`、`acceptance-` 或 `retention-test-` 开始的新目录。先登记所有权，再运行；确认进程退出后登记该测试用途的结果和 stdout/stderr 哈希。其它历史命名仍兼容，但提示未纳入自动保留。例子（使用一个尚不存在的绝对路径，按本次运行改名）：
+
+```powershell
+$isolated = Join-Path (Get-Location) 'data/test-grant-review-001'
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run_isolated_test.ps1 -Script tests/run_grant_recycling.gd -Isolation $isolated -Log (Join-Path $isolated 'grant')
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_artifact_retention.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_isolated_runner.ps1
+```
+
+授权专项使用预填数据和测试时钟，不真的开 256 房或等七天。涉及真实服务的 `run_grant_control_loss.gd` 还须显式隔离数据/索引/公开目录与非正式面板参数，按隔离入口校验准备，不能直接裸运行。测试结果与边界见 [阶段交付](17_framework_shooter_plan.md#stage6-result)。
 
 ## 源码运行
 

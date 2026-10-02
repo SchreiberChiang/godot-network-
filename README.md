@@ -6,19 +6,20 @@
 
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
-配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过，Mint/WSL2 已补基础短验；[后续路线](docs/17_framework_shooter_plan.md#forward-route-20261002) 按依赖准备与授权回收 → 朋友试玩 → 赛车接入安排，当前为规划。
+配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环；[接下来](docs/17_framework_shooter_plan.md#forward-route-20261002) 是朋友试玩，再做赛车接入。
 
 ## 准备服务器和玩家目录
 
 在这台 Windows 构建机双击 **PrepareDeployment.cmd**，默认生成 Linux 服务器与匹配的 Windows 玩家客户端；Windows 服务器用 `PrepareDeployment.cmd -ServerPlatform Windows`。**OpenDeployment.cmd** 随时打开最近生成的干净目录，其中 `Server/` 给服务器机器，`PlayerClient/` 给玩家。各自的启动、配置和停止步骤都在目录说明里，不需要多层寻找包号。
 
-Linux 可以在本机独立启动，无需台式机保持开机；Windows SSH 入口仅用于远程管理。Windows 包带引擎，Linux 包仍需要已有 pwsh 7.6.6 和系统 SQLite，**尚无任意全新电脑自动安装全部依赖的通用入口**。
+Linux 可以在本机独立启动，无需台式机保持开机；Windows SSH 入口仅用于远程管理。Windows 包带引擎；Linux 包也带引擎，可用随包 **PrepareEnvironment.sh** 准备缺少的 pwsh 7.6.6。系统 SQLite、ICU、OpenSSL 仍须可用，缺少时检查会报出，不能据此承诺任意新系统都能一键运行。
 
-Linux 换版本时先停止旧实例，再在新包用 **UpdateRoomKit.sh** 做离线复制、校验与确认，账号和资产保留；撤销仅适用于尚未确认且没有数据变化的候选。步骤及限制见 [更新说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。旧包和快照不自动删除，Windows 数据迁移与启动失败后的自动回退尚未实现。
+Linux 换版本时先停止旧实例，再在新包用 **UpdateRoomKit.sh** 做离线复制、校验与确认，账号和资产保留；撤销仅适用于尚未确认且没有数据变化的候选。步骤及限制见 [更新说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。新登记的构建与交付历史默认按用途保留两份，当前可用交付及必要恢复输入受保护；业务备份/迁移快照不按此规则删除。Windows 数据迁移与启动失败后的自动回退尚未实现。
 
 ## 环境
 
 - Windows 10/11，自带 Windows PowerShell 5.1 和系统 `winsqlite3.dll`；不需要 Node、数据库服务或其它后端。
+- 源码运行前可双击 **CheckEnvironment.cmd**，只检查，不下载或开服；Windows 导出包继续用 **CheckFramework.cmd**。
 - 从源码运行需要 Godot **4.7.2**。默认路径：
 
   ```text
@@ -51,7 +52,7 @@ Linux 换版本时先停止旧实例，再在新包用 **UpdateRoomKit.sh** 做�
 
 ## Linux 源码启动
 
-需要 Godot 4.7.2 官方 Linux 版、pwsh 7.6 和系统的 `libsqlite3.so.0`；引擎和 pwsh 的位置默认在 `~/roomkit/tools`，也可以用 `ROOMKIT_GODOT`、`ROOMKIT_PWSH` 指定。在项目目录下：
+需要 Godot 4.7.2 官方 Linux 版、pwsh 7.6.6 和系统的 `libsqlite3.so.0`、ICU、OpenSSL。在项目目录先运行 `bash PrepareEnvironment.sh check`；缺少程序时显式运行 `bash PrepareEnvironment.sh prepare`，它按固定官方哈希下载并准备到本项目的 `artifacts/environment/tools/`。已有官方归档可离线导入，详见 [依赖准备](docs/22_framework_operations.md#environment-and-retention)。工具选择顺序是 `ROOMKIT_GODOT` / `ROOMKIT_PWSH` 显式指定 → 项目内准备结果 → 原有 `~/roomkit/tools`。准备成功后：
 
 ```bash
 bash tools/roomkit_linux.sh start     # 打印面板地址，默认 http://127.0.0.1:28491/
@@ -71,11 +72,11 @@ bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 
 此前独立包试玩入口 **`PlayLinuxPackage.cmd` / `StopLinuxPackage.cmd`** 保留为历史快捷方式（面板 28691）。旧实例的当前账号和 TLS 配置已清除，旧登录说明与客户端连接配置不能直接复用；须重新初始化并准备匹配的公开配置后再试玩。这两个入口不指向本轮 29191 短验实例，也不是任意服务器的部署工具；Git 克隆不包含本机清单、程序或密码。历史三步说明见 [独立包试玩](docs/17_framework_shooter_plan.md#linux-package-playtest)。
 
-Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；仍需已有的 **pwsh 7.6.6** 和系统 **libsqlite3.so.0**，脚本不安装依赖。当前目录及实测范围见 [Linux 独立目录](docs/17_framework_shooter_plan.md#linux-server-directory)。
+Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；引擎已包含，缺少 pwsh 时用随包 `PrepareEnvironment.sh prepare`，不再下载 Godot 编辑器。系统库仍单独检查。当前目录及实测范围见 [阶段 6](docs/17_framework_shooter_plan.md#stage6-result)。
 
-在目录内依次运行 `bash CheckPackage.sh` → `bash RoomKit.sh start --instance demo`；状态用 `bash RoomKit.sh status --instance demo`，停止用 `bash RoomKit.sh stop --instance demo`。默认只绑定回环，新实例的端口与对外地址可在首次启动时设置；重启沿用保存配置。后台通过本机浏览器或同号 SSH 转发访问。玩家仍使用版本匹配的 Windows 客户端。
+在目录内依次运行 `bash PrepareEnvironment.sh check`（缺少时显式 `prepare`）→ `bash CheckPackage.sh` → `bash RoomKit.sh start --instance demo`；状态用 `bash RoomKit.sh status --instance demo`，停止用 `bash RoomKit.sh stop --instance demo`。默认只绑定回环，新实例的端口与对外地址可在首次启动时设置；重启沿用保存配置。后台通过本机浏览器或同号 SSH 转发访问。玩家仍使用版本匹配的 Windows 客户端。
 
-**Linux 可以自己独立启动**，不用先开 Windows 台式机。复制干净普通包、依赖已准备好后，在 Linux 本机运行上面的命令，再用该 Linux 的浏览器打开打印的地址。台式机的 `PlayLinuxPackage.cmd` 只是此前已准备实例的远程快捷方式。全新电脑需选自己的平台包：Windows 包自带引擎并使用系统 PowerShell/SQLite；Linux 包还需兼容的 pwsh 和系统库。当前没有自动安装全部依赖的通用入口，不能把现有笔记本通过当作任意全新电脑一键部署通过。
+**Linux 可以自己独立启动**，不用先开 Windows 台式机。复制干净普通包、准备依赖后，在 Linux 本机运行上面的命令，再用该 Linux 的浏览器打开打印的地址。台式机的 `PlayLinuxPackage.cmd` 只是此前已准备实例的远程快捷方式。全新电脑需选自己的平台包：Windows 包自带引擎并使用系统 PowerShell/SQLite；Linux 的准备入口可以补 pwsh，缺少系统库则报告。Mint 与 WSL2 已实测官方归档离线准备，不等于任意新系统、ARM 或在线下载均已验收。
 
 运行会产生私有账号库、密钥与日志；给别人分发应使用 Windows 构建出的干净目录，不能复制已经运行过的目录。其它发行版、ARM、公网和开机服务另行验收。
 
@@ -95,7 +96,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\new_game.ps1 -Manage
 
 ## 测试
 
-基础回归：`powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit`。各模式的成功标记，以及账号、管理、射击、托管模板等专项命令，见 [docs/22 测试入口](docs/22_framework_operations.md#测试入口)。测试日志写在 `logs/`，它和 `data/`、`run/`、`artifacts/` 一样都不进入 Git。
+基础回归：`powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit`。各模式的成功标记，以及账号、管理、射击、托管模板等专项命令，见 [docs/22 测试入口](docs/22_framework_operations.md#测试入口)。测试日志写在 `logs/`，它和 `data/`、`run/`、`artifacts/` 一样都不进入 Git。新登记的测试运行目录与构建历史默认每用途保留最近两份，轻量结果和哈希保留；测试源码不删，旧未登记目录、用户修改和必要恢复输入不会被自动认领清除。规则见 [保留策略](docs/22_framework_operations.md#environment-and-retention)。
 
 ## 文档导航
 

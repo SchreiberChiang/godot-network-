@@ -221,6 +221,17 @@ Operator 的工作线程仍最多 8 个，账号上下文总计最多 72 个；�
 
 当前成绩最多 10000 条，资产回执最多 100000 条；整批奖励预先检查剩余回执容量。已经存在的重复提交在容量满时仍能确认；空奖励的结果不需要奖励回执空间。这是本地首版有界存储策略，不是自动归档系统。真实原子性、并发重复、后续玩家失败回滚和容量测试见 [run_result_rewards.gd](../tests/run_result_rewards.gd)。
 
+<a id="result-grant-window"></a>
+### 房间退出、七天窗口与授权回收（2026-10-02）
+
+房间结果密钥不是账号资产。服务器确认真实房间进程退出后，把首次 `exit_confirmed_at` 保存在受校验的进程日志；通过已认证的宿主/Operator 回环 RPC `result.end` 发送 `{launch_id, observed_exit_at}`，Operator 写入 `launches.ended_at`。这不是玩家可调用的接口；重复请求保持首次时间，不延后窗口。房间正常回收必须先得到持久确认；控制链丢失时保留日志和租约，退出后的恢复检查补做关闭，不以断线代替进程退出。
+
+七天为 **604800 秒**，使用服务器时间；到 `ended_at + 604800 <= now` 时，新未接受结果拒绝为 `RESULT_EXPIRED`。提交事务会再次检查截止，不因先前入队时有效而越过窗口。新增授权的事务先清掉到期密钥，再检查原 256 条上限；正在运行、窗口内和旧库没有退出证据的授权不能清理。
+
+已经成功的成绩保留原始 `record_hash` 和签名回执。密钥删除后，完全相同的已接受成绩仍返回 `DUPLICATE`，不重复发奖；不同内容、伪造签名不能借旧结果取得确认。到期元数据不含密钥，保留拒绝计数/hash及既有拒绝证据。旧成绩只有在原 hash 可核验且仍持有密钥时才补签名回执；已匿名化后无法恢复原内容的旧记录不补造签名。
+
+资产库 user_version 仍为 2，自动补建 `launches.ended_at`、`expired_launches` 和 `result_signatures`；旧 `ended_at=NULL` 不猜测退出时刻。进程日志 Schema 增加可选退出时间，result_ack 增加错误码，内部组件需同源更新。结果/回执总容量不变。专项见 [run_grant_recycling.gd](../tests/run_grant_recycling.gd) 和 [run_grant_control_loss.gd](../tests/run_grant_control_loss.gd)，实测范围见 [阶段 6](17_framework_shooter_plan.md#stage6-result)。
+
 ## 备份、恢复与主机指标
 
 管理 API 只允许选择服务器列出的 backup_id。内部 [operator_maintenance.ps1](../tools/operator_maintenance.ps1) 通过私有请求文件接收：
@@ -263,6 +274,7 @@ Operator 的工作线程仍最多 8 个，账号上下文总计最多 72 个；�
 | `ALREADY_OWNED/INSUFFICIENT_CREDITS/ASSET_OPERATION_DENIED` | 已解锁、余额不足，或游戏当前阶段不允许操作 |
 | `REQUEST_CONFLICT/ASSET_VERSION_CONFLICT/ASSET_LIMIT_EXCEEDED` | 重试键冲突、并发 revision 变化，或永久状态超界；先读取状态，不伪造成功 |
 | `INVALID_RESULT/INVALID_REWARD/RESULT_CONFLICT/MATCH_RESULT_CONFLICT` | 成绩或奖励无效/冲突；整批拒绝，不发放部分奖励 |
+| `RESULT_EXPIRED` | 房间确认退出满七天后才提交的未接受成绩；不发奖，保留拒绝证据；已接受成绩的完全相同重放仍可确认 |
 | `DUPLICATE` | 成功返回既有回执/成绩确认；不应再次执行发奖或购买 |
 | `ROOM_DRAINING/ROOM_NOT_FOUND/CONTROL_UNAVAILABLE` | 房间停止/维护、未知房间或控制链路不可用 |
 | `STORAGE_UNAVAILABLE/STORAGE_CAPACITY_EXCEEDED/STORAGE_MAINTENANCE` | 存储故障/容量满/维护中；保留原操作键，不能用新键假装原请求失败 |

@@ -2,6 +2,12 @@
 
 本文件只记录版本号与兼容标识的变化；设计决策与完整兼容说明见 [docs/07](docs/07_versions_decisions.md)，实际验证结果见 [STATUS](STATUS.md)。版本轴彼此独立：源码 SDK、框架包、游戏构建（`build_id` / `compatibility_id` / `game_protocol`）与控制协议 `control_protocol` 分开编号。以下均为本机开发或候选版本，不是正式发布。
 
+## 2026-10-02 七天授权窗口与依赖准备
+
+- 结果确认 Schema 增加 `RESULT_EXPIRED`，进程日志增加可选 `exit_confirmed_at`；已认证内部 RPC 增加 `result.end`，宿主与 Operator 应同源更新。结果版本、控制协议、SDK/框架 **0.5.0** 不变。
+- 资产库 user_version 仍为 **2**，增加 `launches.ended_at` 及 `expired_launches/result_signatures`；旧缺项自动补建，缺少退出证据的授权保守保留。已接受结果的签名回执继续支持密钥回收后的幂等重放。
+- 本次配套 Linux 服务端 / Windows 玩家候选身份 `shooter-dev-002-src-427e6a0cf8a8`；新包包含 PrepareEnvironment.sh，GitHub Release 未发布。
+
 ## 2026-10-02 Linux 服务器目录候选
 
 - 新增配套普通目录的交付清单 `format=1` 与 Linux 离线更新作业 `format=1`；只接受当前账号库版本 1、资产库版本 2，不升级数据库格式。Windows 包仍使用各次构建的正式身份，Linux 包沿用源码内容摘要；两种包分别与同批 Windows 玩家配对。线上协议、SDK/框架版本不变，GitHub Release 未发布。

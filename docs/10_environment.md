@@ -8,6 +8,9 @@
 | 项目 | 当前记录与证据边界 |
 |---|---|
 | 设备 | zhao@192.168.10.105；Mint 22.3、x86_64、i5-5200U（2 核 4 线程）、7.7 GB RAM；IP/负载/空闲磁盘需运行前复查 |
+| 阶段 6 依赖与业务（10-02） | 运行源码 ef0aeb4。WSL2 在 `~/roomkit/stage6/source-ef0aeb4/` 实际离线准备项目内 Godot 4.7.2/pwsh 7.6.6，真实 SQLite 授权 50/0、源码短验 29/0；Mint `~/roomkit/stage6/server-ef0aeb4/` 使用随包引擎并准备项目内 pwsh，导出服务器短验 29/0。两处只绑回环、使用新假数据，均已正常停止；空 HOME 验证不借旧工具发现路径，但系统库已经具备，不等于全新 OS 安装通过 |
+| 项目内工具选择 | 显式 ROOMKIT_GODOT/ROOMKIT_PWSH → 本项目 `artifacts/environment/tools` → 原 `~/roomkit/tools`。prepare 只安装缺少且哈希匹配的官方包，不升级/覆盖共享工具、不装系统包；源码/导出包依赖不同，详见 [阶段结果](17_framework_shooter_plan.md#stage6-result) |
+| 本轮证据/传输 | 笔记本 `~/roomkit/stage6/proof-mint-b47aa6e4/`；WSL `proof-wsl-b47aa6e4/` 为首次驱动拒绝，`proof-wsl-r2-b47aa6e4/` 为成功短验。轻量证据已取回本机 logs/stage6-20261002-b47aa6e4；临时归档暂留，每类一份，清理阻断见专题，不删除原下载包 |
 | 主线引擎 | ~/roomkit/tools/godot/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64，official ed1daf0bf；不替换 |
 | 正式存储运行时 | ~/roomkit/tools/pwsh/7.6.6/pwsh；系统 libsqlite3.so.0；不接实验扩展 |
 | 主线源码/证据 | ~/roomkit/src/<快照>/、incoming/<运行号>/、runs/<运行号>/；库在该源码快照 data/，不用真实库 |
