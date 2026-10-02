@@ -148,9 +148,18 @@ try {
     $names=@(Get-ChildItem -LiteralPath $local -Recurse -File | ForEach-Object Name)
     Check (-not ($names | Where-Object { $_ -match '\.(key|sqlite|db)$' }) -and -not ((Get-Content -Raw (Join-Path $local 'server.crt')) -match 'PRIVATE KEY')) 'local directory has no private key or database'
 
-    # Regeneration keeps the previous directory.
+    # Used player data must move to the new client, never into retention history.
+    $runtimeData=Join-Path $local 'client-data'
+    [void][IO.Directory]::CreateDirectory((Join-Path $runtimeData 'client-operations/server/account/game'))
+    [IO.File]::WriteAllText((Join-Path $runtimeData 'settings.json'),'{"volume":0.5}', $utf8)
+    [IO.File]::WriteAllText((Join-Path $runtimeData 'client-operations/server/account/game/pending.json'),'{"operation_id":"original-pending-id"}', $utf8)
+    $runtimeBefore=Tree $runtimeData
+    # Regeneration keeps the previous program directory without runtime data.
     $r=Prepare ($common+@('-OutputRoot',$out))
     Check ($r.code -eq 0 -and $r.text -match 'PLAYER_CLIENT_PREVIOUS' -and @(Get-ChildItem (Join-Path $out 'previous') -Directory).Count -eq 1) 'regeneration moves the old directory to previous/'
+    Check ((Tree $runtimeData) -ceq $runtimeBefore -and -not @(Get-ChildItem (Join-Path $out 'previous') -Recurse -Directory | Where-Object Name -eq 'client-data').Count) 'regeneration preserves original client data in new client only'
+    $regenerated=Get-Content -Encoding UTF8 -Raw (Join-Path $local 'client-version.json') | ConvertFrom-Json
+    Check (-not @($regenerated.generated_files | Where-Object path -match 'client-data').Count) 'runtime data never enters generated_files'
 
     # User-added and user-modified files block replacement; nothing changes.
     $before=Tree $local
@@ -174,7 +183,9 @@ try {
     $r=Prepare ($common+@('-OutputRoot',$out))
     Check ($r.code -eq 0) 'regeneration after removing the edited directory'
 
-    # Injected failure during swap rolls back.
+    # Injected failure during swap rolls back, including runtime data.
+    [void][IO.Directory]::CreateDirectory((Join-Path $local 'client-data'))
+    [IO.File]::WriteAllText((Join-Path $local 'client-data/settings.json'),'{"volume":0.5}', $utf8)
     $before=Tree $local
     $previousCount=@(Get-ChildItem (Join-Path $out 'previous') -Directory).Count
     $r=Prepare ($common+@('-OutputRoot',$out,'-TestFailAt','swap'))
@@ -229,6 +240,14 @@ try {
     }
     Check ($reports.a -and $reports.a.ok) 'Client.exe without arguments, from another working directory and a Chinese/space path, uses connection.json beside itself'
 
+    $networkReports=Join-Path $fresh 'client-data/reports'
+    $networkFiles=@(Get-ChildItem -LiteralPath $networkReports -Filter '*.jsonl' -File)
+    $networkText=($networkFiles | ForEach-Object {[IO.File]::ReadAllText($_.FullName)}) -join "`n"
+    $networkRows=@($networkText -split "`r?`n" | Where-Object {$_} | ForEach-Object {$_ | ConvertFrom-Json})
+    Check ($networkFiles.Count -eq 2 -and $networkRows.Count -gt 0) 'two real exported clients keep bounded independent reports beside Client.exe'
+    Check (@($networkRows | Where-Object {$_.phase -eq 'IN_ROOM'}).Count -gt 0) 'exported reports include actual in-room network samples'
+    Check ($networkText -notmatch '"(password|token|ticket|username|user_id|invite_code)"\s*:' -and $networkText -notmatch [regex]::Escape($ctx.invite_code) -and $networkText -notmatch [regex]::Escape('pc_a_'+$runId.Substring(0,8))) 'exported reports omit account and invitation secrets'
+
     # Explorer double-click: explorer.exe starts Client.exe with no arguments and no
     # console parent. The window must appear and the game must not own a console.
     $before=@(Get-CimInstance Win32_Process -Filter "Name='Client.exe'" | ForEach-Object ProcessId)
@@ -240,6 +259,16 @@ try {
         $game=Get-Process -Id ([int]$opened.ProcessId)
         $d=[DateTime]::UtcNow.AddSeconds(30); do { Start-Sleep -Milliseconds 300; $game.Refresh() } while($game.MainWindowHandle -eq [IntPtr]::Zero -and -not $game.HasExited -and [DateTime]::UtcNow -lt $d)
         Check ($game.MainWindowHandle -ne [IntPtr]::Zero) ('double-clicked Client.exe shows its window ('+$game.MainWindowTitle+')')
+        # Use the actual production guard against an actual exported process.
+        . (Join-Path $project 'tools/artifact_retention.ps1')
+        $guardTokens=$null;$guardErrors=$null
+        $guardAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $project 'tools/prepare_player_client.ps1'),[ref]$guardTokens,[ref]$guardErrors)
+        if($guardErrors.Count){throw 'Generator parse failure during active-client check.'}
+        $guard=$guardAst.EndBlock.Statements | Where-Object {$_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -eq 'AssertClientStopped'}
+        . ([scriptblock]::Create($guard.Extent.Text))
+        $runningRefusal=''
+        try {AssertClientStopped $fresh} catch {$runningRefusal=$_.Exception.Message}
+        Check ($runningRefusal -match 'CLIENT_RUNNING_CLOSE_FIRST' -and -not $game.HasExited) 'real active Client.exe blocks replacement without ending the game'
         # A separate probe process: AttachConsole(pid) succeeds only if the game owns a console.
         $probe='Add-Type -Namespace P -Name K -MemberDefinition ''[DllImport("kernel32.dll")] public static extern bool FreeConsole(); [DllImport("kernel32.dll")] public static extern bool AttachConsole(uint p);''; [void][P.K]::FreeConsole(); if([P.K]::AttachConsole('+$game.Id+')){ exit 10 } else { exit 0 }'
         $p=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-EncodedCommand',[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probe))) -PassThru -WindowStyle Hidden -Wait

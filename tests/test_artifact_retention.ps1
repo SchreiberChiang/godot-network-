@@ -3,10 +3,11 @@ param([string]$EvidenceDirectory='')
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
 . (Join-Path $project 'tools/artifact_retention.ps1')
+$linkType=if([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT){'Junction'}else{'SymbolicLink'}
 $run=[Guid]::NewGuid().ToString('N')
 if(-not $EvidenceDirectory){$EvidenceDirectory=Join-Path $project ('logs/artifact-retention-test-'+$run)}
 $evidence=[IO.Path]::GetFullPath($EvidenceDirectory)
-if(-not $evidence.StartsWith($project+'\logs\',[StringComparison]::OrdinalIgnoreCase) -or (Test-Path -LiteralPath $evidence)){throw 'Fresh project logs evidence required.'}
+if(-not $evidence.StartsWith((Join-Path $project 'logs')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or (Test-Path -LiteralPath $evidence)){throw 'Fresh project logs evidence required.'}
 [void][IO.Directory]::CreateDirectory($evidence)
 $fixture=Join-Path $evidence 'project';[void][IO.Directory]::CreateDirectory($fixture)
 & git -C $fixture init -q
@@ -21,7 +22,7 @@ function Prune([string]$Category,[string[]]$References=@()){return Invoke-RoomKi
 function Reject([scriptblock]$Action,[string]$Name){$rejected=$false;try{& $Action|Out-Null}catch{$rejected=$true};Check $rejected $Name}
 function RemoveFixtureLink([string]$Path){
     $full=[IO.Path]::GetFullPath($Path)
-    if(-not $full.StartsWith($fixture+'\',[StringComparison]::OrdinalIgnoreCase) -or -not((Get-Item -LiteralPath $full -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Invalid fixture link cleanup.'}
+    if(-not $full.StartsWith($fixture+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or -not((Get-Item -LiteralPath $full -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Invalid fixture link cleanup.'}
     [IO.Directory]::Delete($full) # Remove this junction only; never recurse into its target.
 }
 function Three([string]$Category){$first=Output ($Category+'-1');Register $Category @($first)|Out-Null;$second=Output ($Category+'-2');Register $Category @($second)|Out-Null;$third=Output ($Category+'-3');Register $Category @($third)|Out-Null;return @($first,$second,$third)}
@@ -64,16 +65,40 @@ foreach($number in 1..3){$new=New-RoomKitArtifactTestRoot -ProjectRoot $fixture 
 $result=Prune 'owned-data'
 Check ($result.removed -eq 1 -and -not(Test-Path $testPaths[0]) -and (Test-Path $testPaths[2])) 'new test ownership proof permits same-purpose retention'
 
+# A historical record containing runtime state must fail closed even when a
+# legacy snapshot recorded the exact same files and hashes. Never adopt it.
+$runtime=Output 'runtime-existing';WriteText (Join-Path $runtime 'client-data/settings.json') '{"volume":0.5}'
+Reject {Register 'runtime-existing' @($runtime)} 'runtime data cannot be registered for retention'
+$emptyRuntime=Output 'runtime-empty';[void][IO.Directory]::CreateDirectory((Join-Path $emptyRuntime 'client-data'))
+Reject {Register 'runtime-empty' @($emptyRuntime)} 'even empty runtime directory blocks retention registration'
+foreach($runtimeRelative in @('client-data','data/client-operations','data/client-local')) {
+    $category='historical-runtime-'+$runtimeRelative.Replace('/','-')
+    $paths=Three $category
+    $payload=Join-Path $paths[0] ($runtimeRelative+'/session.jsonl')
+    WriteText $payload '{"sample":1}'
+    Reject {Register ($category+'-adopt') @($paths[0])} ('runtime history registration refused: '+$runtimeRelative)
+    $ledgerFile=Get-ChildItem (Join-Path $fixture 'artifacts/retention-ledger') -Filter '*.json' | Where-Object { (Get-Content $_.FullName -Encoding UTF8 -Raw | ConvertFrom-Json).paths -contains $paths[0] } | Select-Object -First 1
+    $legacy=Get-Content $ledgerFile.FullName -Encoding UTF8 -Raw | ConvertFrom-Json
+    # Build the exact legacy snapshot without invoking the current guarded code.
+    $legacy.snapshot=@(Get-Item $paths[0])+@(Get-ChildItem -LiteralPath $paths[0] -Recurse -Force) | ForEach-Object {
+        @{path=$_.FullName.Substring($fixture.Length+1).Replace('\','/');kind=$(if($_.PSIsContainer){'directory'}else{'file'});size=$(if($_.PSIsContainer){0}else{$_.Length});sha256=$(if($_.PSIsContainer){''}else{(Get-FileHash $_.FullName).Hash.ToLowerInvariant()})}
+    }
+    $legacy.snapshot=@($legacy.snapshot|Sort-Object path)
+    Write-RoomKitRetentionJson $ledgerFile.FullName $legacy
+    $result=Prune $category
+    Check ($result.skipped -eq 1 -and (Test-Path $payload)) ('historical runtime protected even with matching legacy ledger: '+$runtimeRelative)
+}
+
 $canary=Output 'canary'
 $linked=Output 'linked-content';$link=Join-Path $linked 'junction'
-New-Item -ItemType Junction -Path $link -Target $canary|Out-Null
+New-Item -ItemType $linkType -Path $link -Target $canary|Out-Null
 Reject {Register 'links' @($linked)} 'linked descendant refused during registration'
 RemoveFixtureLink $link
-$paths=Three 'later-link';$link=Join-Path $paths[0] 'junction';New-Item -ItemType Junction -Path $link -Target $canary|Out-Null
+$paths=Three 'later-link';$link=Join-Path $paths[0] 'junction';New-Item -ItemType $linkType -Path $link -Target $canary|Out-Null
 $result=Prune 'later-link'
 Check ($result.skipped -eq 1 -and (Test-Path (Join-Path $canary 'payload.bin'))) 'link introduced later never traversed or removed'
 RemoveFixtureLink $link
-$link=Join-Path $fixture 'artifacts/linked-parent';New-Item -ItemType Junction -Path $link -Target $canary|Out-Null
+$link=Join-Path $fixture 'artifacts/linked-parent';New-Item -ItemType $linkType -Path $link -Target $canary|Out-Null
 Reject {Register 'parent-link' @((Join-Path $link 'payload.bin'))} 'linked ancestor refused'
 RemoveFixtureLink $link
 
@@ -99,7 +124,9 @@ $childScript=Join-Path $evidence 'child.ps1';WriteText $childScript 'param([stri
 $shell=(Get-Process -Id $PID).Path
 $arguments=@('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',$childScript,'-HeldDirectory',$paths[0])
 $quoted=foreach($argument in $arguments){'"'+$argument.Replace('"','\"')+'"'}
-$child=Start-Process -FilePath $shell -ArgumentList $quoted -WindowStyle Hidden -PassThru
+$start=@{FilePath=$shell;ArgumentList=$quoted;PassThru=$true}
+if([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT){$start.WindowStyle='Hidden'}
+$child=Start-Process @start
 $handle=$child.Handle
 try{
     $result=Prune 'active';Check ($result.skipped -eq 1 -and (Test-Path $paths[0])) 'running process protects referenced directory'

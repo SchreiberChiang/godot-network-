@@ -27,3 +27,6 @@ Thumbs.db
 /clients/*/server.crt
 /clients/*/server-config/
 /clients/*/*.partial
+
+# Client-local settings, pending receipts and sanitized diagnostics are runtime only
+**/client-data/

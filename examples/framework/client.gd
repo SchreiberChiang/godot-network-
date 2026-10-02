@@ -6,8 +6,12 @@ const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const View = preload("view.gd")
 const Sound = preload("sound.gd")
+const ClientData = preload("client_data.gd")
 var client
 var sound
+var local_data
+var pending_warning := ""
+var _diagnostic_sample_at_ms := -1000
 var last_purchase_sound := ""
 var world
 var view
@@ -56,17 +60,23 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
+	# Source/test storage is explicitly project-local; exports are fixed beside Client.exe.
+	var source := "res://examples/shooter/" if game_id == "shooter" else "res://examples/turn_based/"
+	var manifest_path := "res://game_manifest.json" if FileAccess.file_exists("res://game_manifest.json") else source + "game_manifest.json"
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(manifest_path)) if FileAccess.file_exists(manifest_path) else null
+	local_data = ClientData.new()
+	var data_root: String = ClientData.default_root(str(args.get("--client-data", "res://data/client-local/source")))
+	local_data.configure(data_root, str(parsed.get("build_id", "unknown")) if parsed is Dictionary else "unknown")
 	client = AccountClient.new()
 	root.add_child(client)
 	sound = Sound.new()
 	sound.name = "Sound"
-	if args.has("--audio-settings"):
-		sound.settings_path = str(args["--audio-settings"])
+	sound.settings_loader = local_data.load_settings
+	sound.settings_writer = local_data.queue_settings
 	root.add_child(sound)
 	view = View.new()
 	view.app = self
 	root.add_child(view)
-	var source := "res://examples/shooter/" if game_id == "shooter" else "res://examples/turn_based/"
 	if game_id not in ["shooter", "turns"]:
 		message = "此示例客户端仅包含射击和取石子，请检查启动配置"
 		return
@@ -81,8 +91,6 @@ func _run() -> void:
 	if world.has_signal("presentation_cue"):
 		world.presentation_cue.connect(_on_presentation_cue)
 	root.title = "RoomKit · " + world.title()
-	var manifest_path := "res://game_manifest.json" if FileAccess.file_exists("res://game_manifest.json") else source + "game_manifest.json"
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(manifest_path))
 	if not parsed is Dictionary or parsed.get("game_id", "") != game_id:
 		message = "游戏清单缺失或与启动游戏不匹配"
 		return
@@ -120,7 +128,7 @@ func _run() -> void:
 		await create_timer(0.5).timeout
 		await _capture_if_requested()
 		print("FRAMEWORK_UI_RESULT login_ready=", configuration_ready)
-		quit(0)
+		await _close()
 	elif args.has("--autoplay"):
 		_autoplay(str(args["--autoplay"]))
 
@@ -222,6 +230,7 @@ func register_account(username: String, password: String, display_name: String, 
 	busy = true
 	message = "正在使用邀请码注册…"
 	var result: Dictionary = await client.register_account(username.strip_edges(), password, display_name.strip_edges(), invite.strip_edges())
+	account_error = str(result.get("code", ""))
 	if result.ok:
 		message = "注册成功，请使用刚才的账号密码登录"
 		view.register_mode = false
@@ -293,7 +302,7 @@ func create_room() -> void:
 	busy = false
 
 func join_selected() -> void:
-	if busy or selected_room == "" or client.state != "LOBBY" or maintenance or not pending_asset.is_empty():
+	if busy or selected_room == "" or client.state != "LOBBY" or maintenance or not pending_asset.is_empty() or pending_warning != "":
 		return
 	busy = true
 	inventory_open = false
@@ -353,7 +362,7 @@ func toggle_inventory() -> void:
 	busy = false
 
 func asset_action(kind: String, item_id: String, slot: String = "") -> void:
-	if busy or not inventory_allowed() or not pending_asset.is_empty():
+	if busy or not inventory_allowed() or not pending_asset.is_empty() or pending_warning != "":
 		return
 	pending_asset = {"kind": kind, "item_id": item_id, "slot": slot, "operation_id": Wire.uid()}
 	if not _save_pending():
@@ -405,7 +414,7 @@ func play_click() -> void:
 		sound.play("click")
 
 func respawn() -> void:
-	if busy or not pending_asset.is_empty() or world == null or not world.has_method("send_respawn") or client.state != "IN_ROOM":
+	if busy or not pending_asset.is_empty() or pending_warning != "" or world == null or not world.has_method("send_respawn") or client.state != "IN_ROOM":
 		return
 	var player: Dictionary = world.player_view(client.identity.get("user_id", ""))
 	if player.get("life_state", "") != "dead" or int(player.get("respawn_wait_ms", 1)) > 0 or player.get("asset_busy", false):
@@ -461,45 +470,95 @@ func _reset_session() -> void:
 	asset_level = 1
 	rooms.clear()
 	pending_asset.clear()
+	pending_warning = ""
 	current_room = ""
 	if world != null:
 		world.latest.clear()
 
-func _pending_path() -> String:
-	return Paths.absolute("res://data/client-operations/" + (str(client.identity.get("user_id", "")) + ":" + game_id).sha256_text() + ".json")
+func _pending_server() -> String:
+	return str(client.config.get("url", "")) if client != null else ""
 
 func _load_pending() -> void:
 	pending_asset.clear()
-	if not FileAccess.file_exists(_pending_path()):
+	pending_warning = ""
+	if local_data == null:
 		return
-	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(_pending_path()))
-	if data is Dictionary and data.get("kind", "") in ["purchase", "select"] and data.get("operation_id", "") is String and str(data.operation_id).length() == 32 and data.get("item_id", "") is String and data.get("slot", "") is String:
-		pending_asset = data
+	var result: Dictionary = local_data.load_pending(_pending_server(), str(client.identity.get("user_id", "")), game_id)
+	pending_asset = result.get("operation", {})
+	pending_warning = str(result.get("warning", ""))
+	if pending_warning == "LEGACY_UNBOUND":
+		message = "发现旧版待确认操作，尚不能确认属于哪个服务器。请打开背包核对并迁入；原文件已保留。"
+	elif pending_warning == "LEGACY_MIGRATION_INCOMPLETE":
+		message = "上次旧操作迁入尚未完成，原文件已保留；请打开背包重试同一服务器归属"
+	elif pending_warning != "":
+		message = "待确认操作读取失败，原文件保留；请检查客户端数据目录后重试"
+	elif not pending_asset.is_empty():
 		message = "发现尚未确认的资产操作，请打开背包查询原操作"
 
+func bind_legacy_pending() -> void:
+	if busy or not authenticated or local_data == null or pending_warning not in ["LEGACY_UNBOUND", "LEGACY_MIGRATION_INCOMPLETE"]:
+		return
+	if local_data.bind_legacy(_pending_server(), str(client.identity.get("user_id", "")), game_id):
+		_load_pending()
+		message = "旧操作已迁入，编号保持不变；需要你另行点击查询 / 重试"
+	else:
+		message = "旧操作未迁入，原文件保留；请检查数据目录写入权限"
+
 func _save_pending() -> bool:
-	var path := _pending_path()
-	if pending_asset.is_empty():
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(path)
-		return true
-	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
-	var file := FileAccess.open(path + ".tmp", FileAccess.WRITE)
-	if file == null:
-		message = "无法保存操作回执，请检查客户端数据目录写入权限"
-		return false
-	file.store_string(JSON.stringify(pending_asset))
-	file.flush()
-	file.close()
-	if DirAccess.rename_absolute(path + ".tmp", path) != OK:
-		message = "无法保存操作回执，请检查客户端数据目录写入权限"
+	if local_data == null or not local_data.save_pending(_pending_server(), str(client.identity.get("user_id", "")), game_id, pending_asset):
+		message = "无法保存操作回执，请检查客户端数据目录写入权限；原回执未删除"
 		return false
 	return true
+
+## The SDK owns destructive ENet counter collection. UI and JSONL only copy its cache.
+func diagnostic_metrics() -> Dictionary:
+	var metrics: Dictionary = client.diagnostics_snapshot() if client != null else {}
+	# Managed account preflight can fail before RoomClient._request is reached.
+	if account_error != "" and not authenticated and client != null:
+		metrics.error = client.diagnostic_error_category(account_error)
+	metrics.fps = Engine.get_frames_per_second()
+	metrics.frame_max_ms = view.worst_frame_ms() if view != null else -1.0
+	var updates: Dictionary = world.snapshot_diagnostics() if client != null and client.state == "IN_ROOM" and world != null and world.has_method("snapshot_diagnostics") else {}
+	metrics.snapshot_interval_ms = float(updates.get("interval_ms", -1))
+	metrics.snapshot_age_ms = float(updates.get("age_ms", -1))
+	return metrics
+
+func mark_stall() -> void:
+	if local_data != null and local_data.mark():
+		message = "已在本次脱敏报告中标记刚才卡顿"
+	else:
+		message = "当前诊断日志未写入；可继续游戏，检查数据目录权限或容量"
+
+func open_report_directory() -> void:
+	if local_data == null or local_data.report_directory() == "":
+		message = "报告目录不可用，请检查客户端数据目录权限"
+		return
+	if OS.shell_open(local_data.report_directory()) != OK:
+		message = "无法自动打开，请在 client-data/reports 中查看脱敏 JSONL；不要发送整个 client-data"
+
+func local_data_message() -> String:
+	if local_data == null:
+		return "诊断日志未启动"
+	var status: Dictionary = local_data.status()
+	var result := "脱敏日志：每秒采样" if status.get("enabled", false) else "诊断日志已停记（权限、容量或写入失败）；游戏不受影响"
+	if str(status.get("settings_error", "")) != "":
+		result += "；音效设置未保存"
+	if int(status.get("dropped", 0)) > 0:
+		result += "；队列满时丢弃了 %d 条记录" % int(status.dropped)
+	return result
+
+func _finalize() -> void:
+	if local_data != null:
+		local_data.close()
 
 func _process(delta: float) -> bool:
 	if client == null or view == null or closing:
 		_clear_aim_presentation()
 		return false
+	var diagnostic_now := Time.get_ticks_msec()
+	if local_data != null and diagnostic_now - _diagnostic_sample_at_ms >= 1000:
+		_diagnostic_sample_at_ms = diagnostic_now
+		local_data.sample(diagnostic_metrics())
 	if authenticated and not busy and client.socket.get_ready_state() == WebSocketPeer.STATE_CLOSED:
 		client.close()
 		_reset_session()
@@ -583,6 +642,8 @@ func _close() -> void:
 			while not close_acknowledged and Time.get_ticks_msec() < deadline:
 				await process_frame
 		client.close()
+	if local_data != null:
+		local_data.close()
 	quit(0)
 
 func _logout_on_close() -> void:

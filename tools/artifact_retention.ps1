@@ -47,6 +47,9 @@ function Get-RoomKitArtifactSnapshot {
             if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'RETENTION_LINKED_CONTENT'}
             $relative=$item.FullName.Substring([IO.Path]::GetFullPath($ProjectRoot).TrimEnd('\','/').Length+1).Replace('\','/')
             if($relative -match '(^|/)\.git(/|$)'){throw 'RETENTION_EMBEDDED_REPOSITORY'}
+            # Runtime player state is never an immutable generated artifact, even
+            # if an old ledger mistakenly recorded its exact current bytes.
+            if($relative -match '(^|/)client-data(/|$)' -or $relative -match '(^|/)data/(client-operations|client-local)(/|$)'){throw 'RETENTION_CLIENT_RUNTIME_DATA'}
             if($item.PSIsContainer){
                 [void]$entries.Add([ordered]@{path=$relative;kind='directory';size=0;sha256=''})
                 foreach($child in Get-ChildItem -LiteralPath $name -Force -ErrorAction Stop){$pending.Push($child.FullName)}

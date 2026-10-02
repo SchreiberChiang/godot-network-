@@ -7,12 +7,13 @@
     [switch]$RepositoryCopy,
     [string]$RepositoryDestination = '',
     [string]$Repository = 'SchreiberChiang/godot-network-',
-    [ValidateSet('','swap')][string]$TestFailAt = ''
+    [ValidateSet('','swap','swap-published','data-move','data-commit','legacy-move','legacy-commit')][string]$TestFailAt = ''
 )
 # 从 StartManagement.cmd 当前服务器所用的射击工程导出独立客户端，并附上该服务器的
 # 公开 connection.json/server.crt。版本校验保持原样：客户端清单就是服务器自己的清单。
 # 同一次导出同时供本地分发（含连接配置）和 GitHub 仓库副本（-RepositoryCopy，不含连接配置）。
-# 输出只写入受控目录；替换前核对清单，发现用户新增或改动的文件就拒绝；旧目录移入 previous\，登记后的历史默认保留最近两份，失败时自动回退。
+# Only client-data/ is runtime state. Move it transactionally to the replacement;
+# never register it for retention or copy it into a distribution.
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
 . (Join-Path $PSScriptRoot 'artifact_retention.ps1')
@@ -29,7 +30,7 @@ function Controlled([string]$Path,[string]$Label) {
     # Only Git-ignored artifacts\ or logs\ (or the fixed repository copy) may be written.
     $full=[IO.Path]::GetFullPath($Path).TrimEnd('\','/')
     $ok=$false
-    foreach($root in @('artifacts','logs')) { if($full.StartsWith($project+'\'+$root+'\',[StringComparison]::OrdinalIgnoreCase)) { $ok=$true } }
+    foreach($root in @('artifacts','logs')) { if($full.StartsWith((Join-Path $project $root)+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { $ok=$true } }
     if($Label -eq 'repository' -and $full -ieq $repositoryDefault) { $ok=$true }
     if($Label -eq 'player' -and $full -ieq (Join-Path $project 'PlayerClient')) { $ok=$true }
     if(-not $ok) { throw ('拒绝写入受控范围以外的目录（'+$Label+'）：'+$full) }
@@ -40,16 +41,97 @@ function Controlled([string]$Path,[string]$Label) {
     }
     return $full
 }
+function AssertPlainClientTree([string]$Directory) {
+    # Inspect each directory before descending: never follow junctions, symlinks
+    # (including dangling links), or hard-linked files into another user's data.
+    $pending=New-Object 'Collections.Generic.Stack[string]';$pending.Push($Directory)
+    while($pending.Count) {
+        $path=$pending.Pop();$item=Get-Item -LiteralPath $path -Force -ErrorAction Stop
+        if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or ($item.PSObject.Properties['LinkType'] -and $item.LinkType)) { throw ('CLIENT_LINKED_CONTENT '+$path) }
+        if($item.PSIsContainer) { foreach($child in Get-ChildItem -LiteralPath $path -Force -ErrorAction Stop) { $pending.Push($child.FullName) } }
+    }
+    if(-not (Get-Item -LiteralPath $Directory -Force).PSIsContainer) { throw ('CLIENT_EXPECTED_DIRECTORY '+$Directory) }
+}
+function AssertClientStopped([string]$Directory) {
+    # Inspection failure fails closed. This check does not stop any process.
+    try {
+        if([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+            foreach($process in Get-CimInstance Win32_Process -Filter "Name='Client.exe'" -ErrorAction Stop) {
+                if(-not $process.ExecutablePath) { throw 'client_identity_unavailable' }
+            }
+        }
+        $commands=@(Get-RoomKitRetentionProcesses)
+    } catch { throw 'CLIENT_PROCESS_CHECK_FAILED' }
+    foreach($command in $commands) {
+        if($command.IndexOf($Directory,[StringComparison]::OrdinalIgnoreCase) -ge 0) { throw ('CLIENT_RUNNING_CLOSE_FIRST '+$Directory) }
+    }
+}
 function FileTable([string]$Directory) {
+    AssertPlainClientTree $Directory
+    $data=Join-Path $Directory 'client-data'
+    if(Test-Path -LiteralPath $data) { AssertPlainClientTree $data }
     $table=[ordered]@{}
     foreach($file in Get-ChildItem -LiteralPath $Directory -Recurse -File -Force | Sort-Object FullName) {
         $relative=$file.FullName.Substring($Directory.Length+1).Replace('\','/')
-        if($relative -eq 'client-version.json') { continue }
+        if($relative -eq 'client-version.json' -or $relative.StartsWith('client-data/',[StringComparison]::Ordinal)) { continue }
         $table[$relative]=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     return $table
 }
+function CopyPlayerProject([string]$Source,[string]$Destination) {
+    # Prepared-project resources are an explicit allowlist. A played source
+    # project may hold credentials/pending operations in data/; those bytes must
+    # never reach export work or Client.pck, even under an innocuous *.json name.
+    $pending=New-Object Collections.Queue
+    foreach($item in Get-ChildItem -LiteralPath $Source -Force) {
+        if(($item.PSIsContainer -and $item.Name -in @('game','sdk','schemas')) -or
+           (-not $item.PSIsContainer -and ($item.Name -in @('project.godot','game_manifest.json') -or $item.Extension -in @('.gd','.uid')))) { $pending.Enqueue($item.FullName) }
+    }
+    while($pending.Count) {
+        $path=[string]$pending.Dequeue();$item=Get-Item -LiteralPath $path -Force -ErrorAction Stop
+        if($item.Name -in @('.godot','data','client-data','logs','run','backup','backups')) { continue }
+        if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or ($item.PSObject.Properties['LinkType'] -and $item.LinkType)) { throw 'CLIENT_LINKED_EXPORT_RESOURCE' }
+        $relative=$item.FullName.Substring($Source.Length+1)
+        $destinationPath=Join-Path $Destination $relative
+        if($item.PSIsContainer) {
+            [void][IO.Directory]::CreateDirectory($destinationPath)
+            foreach($child in Get-ChildItem -LiteralPath $path -Force) { $pending.Enqueue($child.FullName) }
+        } else {
+            [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destinationPath))
+            Copy-Item -LiteralPath $path -Destination $destinationPath
+        }
+    }
+}
+function AssertCleanClientStage([string]$Directory) {
+    AssertPlainClientTree $Directory
+    foreach($item in Get-ChildItem -LiteralPath $Directory -Recurse -Force) {
+        $relative=$item.FullName.Substring($Directory.Length+1).Replace('\','/')
+        if($relative -match '(^|/)client-data(/|$)' -or $relative -match '(^|/)data/(client-operations|client-local)(/|$)') { throw 'CLIENT_RUNTIME_IN_DISTRIBUTION' }
+    }
+}
+function CopyGeneratedClient([string]$Source,[string]$Destination) {
+    # Never copy a used player tree recursively. Even an empty runtime directory
+    # is private state and cannot become a Release attachment.
+    AssertPlainClientTree $Source
+    $version=Get-Content -LiteralPath (Join-Path $Source 'client-version.json') -Encoding UTF8 -Raw | ConvertFrom-Json
+    if(-not $version.PSObject.Properties['generated_files'] -or -not @($version.generated_files).Count) { throw 'CLIENT_GENERATED_WHITELIST_REQUIRED' }
+    $names=@('client-version.json')
+    foreach($entry in $version.generated_files) {
+        $relative=[string]$entry.path
+        # Player/Release output is deliberately flat; reject path components,
+        # aliases/streams, runtime names and duplicates before touching output.
+        if($relative -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or $relative -in @('.','..','client-data') -or $relative -in $names) { throw 'CLIENT_INVALID_GENERATED_PATH' }
+        $path=Join-Path $Source $relative
+        if(-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine [string]$entry.sha256) { throw 'CLIENT_GENERATED_HASH_MISMATCH' }
+        $names+=$relative
+    }
+    if(Test-Path -LiteralPath $Destination) { throw 'CLIENT_DISTRIBUTION_DESTINATION_EXISTS' }
+    [void][IO.Directory]::CreateDirectory($Destination)
+    foreach($name in $names) { Copy-Item -LiteralPath (Join-Path $Source $name) -Destination (Join-Path $Destination $name) }
+    AssertCleanClientStage $Destination
+}
 function WriteVersion([string]$Directory,$Base) {
+    AssertCleanClientStage $Directory
     $version=[ordered]@{}
     foreach($key in $Base.Keys) { $version[$key]=$Base[$key] }
     $core=@()
@@ -62,8 +144,52 @@ function WriteVersion([string]$Directory,$Base) {
     $version.generated_files=@($generated.Keys | ForEach-Object { [ordered]@{path=$_;sha256=$generated[$_]} })
     [IO.File]::WriteAllText((Join-Path $Directory 'client-version.json'),($version | ConvertTo-Json -Depth 6),$utf8)
 }
-function SafeReplace([string]$Target,[string]$Stage,[string]$BackupRoot) {
-    if(-not (Test-Path -LiteralPath $Target)) { Move-Item -LiteralPath $Stage -Destination $Target; return '' }
+function GetLegacyOperationMigrationRoot([string]$Directory) {
+    $legacy=Join-Path $Directory 'data'
+    if(-not (Test-Path -LiteralPath $legacy)) { return '' }
+    AssertPlainClientTree $legacy
+    $children=@(Get-ChildItem -LiteralPath $legacy -Force)
+    if($children.Count -ne 1 -or $children[0].Name -cne 'client-operations' -or -not $children[0].PSIsContainer) { throw 'CLIENT_LEGACY_UNKNOWN_CONTENT' }
+    # Original Godot JSON.stringify receipts had exactly these four string keys.
+    # Match the complete object before parsing: reject duplicate/unknown keys,
+    # nested values and control bytes rather than letting a JSON parser overwrite.
+    $string='"(?:[^"\\\x00-\x1f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"'
+    $member='"(?<key>kind|item_id|slot|operation_id)"\s*:\s*'+$string
+    $pattern='\A\s*\{\s*'+$member+'(?:\s*,\s*'+$member+')*\s*\}\s*\z'
+    foreach($file in Get-ChildItem -LiteralPath $children[0].FullName -Force) {
+        if($file.PSIsContainer -or $file.Name -cnotmatch '^[0-9a-f]{64}\.json$' -or $file.Length -gt 4096 -or $file.Length -eq 0) { throw 'CLIENT_LEGACY_UNKNOWN_CONTENT' }
+        try { $raw=[IO.File]::ReadAllText($file.FullName,(New-Object Text.UTF8Encoding($false,$true))) } catch { throw 'CLIENT_LEGACY_INVALID_RECEIPT' }
+        $match=[regex]::Match($raw,$pattern)
+        $keys=@($match.Groups['key'].Captures | ForEach-Object Value)
+        if(-not $match.Success -or $keys.Count -ne 4 -or @($keys | Sort-Object -Unique).Count -ne 4) { throw 'CLIENT_LEGACY_INVALID_RECEIPT' }
+        try { $receipt=$raw | ConvertFrom-Json -ErrorAction Stop } catch { throw 'CLIENT_LEGACY_INVALID_RECEIPT' }
+        if(@('purchase','select') -cnotcontains $receipt.kind -or $receipt.operation_id.Length -ne 32 -or $receipt.item_id.Length -gt 128 -or $receipt.slot.Length -gt 128) { throw 'CLIENT_LEGACY_INVALID_RECEIPT' }
+    }
+    # An empty client-operations directory is recognized too. Rename the entire
+    # data parent so even its empty-directory structure remains recoverable.
+    return $legacy
+}
+function MoveClientDirectory([string]$From,[string]$To,[Collections.ArrayList]$Journal) {
+    [IO.Directory]::Move($From,$To)
+    [void]$Journal.Add(@{kind='move';from=$From;to=$To})
+}
+function SafeReplace([string]$Target,[string]$Stage,[string]$BackupRoot,[switch]$CleanDistribution) {
+    AssertCleanClientStage $Stage
+    if(-not (Test-Path -LiteralPath $Target)) { [IO.Directory]::Move($Stage,$Target); return '' }
+    AssertPlainClientTree $Target
+    AssertClientStopped $Target
+    $data=Join-Path $Target 'client-data'
+    $hasData=Test-Path -LiteralPath $data
+    if($hasData) {
+        AssertPlainClientTree $data
+        if($CleanDistribution) { throw 'CLIENT_RUNTIME_IN_RELEASE_TARGET' }
+    }
+    $legacy=GetLegacyOperationMigrationRoot $Target
+    $quarantine=Join-Path $data 'legacy-client-operations'
+    if($legacy) {
+        if($CleanDistribution) { throw 'CLIENT_RUNTIME_IN_RELEASE_TARGET' }
+        if(Test-Path -LiteralPath $quarantine) { throw 'CLIENT_LEGACY_QUARANTINE_COLLISION' }
+    }
     $versionFile=Join-Path $Target 'client-version.json'
     if(-not (Test-Path -LiteralPath $versionFile -PathType Leaf)) { throw ('目标目录不是本工具生成的客户端，拒绝覆盖：'+$Target) }
     $old=Get-Content -Encoding UTF8 -Raw -LiteralPath $versionFile | ConvertFrom-Json
@@ -74,23 +200,65 @@ function SafeReplace([string]$Target,[string]$Stage,[string]$BackupRoot) {
         foreach($entry in $old.files) { $known[$entry.path]=$entry.sha256 }
         foreach($name in @('README.md','SetServer.ps1','SetServer.cmd','CheckClient.ps1','CheckClient.cmd','FetchClient.ps1','FetchClient.cmd','connection.json','server.crt')) { if(-not $known.ContainsKey($name)) { $known[$name]='*' } }
     }
+    foreach($path in $known.Keys) { if($path -match '(^|[\\/])client-data([\\/]|$)' -or $path -match '^data([\\/]|$)') { throw 'CLIENT_RUNTIME_IN_GENERATED_MANIFEST' } }
     $problems=@()
     $actual=FileTable $Target
     foreach($path in $actual.Keys) {
+        if($legacy -and $path -cmatch '^data/client-operations/[0-9a-f]{64}\.json$') { continue }
         if(-not $known.ContainsKey($path)) { $problems+=('新增 '+$path) }
         elseif($known[$path] -ne '*' -and $known[$path] -ne $actual[$path]) { $problems+=('已改动 '+$path) }
     }
+    # Empty unknown directories must not slip through a file-only manifest.
+    foreach($directory in Get-ChildItem -LiteralPath $Target -Recurse -Directory -Force) {
+        $relative=$directory.FullName.Substring($Target.Length+1).Replace('\','/')
+        if($relative -eq 'client-data' -or $relative.StartsWith('client-data/',[StringComparison]::Ordinal)) { continue }
+        if($legacy -and @('data','data/client-operations') -ccontains $relative) { continue }
+        if(-not @($known.Keys | Where-Object { $_.StartsWith($relative+'/',[StringComparison]::Ordinal) }).Count) { $problems+=('新增目录 '+$relative) }
+    }
     if($problems.Count) { throw ('目标目录里有不是本工具生成的内容，为避免丢失已停止，旧目录未改动：'+$Target+'；'+($problems -join '，')+'。请先把这些文件移走，或换一个目录保存。') }
     New-Item -ItemType Directory -Force -Path $BackupRoot | Out-Null
+    AssertPlainClientTree $BackupRoot
     $backup=Join-Path $BackupRoot ([IO.Path]::GetFileName($Target)+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+$id.Substring(0,6))
-    Move-Item -LiteralPath $Target -Destination $backup
+    $backupData=Join-Path $backup 'client-data'
+    # Recheck immediately before mutation. All moves below are directory renames,
+    # never a recursive copy/delete, so a failed move cannot leave a partial tree.
+    AssertClientStopped $Target
+    $journal=New-Object Collections.ArrayList
     try {
+        MoveClientDirectory $Target $backup $journal
         if($TestFailAt -eq 'swap') { throw 'TEST_INJECTED_SWAP_FAILURE' }
-        Move-Item -LiteralPath $Stage -Destination $Target
+        MoveClientDirectory $Stage $Target $journal
+        if($TestFailAt -eq 'swap-published') { throw 'TEST_INJECTED_PUBLISHED_SWAP_FAILURE' }
+        if($hasData) {
+            if($TestFailAt -eq 'data-move') { throw 'TEST_INJECTED_DATA_MIGRATION_FAILURE' }
+            MoveClientDirectory $backupData $data $journal
+            if($TestFailAt -eq 'data-commit') { throw 'TEST_INJECTED_DATA_COMMIT_FAILURE' }
+        }
+        if($legacy) {
+            if(-not $hasData) {
+                [void][IO.Directory]::CreateDirectory($data)
+                [void]$journal.Add(@{kind='mkdir';to=$data})
+            }
+            if($TestFailAt -eq 'legacy-move') { throw 'TEST_INJECTED_LEGACY_MIGRATION_FAILURE' }
+            # Preserve every byte and the full old data/ tree. Server/account
+            # binding and any query/replay stay in the explicit client flow.
+            MoveClientDirectory (Join-Path $backup 'data') $quarantine $journal
+            if($TestFailAt -eq 'legacy-commit') { throw 'TEST_INJECTED_LEGACY_COMMIT_FAILURE' }
+        }
     } catch {
-        if(Test-Path -LiteralPath $Target) { throw ('替换失败且无法自动回退；旧目录保存在 '+$backup) }
-        Move-Item -LiteralPath $backup -Destination $Target
-        throw ('替换失败，已恢复旧目录：'+$_.Exception.Message)
+        $failure=$_.Exception.Message
+        try {
+            for($step=$journal.Count-1;$step -ge 0;$step--) {
+                $entry=$journal[$step]
+                if($entry.kind -eq 'move') { [IO.Directory]::Move($entry.to,$entry.from) }
+                else { [IO.Directory]::Delete($entry.to,$false) } # only our empty parent
+            }
+        } catch {
+            # Preserve both trees, including the staging tree, for manual recovery.
+            $script:preserveStaging=$true
+            throw ('CLIENT_ROLLBACK_REQUIRES_RECOVERY target='+$Target+' backup='+$backup+' stage='+$Stage+'; '+$failure+'; '+$_.Exception.Message)
+        }
+        throw ('替换失败，已恢复旧目录和数据：'+$failure)
     }
     return $backup
 }
@@ -128,11 +296,9 @@ $stage=Join-Path $staging 'shooter-windows'
 $repoStage=Join-Path $staging 'repository'
 New-Item -ItemType Directory -Force -Path $work,$stage,(Join-Path $project 'logs') | Out-Null
 $retentionOutcome='failure'
+$script:preserveStaging=$false
 try {
-    foreach($item in Get-ChildItem -LiteralPath $source -Force) {
-        if($item.Name -eq '.godot') { continue }
-        Copy-Item -LiteralPath $item.FullName -Destination $work -Recurse
-    }
+    CopyPlayerProject $source $work
     [IO.File]::WriteAllText((Join-Path $work 'main.gd'),"class_name PlayerClientMain`nextends `"res://client.gd`"`n",$utf8)
     [IO.File]::WriteAllText((Join-Path $work 'empty.tscn'),"[gd_scene format=3]`n[node name=`"Bootstrap`" type=`"Node`"]`n",$utf8)
     $settingsFile=Join-Path $work 'project.godot'
@@ -146,7 +312,7 @@ runnable=true
 dedicated_server=false
 export_filter="all_resources"
 include_filter="*.json,*.gd,*.tscn"
-exclude_filter="**/preview.gd,**/test_runner.gd"
+exclude_filter="**/preview.gd,**/test_runner.gd,client-data/*,**/client-data/*,data/*,**/data/*,logs/*,**/logs/*,run/*,**/run/*,backups/*,**/backups/*"
 export_path=""
 script_export_mode=0
 [preset.0.options]
@@ -195,6 +361,13 @@ checks the executable/pack hashes and reports whether a server is configured.
 client-version.json must match the server build; admission checks are unchanged.
 Server updates may need a matching fresh player folder. Do not give players
 server databases, private certificates, administrator credentials or backups.
+
+Local settings, diagnostic logs and pending operations go in client-data/ beside
+Client.exe. Close every client before rebuilding: a plain, link-free client-data
+folder is preserved in the replacement, and failed swaps/migrations restore the
+old client and data. Other unexpected files still block rebuilding. Never send
+client-data to another player or a Release; send only an exported redacted report.
+Use a freshly generated clean folder for distribution, not a used player folder.
 '@,$utf8)
     }
     # SetServer validates the public files (wss url, allowed fields, no private key).
@@ -206,6 +379,7 @@ server databases, private certificates, administrator credentials or backups.
 
     foreach($directory in @($stage,$repoStage)) {
         if(-not (Test-Path -LiteralPath $directory)) { continue }
+        AssertCleanClientStage $directory
         foreach($file in Get-ChildItem -LiteralPath $directory -Recurse -File -Force) {
             $relative=$file.FullName.Substring($directory.Length+1).Replace('\','/')
             if($relative -match '(^|/)(data|run|logs|backups?)/|\.(key|sqlite|db|token)$|admin|secret') { throw ('客户端目录中出现不应分发的文件：'+$relative) }
@@ -230,8 +404,8 @@ server databases, private certificates, administrator credentials or backups.
         # the folder so the folder holds only what gets uploaded.
         $releaseDir=Join-Path $OutputRoot ('release-'+$tag)
         $releaseStage=Join-Path $staging 'release'
-        Copy-Item -LiteralPath $RepositoryDestination -Destination $releaseStage -Recurse
-        $releasePrevious=SafeReplace $releaseDir $releaseStage (Join-Path $OutputRoot 'previous-release')
+        CopyGeneratedClient $RepositoryDestination $releaseStage
+        $releasePrevious=SafeReplace $releaseDir $releaseStage (Join-Path $OutputRoot 'previous-release') -CleanDistribution
         if($releasePrevious) { Write-Output ('RELEASE_ASSETS_PREVIOUS '+$releasePrevious);RetainGenerated 'player-client-release-previous' @($releasePrevious) }
         $assets=@(Get-ChildItem -LiteralPath $releaseDir -File | Sort-Object Name | ForEach-Object { [ordered]@{name=$_.Name;size=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} })
         if(@(Get-ChildItem -LiteralPath $releaseDir -Directory).Count) { throw 'Release attachments must be a flat folder.' }
@@ -243,7 +417,7 @@ server databases, private certificates, administrator credentials or backups.
     }
     $retentionOutcome='success'
 } finally {
-    if(Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+    if(-not $script:preserveStaging -and (Test-Path -LiteralPath $staging)) { Remove-Item -LiteralPath $staging -Recurse -Force }
     if($null -ne $process){$process.Dispose()}
     $exportLogs=@($stdout,$stderr)|Where-Object {$_ -and (Test-Path -LiteralPath $_ -PathType Leaf)}
     if($exportLogs.Count){RetainGenerated 'player-client-export' $exportLogs $retentionOutcome}

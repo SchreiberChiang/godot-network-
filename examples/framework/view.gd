@@ -43,6 +43,10 @@ var game_status: Label
 var scoreboard: Label
 var help_text: Label
 var diagnostics_text: Label
+var diagnostics_panel := PopupPanel.new()
+var diagnostics_detail: Label
+var legacy_import_button: Button
+var legacy_confirm := ConfirmationDialog.new()
 var _frame_samples: Array[Dictionary] = []
 var _previous_frame_at_usec := -1
 var own_notice: Label
@@ -100,6 +104,7 @@ func _ready() -> void:
 	_build_game()
 	_build_inventory()
 	_build_account()
+	_build_diagnostics()
 
 func _box(color: Color, border := Color.TRANSPARENT) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
@@ -314,8 +319,8 @@ func _process(delta: float) -> void:
 	login_button.disabled = app.busy or not app.configuration_ready
 	toggle_auth.disabled = app.busy
 	refresh_button.disabled = app.busy or app.polling
-	create_button.disabled = app.busy or app.maintenance or not app.pending_asset.is_empty()
-	join_button.disabled = app.busy or app.maintenance or app.selected_room == "" or not app.pending_asset.is_empty() or not _selected_ready()
+	create_button.disabled = app.busy or app.maintenance or app.pending_warning != "" or not app.pending_asset.is_empty()
+	join_button.disabled = app.busy or app.maintenance or app.selected_room == "" or app.pending_warning != "" or not app.pending_asset.is_empty() or not _selected_ready()
 	leave_button.disabled = app.busy
 	for button in inventory_buttons:
 		button.disabled = app.busy or not app.inventory_allowed()
@@ -331,11 +336,12 @@ func _process(delta: float) -> void:
 		game_status.text = app.world.status_text(app.client.identity.get("user_id", ""))
 		help_text.text = app.world.instructions()
 		var update_stats: Dictionary = app.world.snapshot_diagnostics() if app.world.has_method("snapshot_diagnostics") else {}
-		diagnostics_text.text = diagnostics_line(Engine.get_frames_per_second(), worst_frame_ms(), app.client.room_round_trip_ms(), update_stats)
+		var transport: Dictionary = app.client.diagnostics_snapshot()
+		diagnostics_text.text = diagnostics_line(Engine.get_frames_per_second(), worst_frame_ms(), float(transport.get("rtt_ms", -1)), update_stats, transport)
 		var own: Dictionary = app.world.player_view(app.client.identity.get("user_id", "")) if app.world.has_method("player_view") else {}
 		own_notice.text = str(own.get("notice", ""))
 		gameplay_buttons[0].visible = app.game_id == "shooter"
-		gameplay_buttons[0].disabled = app.busy or own.get("life_state", "") != "dead" or int(own.get("respawn_wait_ms", 1)) > 0 or own.get("asset_busy", false) or not app.pending_asset.is_empty()
+		gameplay_buttons[0].disabled = app.busy or own.get("life_state", "") != "dead" or int(own.get("respawn_wait_ms", 1)) > 0 or own.get("asset_busy", false) or app.pending_warning != "" or not app.pending_asset.is_empty()
 		for index in [1, 2]:
 			gameplay_buttons[index].visible = app.game_id == "turns"
 			gameplay_buttons[index].disabled = app.busy or app.world.latest.get("active_user", "") != app.client.identity.get("user_id", "") or app.world.latest.get("players", []).size() < 2
@@ -350,6 +356,8 @@ func _process(delta: float) -> void:
 		scoreboard.text = "\n".join(score_lines)
 	if inventory_panel.visible:
 		_update_inventory()
+	if diagnostics_panel.visible:
+		diagnostics_detail.text = diagnostics_details(app.diagnostic_metrics()) + "\n\n" + app.local_data_message()
 	queue_redraw()
 
 func _observe_frame(now_usec: int = -1) -> void:
@@ -375,11 +383,51 @@ func worst_frame_ms(now_usec: int = -1) -> float:
 		worst = maxf(worst, float(sample.ms))
 	return worst
 
-static func diagnostics_line(fps: int, worst_ms: float, rtt_ms: float, updates: Dictionary) -> String:
+static func diagnostics_line(fps: int, worst_ms: float, rtt_ms: float, updates: Dictionary, transport: Dictionary = {}) -> String:
+	if not transport.is_empty():
+		var loss := "统计中" if transport.get("loss_state", "") == "collecting" else _diagnostic_percent(float(transport.get("reliable_loss_percent", -1)))
+		return "%d FPS · 帧 %s · RTT %s · 可靠发送丢包估计 %s · 更新 %s · 等待 %s" % [fps, _diagnostic_ms(worst_ms), _diagnostic_ms(rtt_ms), loss, _diagnostic_ms(float(updates.get("interval_ms", -1))), _diagnostic_ms(float(updates.get("age_ms", -1)))]
 	return "%d FPS  ·  最慢帧 %s  ·  RTT %s  ·  更新间隔 %s  ·  未更新 %s" % [fps, _diagnostic_ms(worst_ms), _diagnostic_ms(rtt_ms), _diagnostic_ms(float(updates.get("interval_ms", -1))), _diagnostic_ms(float(updates.get("age_ms", -1)))]
 
 static func _diagnostic_ms(value: float) -> String:
 	return "—" if value < 0 or not is_finite(value) else "%d ms" % roundi(value)
+
+func _build_diagnostics() -> void:
+	_button(self, "网络详情 / 报告", Vector2(1010, 708), Vector2(202, 30), func(): diagnostics_panel.popup_centered(Vector2i(810, 430)))
+	diagnostics_panel.size = Vector2i(810, 430)
+	diagnostics_panel.add_theme_stylebox_override("panel", _box(Color("142536"), Color("365468")))
+	add_child(diagnostics_panel)
+	var contents := Control.new()
+	contents.custom_minimum_size = Vector2(810, 430)
+	diagnostics_panel.add_child(contents)
+	_label(contents, "客户端网络诊断", Vector2(24, 18), Vector2(590, 38), 24)
+	_button(contents, "关闭", Vector2(684, 18), Vector2(94, 36), func(): diagnostics_panel.hide())
+	diagnostics_detail = _label(contents, "—", Vector2(24, 66), Vector2(760, 272), 16, Color("bad1df"))
+	diagnostics_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_button(contents, "标记刚才卡顿", Vector2(24, 348), Vector2(198, 42), func(): app.mark_stall())
+	_button(contents, "打开报告目录", Vector2(242, 348), Vector2(198, 42), func(): app.open_report_directory())
+	_label(contents, "只发送 reports 中的脱敏 JSONL，不发送整个 client-data", Vector2(24, 395), Vector2(758, 26), 13, Color("ffcf91"))
+	legacy_import_button = _button(inventory_panel, "核对旧操作来源", Vector2(30, 538), Vector2(220, 42), _confirm_legacy_import)
+	legacy_import_button.hide()
+	legacy_confirm.title = "确认旧操作属于当前服务器"
+	legacy_confirm.ok_button_text = "确认归属并迁入"
+	legacy_confirm.cancel_button_text = "暂不迁入"
+	legacy_confirm.confirmed.connect(func(): app.bind_legacy_pending())
+	add_child(legacy_confirm)
+
+func _confirm_legacy_import() -> void:
+	legacy_confirm.dialog_text = "旧版回执没有服务器标记。只有确认它属于当前服务器、当前登录账号和当前游戏，才能迁入。\n服务器：%s\n迁入保留原操作编号，不会发送网络请求。随后仍需另行点击查询 / 重试。\n不能确认时请取消，保留原文件并联系主机核对。" % app._pending_server()
+	legacy_confirm.popup_centered(Vector2i(660, 250))
+
+static func diagnostics_details(metrics: Dictionary) -> String:
+	var loss := "统计中（等待首个完整 ENet 周期）" if metrics.get("loss_state", "") == "collecting" else _diagnostic_percent(float(metrics.get("reliable_loss_percent", -1)))
+	return "阶段 %s  ·  错误类别 %s\nFPS %s  ·  最近 1 秒最慢帧 %s（非 GPU 耗时）\n房间 RTT %s（往返，非单程） · RTT 波动 %s\n可靠发送丢包估计 %s\nENet 发送 %s  ·  接收 %s\n快照到达间隔 %s  ·  未更新 %s\n30 秒 RTT 观测 P50 / P95：%s / %s（至少 10 个秒样本）\n波动是 ENet 平滑绝对偏差，不是标准差；丢包估计不是所有 UDP 或下行快照丢失率。" % [str(metrics.get("phase", "CLOSED")), str(metrics.get("error", "NONE")), str(metrics.get("fps", "—")), _diagnostic_ms(float(metrics.get("frame_max_ms", -1))), _diagnostic_ms(float(metrics.get("rtt_ms", -1))), _diagnostic_ms(float(metrics.get("rtt_variance_ms", -1))), loss, _diagnostic_rate(float(metrics.get("tx_bytes_per_sec", -1))), _diagnostic_rate(float(metrics.get("rx_bytes_per_sec", -1))), _diagnostic_ms(float(metrics.get("snapshot_interval_ms", -1))), _diagnostic_ms(float(metrics.get("snapshot_age_ms", -1))), _diagnostic_ms(float(metrics.get("rtt_p50_ms", -1))), _diagnostic_ms(float(metrics.get("rtt_p95_ms", -1)))]
+
+static func _diagnostic_percent(value: float) -> String:
+	return "—" if value < 0 or not is_finite(value) else "%.2f%%" % value
+
+static func _diagnostic_rate(value: float) -> String:
+	return "—" if value < 0 or not is_finite(value) else "%.1f KiB/s" % (value / 1024.0)
 
 func _selected_ready() -> bool:
 	for row in app.rooms:
@@ -422,7 +470,7 @@ func _update_inventory() -> void:
 			slot_select.add_item("默认武器" if slot == "primary" else ("默认主题" if slot == "theme" else str(slot)))
 			slot_select.set_item_metadata(index, slot)
 	var slot := str(slot_select.get_item_metadata(slot_select.selected)) if slot_select.item_count > 0 and slot_select.selected >= 0 else ""
-	var signature: String = JSON.stringify(app.assets) + JSON.stringify(app.catalog) + slot + str(app.busy) + str(app.pending_asset.is_empty())
+	var signature: String = JSON.stringify(app.assets) + JSON.stringify(app.catalog) + slot + str(app.busy) + str(app.pending_asset.is_empty()) + app.pending_warning
 	if signature != inventory_signature:
 		inventory_signature = signature
 		for child in inventory_cards.get_children():
@@ -443,9 +491,13 @@ func _update_inventory() -> void:
 			var description: String = {"rifle": "稳定、精确的基础武器", "smg": "高射速，适合中近距离", "shotgun": "近距离六颗散射弹丸", "classic": "简单清晰的经典石子", "jade": "柔和的玉石色彩主题"}.get(item_id, "持久物品 · 当前游戏可用")
 			_label(card, description, Vector2(18, 104), Vector2(228, 30), 14, Color("8faebe"))
 			var action := _button(card, "已设为默认" if selected else ("选择为默认" if owned else "解锁"), Vector2(18, 157), Vector2(228, 44), func(): app.asset_action("select" if owned else "purchase", item_id, slot))
-			action.disabled = app.busy or selected or not app.pending_asset.is_empty() or (not owned and int(app.assets.get("credits", 0)) < int(item.get("price", 0)))
+			action.disabled = app.busy or selected or app.pending_warning != "" or not app.pending_asset.is_empty() or (not owned and int(app.assets.get("credits", 0)) < int(item.get("price", 0)))
 	pending_label.text = "" if app.pending_asset.is_empty() else "待确认：" + ("解锁 " if app.pending_asset.kind == "purchase" else "选择 ") + _item_name(app.pending_asset.item_id) + "。请查询原操作后再入房或复活。"
 	retry_button.visible = not app.pending_asset.is_empty()
+	legacy_import_button.visible = app.pending_warning in ["LEGACY_UNBOUND", "LEGACY_MIGRATION_INCOMPLETE"]
+	legacy_import_button.disabled = app.busy
+	if app.pending_warning != "":
+		pending_label.text = "旧回执已保留。请先核对服务器归属，迁入不自动重发。" if app.pending_warning == "LEGACY_UNBOUND" else "回执读取失败，原文件已保留；暂不能创建新资产操作。"
 	retry_button.disabled = app.busy
 	slot_select.disabled = app.busy
 

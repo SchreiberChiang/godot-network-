@@ -433,6 +433,10 @@ func world_state(value: Dictionary) -> void:
 
 ## Client reception gaps/progress age only. No remote clock or packet-loss claim.
 func snapshot_diagnostics() -> Dictionary:
+	# The shell clears latest before a new room's first state; never leak the
+	# previous room's reception age while awaiting that first accepted snapshot.
+	if latest.is_empty():
+		return {"interval_ms": -1, "age_ms": -1}
 	return {"interval_ms": _diagnostic_interval_ms, "age_ms": Time.get_ticks_msec() - _diagnostic_received_ms if _diagnostic_received_ms >= 0 else -1}
 
 ## Sound cues between two accepted snapshots. Shots are server-confirmed and

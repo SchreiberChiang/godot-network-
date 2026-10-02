@@ -1,8 +1,8 @@
 extends Node
 ## Client-only sound board for the example shell. Every cue is synthesized here at
 ## startup (no audio files, no licences to track); the numbers below are the
-## source. The room server never loads this script. Settings live in user://
-## (outside the generated client folder, so regenerating PlayerClient keeps them).
+## source. The room server never loads this script. The shell injects client-data
+## persistence; isolated tests can supply an explicit file. No user:// fallback.
 const RATE := 22050
 const MAX_VOICES := 8
 ## Concurrent voices per cue and minimum spacing: rapid fire restarts the oldest
@@ -12,7 +12,9 @@ const MIN_GAP_MS := {"fire": 40, "hit": 50, "death": 0, "purchase": 150, "click"
 const GAIN := {"fire": 0.55, "hit": 0.6, "death": 0.75, "purchase": 0.7, "click": 0.4}
 const DEFAULT_VOLUME := 0.7
 
-var settings_path := "user://audio_settings.json"
+var settings_path := ""
+var settings_loader: Callable
+var settings_writer: Callable
 var volume := DEFAULT_VOLUME
 var muted := false
 var settings_error := ""
@@ -142,9 +144,15 @@ func set_muted(value: bool) -> void:
 
 func load_settings() -> void:
 	settings_error = ""
-	if not FileAccess.file_exists(settings_path):
+	var data: Variant
+	if settings_loader.is_valid():
+		data = settings_loader.call()
+		if data is Dictionary and data.is_empty():
+			return
+	elif settings_path != "" and FileAccess.file_exists(settings_path):
+		data = JSON.parse_string(FileAccess.get_file_as_string(settings_path))
+	else:
 		return
-	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(settings_path))
 	if not data is Dictionary or not (data.get("volume") is float or data.get("volume") is int) or not data.get("muted") is bool:
 		settings_error = "invalid"
 		return
@@ -152,15 +160,23 @@ func load_settings() -> void:
 	muted = data.muted
 
 func save_settings() -> bool:
+	var settings := {"format": 1, "volume": snappedf(volume, 0.01), "muted": muted}
+	if settings_writer.is_valid():
+		var accepted: bool = settings_writer.call(settings)
+		settings_error = "" if accepted else "write"
+		return accepted
+	if settings_path == "":
+		settings_error = "write"
+		return false
 	var path := ProjectSettings.globalize_path(settings_path)
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
-	var file := FileAccess.open(path + ".tmp", FileAccess.WRITE)
+	var file := FileAccess.open(path + "." + str(OS.get_process_id()) + ".tmp", FileAccess.WRITE)
 	if file == null:
 		settings_error = "write"
 		return false
-	file.store_string(JSON.stringify({"format": 1, "volume": snappedf(volume, 0.01), "muted": muted}))
+	file.store_string(JSON.stringify(settings))
 	file.close()
-	if DirAccess.rename_absolute(path + ".tmp", path) != OK:
+	if DirAccess.rename_absolute(path + "." + str(OS.get_process_id()) + ".tmp", path) != OK:
 		settings_error = "write"
 		return false
 	settings_error = ""

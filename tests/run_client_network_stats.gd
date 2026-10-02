@@ -55,9 +55,10 @@ func _real_enet(client: Node) -> void:
 	_check(client.enet.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED, "real loopback ENet handshake completes")
 	if client.enet.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 		var packet_peer: ENetPacketPeer = client.enet.get_peer(1)
+		client._collect_network_diagnostics(Time.get_ticks_msec())
 		var observed: float = client.room_round_trip_ms()
 		_check(is_finite(observed) and observed >= 0, "connected room exposes finite transport RTT estimate")
-		_check(observed == packet_peer.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME), "getter reads ENet reliable round-trip statistic directly")
+		_check(observed == packet_peer.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME), "collector caches ENet reliable round-trip statistic for readers")
 		client.state = "LOBBY"
 		_check(client.room_round_trip_ms() < 0, "leaving room hides even still-open transport RTT")
 		client.state = "IN_ROOM"
