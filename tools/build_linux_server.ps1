@@ -79,7 +79,7 @@ foreach($notice in @('LICENSE.txt','COPYRIGHT.txt')){
     if(-not(Test-Path -LiteralPath $noticeSource -PathType Leaf)){throw 'Godot runtime copyright notices are required for distribution.'}
     Copy-Item -LiteralPath $noticeSource -Destination (Join-Path $bundle ('GODOT-'+$notice))
 }
-foreach($inputFile in @('project.godot','LICENSE','PrepareEnvironment.sh','tools/prepare_environment.sh','tools/runtime_paths.sh','tools/build_linux_server.ps1','tools/build_framework.ps1','tools/content_digest.ps1','tools/roomkit_linux.sh','tools/linux_package_check.sh')){
+foreach($inputFile in @('RoomKit.sh','tools/roomkit.ps1','tools/roomkit_entry.ps1','project.godot','LICENSE','PrepareEnvironment.sh','tools/prepare_environment.sh','tools/runtime_paths.sh','tools/build_linux_server.ps1','tools/build_framework.ps1','tools/content_digest.ps1','tools/roomkit_linux.sh','tools/linux_package_check.sh')){
     [void]$sourceFiles.Add(@{path=$inputFile;sha256=(Get-FileHash -LiteralPath (Join-Path $project $inputFile) -Algorithm SHA256).Hash.ToLowerInvariant()})
 }
 foreach($helper in @('sqlite_store.ps1','account_store.ps1','storage_worker.ps1','operator_maintenance.ps1')){
@@ -105,13 +105,13 @@ foreach($entry in @(@{name='Operator';script='res://host/operator.gd'},@{name='M
     ExportPack $hostProject (Join-Path $bundle ($entry.name+'.pck')) $entry.name
     Copy-Item -LiteralPath $template -Destination (Join-Path $bundle ($entry.name+'.x86_64'))
 }
-foreach($name in @('roomkit_linux.sh','linux_package_check.sh','prepare_environment.sh','runtime_paths.sh')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))}
+foreach($name in @('roomkit.ps1','roomkit_entry.ps1','roomkit_linux.sh','linux_package_check.sh','prepare_environment.sh','runtime_paths.sh')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))}
 Copy-Item -LiteralPath (Join-Path $project 'PrepareEnvironment.sh') -Destination (Join-Path $bundle 'PrepareEnvironment.sh')
 foreach($name in @('update_linux_package.sh','update_linux_package.ps1')){
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))
     [void]$sourceFiles.Add(@{path=('tools/'+$name);sha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $name) -Algorithm SHA256).Hash.ToLowerInvariant()})
 }
-WriteUtf8 (Join-Path $bundle 'RoomKit.sh') "#!/usr/bin/env bash`nexec bash `"`$(dirname `"`$0`")/tools/roomkit_linux.sh`" `"`$@`"`n"
+Copy-Item -LiteralPath (Join-Path $project 'RoomKit.sh') -Destination (Join-Path $bundle 'RoomKit.sh')
 WriteUtf8 (Join-Path $bundle 'CheckPackage.sh') "#!/usr/bin/env bash`nexec bash `"`$(dirname `"`$0`")/tools/linux_package_check.sh`" `"`$@`"`n"
 WriteUtf8 (Join-Path $bundle 'UpdateRoomKit.sh') "#!/usr/bin/env bash`nexec bash `"`$(dirname `"`$0`")/tools/update_linux_package.sh`" `"`$@`"`n"
 $base=(& git -C $project rev-parse HEAD).Trim();if($LASTEXITCODE){throw 'Cannot identify source commit.'}

@@ -134,35 +134,50 @@ if(-not $PrepareOnly) {
 }
 
 $launcher=@'
-param([ValidateSet('panel','client','stop','verify','publish-clients')][string]$Operation='panel',[ValidateSet('shooter','turns')][string]$Game='shooter',[ValidateRange(1024,65535)][int]$PanelPort=28291,[switch]$NoBrowser)
+param([ValidateSet('panel','client','stop','status','verify','publish-clients')][string]$Operation='panel',[ValidateSet('shooter','turns')][string]$Game='shooter',[ValidateRange(1024,65535)][int]$PanelPort=28291,[switch]$NoBrowser,[ValidatePattern('^[a-z0-9-]{1,32}$')][string]$Instance='framework',[ValidateRange(1024,65535)][int]$LobbyPort=28300,[ValidateRange(1024,65535)][int]$ControlPort=28301,[ValidatePattern('^[1-9][0-9]{3,4}-[1-9][0-9]{3,4}$')][string]$UdpRange='28400-28431',[string]$Bind='0.0.0.0')
 $ErrorActionPreference='Stop'
 $packageRoot=[IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\','/')
 $utf8=New-Object Text.UTF8Encoding($false)
 Set-Location -LiteralPath $packageRoot
+$dataRoot=Join-Path $packageRoot 'data/framework'
+$publicRoot=Join-Path $packageRoot 'artifacts/client'
+if($Instance -ne 'framework') {
+    $dataRoot=Join-Path $packageRoot ('data/instance-'+$Instance+'/data')
+    $publicRoot=Join-Path $packageRoot ('data/instance-'+$Instance+'/public')
+}
+. (Join-Path $packageRoot 'tools/roomkit_entry.ps1')
+if($Operation -in @('panel','stop','status')){Assert-RoomKitPath (Join-Path $dataRoot 'operator.json')}
+if($Operation -eq 'status'){& (Join-Path $packageRoot 'tools/roomkit_status.ps1') -DataRoot $dataRoot;exit $LASTEXITCODE}
 function QuoteArgs($Arguments) { return @($Arguments | ForEach-Object { '"'+([string]$_ -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }) }
 function PublishClients {
-    $configuration=Join-Path $packageRoot 'artifacts\client\connection.json'
-    $certificate=Join-Path $packageRoot 'artifacts\client\server.crt'
+    Assert-RoomKitTree $publicRoot
+    $configuration=Join-Path $publicRoot 'connection.json'
+    $certificate=Join-Path $publicRoot 'server.crt'
     if(-not (Test-Path -LiteralPath $configuration) -or -not (Test-Path -LiteralPath $certificate)) { throw 'Start the management panel first to publish the public connection configuration.' }
     $connection=Get-Content -Encoding UTF8 -Raw -LiteralPath $configuration | ConvertFrom-Json
     $connection.ca_certificate='server.crt'
     foreach($gameId in @('shooter','turns')) {
         $destination=Join-Path $packageRoot ('clients\'+$gameId)
+        Assert-RoomKitPath (Join-Path $destination 'server.crt')
+        Assert-RoomKitPath (Join-Path $destination 'connection.json')
         Copy-Item -LiteralPath $certificate -Destination (Join-Path $destination 'server.crt') -Force
         [IO.File]::WriteAllText((Join-Path $destination 'connection.json'),($connection | ConvertTo-Json -Depth 12),$utf8)
     }
 }
 if($Operation -eq 'verify') {
+    Assert-RoomKitPath (Join-Path $packageRoot 'checksums.json')
     $manifest=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $packageRoot 'checksums.json') | ConvertFrom-Json
     foreach($file in $manifest.files) {
         $path=[IO.Path]::GetFullPath((Join-Path $packageRoot $file.path))
+        Assert-RoomKitPath $path
         if(-not $path.StartsWith($packageRoot+'\',[StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $file.sha256) { throw ('Package checksum mismatch: '+$file.path) }
     }
     Write-Output ('FRAMEWORK_PACKAGE_VALID files='+$manifest.files.Count)
     exit 0
 }
 if($Operation -eq 'stop') {
-    $data=Join-Path $packageRoot 'data\framework'
+    Assert-RoomKitPath (Join-Path $dataRoot 'operator-stop.request')
+    $data=$dataRoot
     if(-not (Test-Path -LiteralPath $data -PathType Container)) { throw 'The management service has not initialized this package.' }
     [IO.File]::WriteAllText((Join-Path $data 'operator-stop.request'),'stop',$utf8)
     Write-Output 'FRAMEWORK_STOP_REQUESTED: the operator will stop its owned host and rooms, then exit.'
@@ -172,12 +187,18 @@ if($Operation -eq 'publish-clients') { PublishClients; Write-Output 'PUBLIC_CLIE
 if($Operation -eq 'client') {
     PublishClients
     $clientDirectory=Join-Path $packageRoot ('clients\'+$Game)
+    foreach($name in @('RunGame.ps1','Client.exe','Client.pck')){Assert-RoomKitPath (Join-Path $clientDirectory $name)}
     & (Join-Path $clientDirectory 'RunGame.ps1')
     exit 0
 }
+Assert-RoomKitTree $dataRoot
+Assert-RoomKitTree $publicRoot
+Assert-RoomKitTree (Join-Path $packageRoot 'run')
+Assert-RoomKitPath (Join-Path $packageRoot 'data/.gdignore')
+foreach($name in @('operator.log','operator-console.log','operator-stderr.log')){Assert-RoomKitPath (Join-Path $packageRoot ('logs/'+$name))}
 & (Join-Path $packageRoot 'tools\protect_runtime.ps1') -ProjectRoot $packageRoot
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot 'logs') | Out-Null
-$descriptor=Join-Path $packageRoot 'data\framework\operator.json'
+$descriptor=Join-Path $dataRoot 'operator.json'
 $existing=$null
 if(Test-Path -LiteralPath $descriptor) {
     try {
@@ -203,12 +224,15 @@ if(Test-Path -LiteralPath $descriptor) {
         # Only a confirmed absent PID plus unavailable HTTP permits deleting
         # these two fixed stale signal files, never databases or process journals.
         Remove-Item -LiteralPath $descriptor -Force
-        $staleStop=Join-Path $packageRoot 'data\framework\operator-stop.request'
+        $staleStop=Join-Path $dataRoot 'operator-stop.request'
         if(Test-Path -LiteralPath $staleStop -PathType Leaf) { Remove-Item -LiteralPath $staleStop -Force }
     }
 }
 if($null -eq $existing) {
-    $arguments=QuoteArgs @('--headless','--log-file',(Join-Path $packageRoot 'logs\operator.log'),'--',('--panel-port='+$PanelPort),('--operator-log-path='+(Join-Path $packageRoot 'logs\operator.log')))
+    $rawArguments=@('--headless','--log-file',(Join-Path $packageRoot 'logs\operator.log'),'--',('--data-root='+$dataRoot),('--public-client-dir='+$publicRoot),('--panel-port='+$PanelPort),('--operator-log-path='+(Join-Path $packageRoot 'logs\operator.log')))
+    if($PSBoundParameters.ContainsKey('Bind')){$rawArguments+=('--initial-bind='+$Bind)}
+    if($PSBoundParameters.ContainsKey('LobbyPort') -or $PSBoundParameters.ContainsKey('ControlPort') -or $PSBoundParameters.ContainsKey('UdpRange')){$rawArguments+=('--initial-ports='+$LobbyPort+','+$ControlPort+','+$UdpRange.Replace('-',','))}
+    $arguments=QuoteArgs $rawArguments
     $process=Start-Process -FilePath (Join-Path $packageRoot 'Operator.exe') -ArgumentList $arguments -WorkingDirectory $packageRoot -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $packageRoot 'logs\operator-console.log') -RedirectStandardError (Join-Path $packageRoot 'logs\operator-stderr.log')
     $ownedHandle=$process.Handle
     $deadline=[DateTime]::UtcNow.AddSeconds(90)
@@ -233,6 +257,8 @@ if(-not $NoBrowser) { Start-Process $url }
 Write-Output ('FRAMEWORK_PANEL_READY '+$url)
 '@
 WriteUtf8 (Join-Path $bundle 'RunFramework.ps1') $launcher
+foreach($name in @('roomkit.ps1','roomkit_entry.ps1','roomkit_status.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $bundle ('tools/'+$name))}
+Copy-Item -LiteralPath (Join-Path $project 'RoomKit.cmd') -Destination $bundle
 WriteCmd (Join-Path $bundle 'StartPanel.cmd') 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0RunFramework.ps1" -Operation panel %*'
 WriteCmd (Join-Path $bundle 'StopFramework.cmd') 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0RunFramework.ps1" -Operation stop %*'
 WriteCmd (Join-Path $bundle 'CheckFramework.cmd') 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0RunFramework.ps1" -Operation verify %*'
