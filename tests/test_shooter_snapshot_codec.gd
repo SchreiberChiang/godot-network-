@@ -56,6 +56,8 @@ func run() -> Dictionary:
 
 	_test_headers(state, packets)
 	_test_payloads()
+	_test_typed_containers()
+	_test_wide_integers()
 	var unicode := _snapshot(16, 192)
 	for player in unicode.players:
 		player.user_id = "🙂".repeat(128)
@@ -68,6 +70,30 @@ func run() -> Dictionary:
 	_check(_deliver(Codec.new(), Codec.encode(unicode, 1, 1), 0) == unicode, "maximum legal collections and Unicode strings round trip without loss")
 	print("INFO maximum_schema_variant_bytes=", raw_size)
 	return {"passed": passed, "failed": failed, "expected_native_rejections": expected_native_rejections}
+
+func _test_typed_containers() -> void:
+	var ordinary := _snapshot(2, 4)
+	ordinary.last_results.append({"user_id": ordinary.players[0].user_id, "kills": 1, "deaths": 2, "participation_ms": 50, "credits": 3})
+	var typed: Dictionary[String, Variant] = {}
+	typed.assign(ordinary)
+	for name in ["players", "shots", "last_results"]:
+		var rows: Array[Dictionary] = []
+		for row in ordinary[name]:
+			var typed_row: Dictionary[String, Variant] = {}
+			typed_row.assign(row)
+			rows.append(typed_row)
+		typed[name] = rows
+	var received := _deliver(Codec.new(), Codec.encode(typed, 1, 42), 0)
+	_check(typed.is_typed() and typed.players.is_typed() and typed.players[0].is_typed() and received == ordinary and not received.is_typed() and not received.players.is_typed() and not received.players[0].is_typed(), "typed root, row dictionaries and arrays normalize while preserving snapshot semantics")
+
+func _test_wide_integers() -> void:
+	var state := _snapshot(1, 1)
+	state.tick = 4294967297
+	state.round = 9007199254740991
+	state.shots[0].id = 9223372036854775807
+	state.shots[0].at = 4294967297
+	var received := _deliver(Codec.new(), Codec.encode(state, 1, 42), 0)
+	_check(Validator.validate_file(state, Codec.STATE_SCHEMA) == "" and received == state and typeof(received.get("tick")) == TYPE_INT and received.get("tick") == 4294967297 and received.get("round") == 9007199254740991 and not received.get("shots", []).is_empty() and received.shots[0].id == 9223372036854775807 and received.shots[0].at == 4294967297, "schema-legal 64-bit integers round trip exactly without 32-bit truncation or float conversion")
 
 func _test_headers(state: Dictionary, packets: Array[PackedByteArray]) -> void:
 	var mutations := {"magic": [0, 0], "version": [4, 2], "flags": [8, 2], "stream_zero": [12, 0], "serial_zero": [16, 0], "raw_zero": [20, 0], "raw_over_cap": [20, Codec.MAX_RAW_BYTES + 1], "encoded_over_cap": [24, Codec.MAX_ENCODED_BYTES + 1], "count_wrong": [28, 1], "index_outside": [32, packets.size()]}
