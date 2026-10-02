@@ -2,6 +2,26 @@
 
 当前主线为 main，规格见 docs/17，测试证据见 STATUS。这里说明现有入口，不把代码已编写等同于发布验收通过。
 
+<a id="unified-entry"></a>
+## Windows / Linux 统一管理入口
+
+在源码目录或新生成的对应系统服务器包根目录运行，每次选择一个动作：
+
+```bat
+RoomKit.cmd check
+RoomKit.cmd start
+RoomKit.cmd status
+RoomKit.cmd stop
+```
+
+Linux 对应 `bash RoomKit.sh check`、`start`、`status`、`stop`。入口自动识别平台与源码/包；不带动作或用 `help` 只显示帮助，不开服、不自动安装。启动输出真实后台地址与实例位置。旧快捷入口仍保留；当前远程试玩继续用 `PlayLinuxPackage.cmd`，不会因加入统一入口而切换正在运行的包。
+
+默认实例沿用旧入口：Windows 为 `framework`（`data/framework`，面板 28291），Linux 为 `l3`（`data/instance-l3/data`，面板 28491）。已有命名实例必须继续传原来的 `--instance 名称`；此功能不迁移账号，也不保证同一目录同时运行多实例。试验使用独立目录和显式端口。
+
+Windows 老的 Operator 标记没有足够的创建身份信息，进程仍在时 `status` 保守返回 `UNKNOWN`、退出 3；不把端口响应当作身份确认。没有标记时返回 `NOT_RUNNING`、退出 0，遗留无效标记为 `STALE`。Windows 包的 `stop` 表示 `STOP_REQUESTED`，仍需等待进程退出；不会为确认身份而结束不受信的进程。
+
+独立验收：Windows 源码与真实导出包各一次管理服务启停/HTTP 检查，均 11/0；Linux 笔记本新导出包完整性、只读状态、启动、HTTP、停止通过。此处未重复游戏对局或公网测试；旧包需重新生成才含新入口。[原始失败、修复及命令](17_framework_shooter_plan.md#u1-mainline-acceptance)。
+
 ## 配套交付与离线更新
 
 构建机的 `PrepareDeployment.cmd` 默认生成 Linux 服务端与匹配的 Windows 玩家目录；`-ServerPlatform Windows` 改为 Windows 服务端。`OpenDeployment.cmd` 打开最近的干净目录。目标机启动、玩家 `SetServer.cmd` 配置和 Linux `UpdateRoomKit.sh` 更新流程见 [首版交付](17_framework_shooter_plan.md#deployment-stage-result)；准备依赖需显式使用下面的入口，构建和更新不会操作运行服务。目录用途见 [根目录说明](01_scope_architecture.md#root-folders)。

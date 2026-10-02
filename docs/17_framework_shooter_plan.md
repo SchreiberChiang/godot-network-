@@ -28,8 +28,34 @@
 
 **U1 的产品决定**：用户已选“同一启动入口，自动识别 Windows / Linux”，不是遥控目标选择页面。目标统一名为 RoomKit、统一动作/输出语义；平台只保留必要的 `.cmd`/`.sh` 轻壳，内部自动识别平台与源码/包。不能声称同一个 EXE 可跨 OS。首次启动打印真实后台地址、所用实例/数据目录；已有默认实例继续沿用，不因为换入口新建一套管理员。Windows `status` 当前不存在，应补只读适配，不能把旧元数据或端口有响应直接当进程身份已确认。不自动安装、合并数据库、开放后台或接管别人的进程。源码与包各验入口，但 Linux 本地通过不替代 Windows 验收。
 
+<a id="u1-mainline-acceptance"></a>
+### U1 主线修复、独立验收与接收（2026-10-02）
+
+上节为初检历史；候选现已修复并接入主线。实现提交为 `d6bb7a9`、`231507a`。主线亲自调整：停服/状态只检查实际标记与停止信号及其祖先，不递归无关 artifacts；启动、发布、构建的敏感目标仍拒绝链接。Windows 包原启动命令会一直等到 Operator 退出，现复用既有 detached 启动器，并将两份依赖纳入包与校验清单。
+
+| 主线实际运行 | 结果和限制 |
+|---|---|
+| Windows PS 5.1 分派 / 启动器替身 / 动作路径 | 46/0（文件符号链接 1 项未运行）、4/0、19/0，退出均 0；目录联接真实验证 |
+| Windows 源码隔离服务 | 11/0，真实 cmd、无关工作目录、私有新实例、HTTP、停止与残留检查；未创建管理员/游戏宿主 |
+| Windows 新导出包 | 构建退出 0，42 文件完整性通过，真实管理服务闭环 11/0；与源码分开实例 |
+| Linux 轻量复验 | 新源码目录，分派 47/0、动作路径 18/0、壳 12/0，合计退出 0；Windows 包路径专用项明确略过 |
+| Linux 新导出包 | 笔记本全新目录，完整性、check、未运行状态不写实例、start、HTTP、RUNNING、stop、NOT_RUNNING、标记移除、stderr 空，脚本退出 0 |
+
+命令：Windows `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_unified_entry.ps1`，同方式执行 `test_unified_windows_launchers.ps1`、`test_unified_action_paths.ps1`；真实服务使用 `tests/test_unified_entry_live.ps1`（新 test-u1 实例、显式 30000–60000 测试端口）。包分别由 `build_framework_release.ps1`、`build_linux_server.ps1` 构建。Linux 验收驱动及精确调用保存在 `logs/u1-mainline-20261002/linux-package-live.sh`，新远端目录 `~/roomkit/work/u1-mainline-review-20261002/`。未安装、不改防火墙、不操作当前 releases 试玩实例。
+
+证据：主线 `logs/u1-mainline-20261002/` 保留轻量输出；独立树 `artifacts/worktrees/unified-entry-review/logs/u1-review/` 保留完整失败/成功记录。初次 Windows 两个夹具因符号链接权限/编码退出 1；首轮源码 HTTP 夹具因 Expect:100-continue 被接口拒绝，已修夹具。首轮 Windows 包启动挂起是产品缺陷，正常停止本次实例后修复并用新包重验。Linux 单项退出码汇总文本因远端 printf 引号产生格式缺陷；原始分项输出与整体退出 0 保留，不把该文本冒充完好逐项台账。
+
+Windows 在旧标记下 status 为 UNKNOWN，不冒称身份已确认；包 stop 只发请求，验收另等待真实退出。未新增游戏对局/公网/云服务器证据。既有 PlayerClient、真实 data/framework 与当前 Linux 试玩包均未替换。Windows 保留两份本轮包、Linux 一份，均在 F 盘或本次远端隔离目录。
+
+<a id="n1-candidate-received"></a>
+### N1 候选已接收（2026-10-02，复验中）
+
+用户手动保存 `artifacts/RoomKit-N1-candidate.zip`，SHA256 `f85aeef8572671f16e6dad0957db25abbdbcf2cca5131295a9518ab2f04d5039`。安全检查归档路径后解到 `artifacts/dot-network-candidate-20261002/`；110 份清单文件校验全部一致。补丁在 F 盘 `artifacts/worktrees/network-journal-review/`、分支 `codex/network-journal-review`、基准 `1a0fcc5` 应用；23 文件，尚未合并。网络指标只读审查未见必须修项；旧回执读取需拒绝未知/重复键，随后补 Windows 生成器、日志和展示验证。对方云端运行结果仅作参考，不能替代 Windows 实机与导出包验收。
+
+自动传送曾报 `os.setxattr` 不可用（Windows 下载工具平台兼容错误），这次由用户手动下载解决，未修复应用工具。今后任务单固定写交付主机、完整路径、文件名、SHA256 与失败替代方案；只落附件，不自行应用补丁。V1 模型仍缺可复核附件。
+
 <a id="u1-candidate-review"></a>
-### U1 候选接收与主线独立复核（2026-10-02）
+### U1 候选接收与主线独立复核（2026-10-02，初检历史）
 
 已从笔记本取回 `U1-candidate.patch`、`U1-evidence.tar.gz`、`U1-progress.txt`，保存到本机忽略目录 `artifacts/dot-unified-entry-20261002/`；三文件 SHA256 与远端一致。补丁 SHA256 为 `3a30b05825808cdfe3f409355e1f881f607c721952c5bab6099fa400d6f8c557`，证据归档为 `165e6209e80c92f0dcfb305f30146745f9be929e53a72513ea35de7bd3be8109`。归档先核对条目为相对路径普通文件，再解入该目录。主线未应用候选；在 F 盘 `artifacts/worktrees/unified-entry-review/`、`codex/unified-entry-review` 独立树按原基准应用并审查。
 

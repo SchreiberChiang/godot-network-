@@ -14,6 +14,8 @@
 
 ## 准备服务器和玩家目录
 
+**统一管理入口已接入**：Windows 用 `RoomKit.cmd start|status|stop|check`，Linux 用 `bash RoomKit.sh start|status|stop|check`（每次选一个动作）。入口自动识别源码/对应系统的导出包；不带动作只显示帮助。原有双击快捷入口继续可用，当前 Linux 试玩仍用 `PlayLinuxPackage.cmd`。默认实例、状态判断和验证范围见 [统一入口](docs/22_framework_operations.md#unified-entry)。
+
 在这台 Windows 构建机双击 **PrepareDeployment.cmd**，默认生成 Linux 服务器与匹配的 Windows 玩家客户端；Windows 服务器用 `PrepareDeployment.cmd -ServerPlatform Windows`。**OpenDeployment.cmd** 随时打开最近生成的干净目录，其中 `Server/` 给服务器机器，`PlayerClient/` 给玩家。各自的启动、配置和停止步骤都在目录说明里，不需要多层寻找包号。
 
 Linux 可以在本机独立启动，无需台式机保持开机；Windows SSH 入口仅用于远程管理。Windows 包带引擎；Linux 包也带引擎，可用随包 **PrepareEnvironment.sh** 准备缺少的 pwsh 7.6.6。系统 SQLite、ICU、OpenSSL 仍须可用，缺少时检查会报出，不能据此承诺任意新系统都能一键运行。
