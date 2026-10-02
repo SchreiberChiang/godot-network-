@@ -37,6 +37,11 @@ $assignment=$ast.Find({param($n)$n -is [Management.Automation.Language.Assignmen
 Put (Join-Path $package 'RunFramework.ps1') $assignment.Right.Expression.Value
 Put (Join-Path $package 'tools/protect_runtime.ps1') 'param($ProjectRoot)'
 Put (Join-Path $package 'tools/roomkit_entry.ps1') ([IO.File]::ReadAllText((Join-Path $root 'tools/roomkit_entry.ps1')))
+Put (Join-Path $package 'tools/detached_process.ps1') @'
+function Start-Detached($FilePath,$Arguments,$Directory,$Stdout,$Stderr,$WindowStyle='Hidden') {
+ Start-Process -FilePath $FilePath -ArgumentList (QuoteArgs $Arguments) -WorkingDirectory $Directory -PassThru -WindowStyle Hidden -RedirectStandardOutput $Stdout -RedirectStandardError $Stderr
+}
+'@
 foreach($game in @('shooter','turns')){[void][IO.Directory]::CreateDirectory((Join-Path $package ('clients/'+$game)))}
 function Start-Process($FilePath,$ArgumentList,$WorkingDirectory,[switch]$PassThru,$WindowStyle,$RedirectStandardOutput,$RedirectStandardError) {
  $all=$ArgumentList -join ' '

@@ -42,6 +42,7 @@ try {
  Assert ($errors.Count -eq 0) 'builder parse failed'
  $assignment=$ast.Find({param($n)$n -is [Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$launcher'},$true)
  $package=Join-Path $test 'package';Put (Join-Path $package 'RunFramework.ps1') $assignment.Right.Expression.Value
+ Put (Join-Path $package 'tools/detached_process.ps1') '# No process creation is permitted in this fixture.'
  foreach($name in @('roomkit_entry.ps1','roomkit_status.ps1')){Put (Join-Path $package ('tools/'+$name)) ([IO.File]::ReadAllText((Join-Path $SourceRoot ('tools/'+$name))))}
  [void][IO.Directory]::CreateDirectory((Join-Path $package 'data/framework'))
  Link (Join-Path $package 'artifacts/client') $target

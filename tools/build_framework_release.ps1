@@ -23,7 +23,7 @@ $utf8=New-Object Text.UTF8Encoding($false)
 if (-not (Test-Path -LiteralPath $Godot -PathType Leaf)) { throw 'Godot editor executable is missing.' }
 if (-not (Test-Path -LiteralPath $template -PathType Leaf)) { throw 'The tested Godot 4.7.2 Windows release export template is missing.' }
 New-Item -ItemType Directory -Force -Path $work,$source,$bundle,(Join-Path $project 'logs') | Out-Null
-$helpers=@('bounded_helper.ps1','process_identity.ps1','protect_runtime.ps1','protect_data.ps1','sqlite_store.ps1','account_store.ps1','operator_maintenance.ps1','storage_worker.ps1')
+$helpers=@('bounded_helper.ps1','process_identity.ps1','protect_runtime.ps1','protect_data.ps1','sqlite_store.ps1','account_store.ps1','operator_maintenance.ps1','storage_worker.ps1','detached_process.ps1','detached_start.ps1')
 $preset=@'
 [preset.0]
 name="Windows Desktop"
@@ -146,6 +146,7 @@ if($Instance -ne 'framework') {
     $publicRoot=Join-Path $packageRoot ('data/instance-'+$Instance+'/public')
 }
 . (Join-Path $packageRoot 'tools/roomkit_entry.ps1')
+. (Join-Path $packageRoot 'tools/detached_process.ps1')
 if($Operation -in @('panel','stop','status')){Assert-RoomKitPath (Join-Path $dataRoot 'operator.json')}
 if($Operation -eq 'status'){& (Join-Path $packageRoot 'tools/roomkit_status.ps1') -DataRoot $dataRoot;exit $LASTEXITCODE}
 function QuoteArgs($Arguments) { return @($Arguments | ForEach-Object { '"'+([string]$_ -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }) }
@@ -196,6 +197,7 @@ Assert-RoomKitTree $publicRoot
 Assert-RoomKitTree (Join-Path $packageRoot 'run')
 Assert-RoomKitPath (Join-Path $packageRoot 'data/.gdignore')
 foreach($name in @('operator.log','operator-console.log','operator-stderr.log')){Assert-RoomKitPath (Join-Path $packageRoot ('logs/'+$name))}
+Assert-RoomKitPath (Join-Path $packageRoot 'logs/detached-start')
 & (Join-Path $packageRoot 'tools\protect_runtime.ps1') -ProjectRoot $packageRoot
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot 'logs') | Out-Null
 $descriptor=Join-Path $dataRoot 'operator.json'
@@ -232,8 +234,7 @@ if($null -eq $existing) {
     $rawArguments=@('--headless','--log-file',(Join-Path $packageRoot 'logs\operator.log'),'--',('--data-root='+$dataRoot),('--public-client-dir='+$publicRoot),('--panel-port='+$PanelPort),('--operator-log-path='+(Join-Path $packageRoot 'logs\operator.log')))
     if($PSBoundParameters.ContainsKey('Bind')){$rawArguments+=('--initial-bind='+$Bind)}
     if($PSBoundParameters.ContainsKey('LobbyPort') -or $PSBoundParameters.ContainsKey('ControlPort') -or $PSBoundParameters.ContainsKey('UdpRange')){$rawArguments+=('--initial-ports='+$LobbyPort+','+$ControlPort+','+$UdpRange.Replace('-',','))}
-    $arguments=QuoteArgs $rawArguments
-    $process=Start-Process -FilePath (Join-Path $packageRoot 'Operator.exe') -ArgumentList $arguments -WorkingDirectory $packageRoot -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $packageRoot 'logs\operator-console.log') -RedirectStandardError (Join-Path $packageRoot 'logs\operator-stderr.log')
+    $process=Start-Detached (Join-Path $packageRoot 'Operator.exe') $rawArguments $packageRoot (Join-Path $packageRoot 'logs/operator-console.log') (Join-Path $packageRoot 'logs/operator-stderr.log')
     $ownedHandle=$process.Handle
     $deadline=[DateTime]::UtcNow.AddSeconds(90)
     while([DateTime]::UtcNow -lt $deadline) {
