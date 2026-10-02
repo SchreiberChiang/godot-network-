@@ -4,6 +4,8 @@
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
+**离线查看人物移动：双击 `PreviewMovement.cmd`**，TAB 切换稳定更新、抖动和断流，ESC 退出。它使用当前游戏显示算法与合成轨迹，不启动服务器；测量定义见 [移动基线](docs/25_shooter_room_rules.md#movement-baseline)。
+
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
 **分支和本地目录看这里：[主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)。** 日常仍用此项目根目录；主线已接收本地转枪方案，两个历史候选目录继续保留供对照。双击根目录 **PreviewAim.cmd** 可离线看旧/新转枪（TAB 切换、ESC 退出），配套联网试玩目录尚未更新。

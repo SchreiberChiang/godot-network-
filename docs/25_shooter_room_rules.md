@@ -86,3 +86,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_room_rules.ps1
 - 契约与示例：`schemas/{room_rules.schema.json,game_manifest.schema.json,admin_request.schema.json,shooter_config.schema.json,shooter_state.schema.json}`、`examples/managed_messages.example.json`。
 - 验证：`tests/{test_registry_ports.gd,test_shooter.gd,run_shooter.gd,run_shooter_visual.gd,run_managed_contracts.gd,test_admin_room_rules.cjs,test_room_rules.ps1}`。
 - 文档：本文件、`STATUS.md`、`docs/{07_versions_decisions.md,21_managed_protocol.md,22_framework_operations.md,23_branch_files.md}`。前面轮次的未提交修改保持保留。
+
+<a id="movement-baseline"></a>
+## 人物移动基线与候选比较（2026-10-02）
+
+入口：根目录 `PreviewMovement.cmd`。TAB 在稳定、抖动、断流间切换，ESC 退出。三行分别为最新权威位置、当前 `game.gd` 的 `render_position`、合成轨迹参考。参考行不是已实现的客户端预测，不承诺真实服务器位置可提前知道。
+
+可复用夹具是 `tests/support/movement_probe.gd`，无窗口入口为 `tests/run_movement_baseline.gd`。使用真实 Game 对象和经过 Schema 校验的快照；不连接网络、不启动房间或账号。轨迹为 120 px/s 匀速、20 Hz 快照，显示时钟固定 120 Hz，总长 3 秒，排除前 0.2 秒。抖动延迟循环为 0/15/35/5 ms，断流丢弃源时间 [1.0,1.25) 的快照。每个到达时刻拆分推进，避免把显示帧采样误差混入快照接收。
+
+指标：移动帧比例、连续无位移最长时间、与同一时刻已知轨迹的平均/最大位置误差；等效平均落后 = 平均绝对位置误差 / 120 px/s。它不是 RTT，后续出现超前位置时也只能解释为绝对误差，不能当作带符号延迟。真实渲染预览的 FPS 与固定时钟测量分开报告。
+
+当前主线结果：稳定 100% 移动帧、最长停顿 0 ms、等效落后 50 ms；抖动 87.5%、16.7 ms、66.1 ms；断流 91.1%、250 ms、63.4 ms。9 项检查只验证夹具快照有效、结果范围和可重复，不代表同步体验通过。没有覆盖转向、跳跃、死亡复活、传送或真实公网。
+
+运行示例（从项目根目录，隔离目录每次换新）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/run_isolated_test.ps1 -Script res://tests/run_movement_baseline.gd -Isolation data/test-movement-comparison-001 -Log data/test-movement-comparison-001/result -TimeoutSeconds 60
+```
+
+比较候选时，把这三份测试脚本逐字节复制到候选的独立工作目录，仅替换该目录自己的游戏实现；先记录基准提交、候选提交和夹具 SHA256，再跑同一个入口。报告全部三种场景的停顿、位置误差与任何新增缓冲时间，不以移动帧比例单独决定胜负。本轮没有修改主线游戏代码或重建玩家目录。

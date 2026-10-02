@@ -2,6 +2,14 @@
 
 **阶段 7 公网试玩已获人工通过反馈，移动卡顿待定位**：用户转述朋友移动像掉帧，本人单人入房也发现人物移动与枪口旋转略卡，观察 FPS 约 120、感觉没有下降。更偏向显示同步问题；没有连续帧时间或网络时序数据，不将基本可玩扩大为性能达标。先补诊断与显示平滑，再安排赛车；合作种田和云端后置。详见 [阶段 7](docs/17_framework_shooter_plan.md#friends-public-preparation) 与 [指标定义](docs/25_shooter_room_rules.md#client-diagnostics)。
 
+## 人物移动测量工具（10-02）
+
+已新增根目录 `PreviewMovement.cmd` 和可复用测量夹具，没有修改游戏实现。实际 Godot 隔离运行退出 0，夹具有效性与重复性检查 **9/0**；三脚本只解析通过。真实渲染窗口运行约 4 秒、退出 0、stderr 空，报告 120 FPS，截图已检查文字可读。
+
+120 Hz 合成显示、20 Hz 快照、120 px/s 匀速轨迹：稳定更新最长停顿 **0 ms**，抖动 **16.7 ms**，250 ms 断流 **250 ms**；等效平均位置落后分别 **50 / 66.1 / 63.4 ms**。这是合成轨迹的位置误差换算，**不是公网延迟实测，也不是身体移动已修复**。后续 dot 候选用同一夹具比较停顿和显示延迟，不能只凭更顺滑验收。
+
+原始输出：[最终测量](data/test-movement-baseline-final-20261002/result.stdout)、[渲染窗口](logs/movement-baseline-20261002/renderer-final.stdout)。指标与候选用法见 [专题](docs/25_shooter_room_rules.md#movement-baseline)。本轮没有运行联网、Linux 或全量回归。
+
 ## 当前工作目录与候选状态
 
 日常入口仍是 `F:\文档\GodotGame\Net\RoomKit` 的 `main`。10-02 工作树核查已记录到 `778a0f8`；**主线现已接收本地枪口方案，身体移动尚未修改，配套试玩包尚未更新**。两份候选目录继续保留供对照；七个旧本地分支的实施内容均已在 main，不是七项待合并功能。
