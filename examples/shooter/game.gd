@@ -37,6 +37,9 @@ var last_results: Array = []
 var last_duration_ms := 0
 # Presentation only: authoritative state and hit detection stay untouched.
 var render_tracks: Dictionary = {}
+var aim_tracks: Dictionary = {}
+var local_visual_user := ""
+var local_visual_aim := Vector2.RIGHT
 var visual_shots: Array = []
 var last_visual_shot := 0
 var snapshot_age := 0.0
@@ -396,6 +399,8 @@ func world_state(value: Dictionary) -> void:
 		var cues: Array = [] if latest.is_empty() else presentation_cues(latest, value, last_visual_shot)
 		if latest.is_empty():
 			render_tracks.clear()
+			aim_tracks.clear()
+			local_visual_user = ""
 			visual_shots.clear()
 			last_visual_shot = 0
 			_diagnostic_tick = -1
@@ -455,6 +460,17 @@ func _update_visual_targets(value: Dictionary) -> void:
 		var target := Vector2(player.x, player.y)
 		var from := render_position(player)
 		var old: Dictionary = render_tracks.get(user, {})
+		var old_aim: Dictionary = aim_tracks.get(user, {})
+		var target_angle := Vector2(player.aim_x, player.aim_y).angle()
+		# Aim has its own clock: turning in place must not reset movement blends.
+		# Death-count changes also detect a respawn when the dead packet was lost.
+		var reset_aim: bool = old_aim.is_empty() or old_aim.get("life", "") != player.life_state or int(old_aim.get("deaths", -1)) != int(player.deaths) or from.distance_to(target) > 100.0
+		if reset_aim:
+			aim_tracks[user] = {"from": target_angle, "to": target_angle, "age": BLEND_SECONDS, "life": player.life_state, "deaths": player.deaths}
+			if local_visual_user == user:
+				local_visual_user = ""
+		elif not is_zero_approx(angle_difference(float(old_aim.to), target_angle)):
+			aim_tracks[user] = {"from": _snapshot_render_aim(player).angle(), "to": target_angle, "age": 0.0, "life": player.life_state, "deaths": player.deaths}
 		# Death, respawn and teleports must never glide through the map.
 		if old.get("life", "") != player.life_state or from.distance_to(target) > 100.0:
 			from = target
@@ -463,6 +479,11 @@ func _update_visual_targets(value: Dictionary) -> void:
 	for user in render_tracks.keys():
 		if not present.has(user):
 			render_tracks.erase(user)
+	for user in aim_tracks.keys():
+		if not present.has(user):
+			aim_tracks.erase(user)
+	if not present.has(local_visual_user):
+		local_visual_user = ""
 	for shot in value.shots:
 		if int(shot.id) <= last_visual_shot:
 			continue
@@ -472,6 +493,8 @@ func _update_visual_targets(value: Dictionary) -> void:
 func advance_visual(delta: float) -> void:
 	snapshot_age += delta
 	for track in render_tracks.values():
+		track.age = minf(float(track.age) + delta, BLEND_SECONDS)
+	for track in aim_tracks.values():
 		track.age = minf(float(track.age) + delta, BLEND_SECONDS)
 	for index in range(visual_shots.size() - 1, -1, -1):
 		var shot: Dictionary = visual_shots[index]
@@ -484,6 +507,27 @@ func render_position(player: Dictionary) -> Vector2:
 	if track.is_empty():
 		return Vector2(player.x, player.y)
 	return track.from.lerp(track.to, clampf(float(track.age) / BLEND_SECONDS, 0.0, 1.0))
+
+## Local display only. Never writes latest/players, sends input or predicts hits.
+## Match send_input's origin and zero-vector fallback, not the interpolated body
+## or the 5px-offset gun pivot: changing those would silently alter shot intent.
+func set_local_visual_aim(user: String, aim: Vector2) -> void:
+	if server or not aim.is_finite() or player_view(user).get("life_state", "") != "alive":
+		local_visual_user = ""
+		return
+	local_visual_user = user
+	local_visual_aim = aim.normalized() if aim.length_squared() > 0.0001 else Vector2.RIGHT
+
+func render_aim(player: Dictionary) -> Vector2:
+	if not server and player.user_id == local_visual_user and player.life_state == "alive":
+		return local_visual_aim
+	return _snapshot_render_aim(player)
+
+func _snapshot_render_aim(player: Dictionary) -> Vector2:
+	var track: Dictionary = aim_tracks.get(player.user_id, {})
+	if track.is_empty():
+		return Vector2(player.aim_x, player.aim_y)
+	return Vector2.from_angle(lerp_angle(float(track.from), float(track.to), clampf(float(track.age) / BLEND_SECONDS, 0.0, 1.0)))
 
 static func tracer_segment(origin: Vector2, end: Vector2, age: float) -> PackedVector2Array:
 	var distance := origin.distance_to(end)
@@ -579,7 +623,7 @@ func draw_on(canvas: CanvasItem, user: String, font: Font) -> void:
 		canvas.draw_rect(Rect2(position + Vector2(-7, -17), Vector2(14, 5)), Color("142638"))
 		canvas.draw_line(position + Vector2(-6, 14), position + Vector2(-7, 22), color.darkened(0.22), 6)
 		canvas.draw_line(position + Vector2(6, 14), position + Vector2(7, 22), color.darkened(0.22), 6)
-		var aim := Vector2(player.aim_x, player.aim_y)
+		var aim := render_aim(player)
 		var gun_length := 29.0 if player.weapon == "rifle" else (20.0 if player.weapon == "smg" else 34.0)
 		canvas.draw_line(position + Vector2(0, -5), position + Vector2(0, -5) + aim * gun_length, Color("d8e1e3"), 6)
 		canvas.draw_rect(Rect2(position + Vector2(-22, -37), Vector2(44, 4)), Color("34414d"))

@@ -512,17 +512,22 @@ func _process(delta: float) -> bool:
 		var own: String = client.identity.get("user_id", "")
 		_sync_life_view()
 		input_elapsed += delta
-		if world.has_method("send_input") and input_elapsed >= 1.0 / 30.0:
-			input_elapsed = 0
-			var enabled: bool = root.has_focus() and not inventory_open and not account_open and not busy
-			var axis := 0.0
-			if enabled:
-				axis = float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT))
+		if world.has_method("send_input"):
+			# Sample once per display frame. Presentation uses the same vector as the
+			# existing input command, without waiting for its 30 Hz send/server echo.
 			var player: Dictionary = world.player_view(own)
 			var pointer: Vector2 = view.get_local_mouse_position() - view.ARENA_POSITION
 			var aim := pointer - Vector2(float(player.get("x", 480)), float(player.get("y", 270)))
-			var fire: bool = enabled and Rect2(Vector2.ZERO, Vector2(960, 540)).has_point(pointer) and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-			world.send_input(axis, enabled and (Input.is_physical_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_W)), aim, fire)
+			if world.has_method("set_local_visual_aim"):
+				world.set_local_visual_aim(own, aim)
+			if input_elapsed >= 1.0 / 30.0:
+				input_elapsed = 0
+				var enabled: bool = root.has_focus() and not inventory_open and not account_open and not busy
+				var axis := 0.0
+				if enabled:
+					axis = float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT))
+				var fire: bool = enabled and Rect2(Vector2.ZERO, Vector2(960, 540)).has_point(pointer) and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+				world.send_input(axis, enabled and (Input.is_physical_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_W)), aim, fire)
 	if args.has("--close-after-ms") and Time.get_ticks_msec() - client_started >= int(args["--close-after-ms"]):
 		_close()
 	return false
