@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "移动候选已在Windows和Linux Godot 4.7.2独立复验，旧/新同屏预览可用；下一步同源Windows玩家/Linux服务端与短试玩，之后赛车最小双人闭环。合成抖动停顿减少，有少量显示落后代价，不消除断流。Linux报告已核对，真实手感另验；已完成的两端控制小试验不重跑。当前提交用git log -1核实，证据见docs/17整合结果",
+  baseline: "枪口与身体移动新版已同源交付，Windows真实客户端连接Linux新包短验54/0；原账号配置已迁移保留，继续用PlayLinuxPackage。下一步5–10分钟真人体验，再进入赛车最小双人闭环。合成抖动停顿减少，有少量显示落后代价，不消除断流。Linux候选报告已核对，不重复派发；当前提交用git log -1核实，证据见docs/17整合结果",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -246,11 +246,11 @@ window.ROADMAP_DATA = {
       evidence: "诊断30/0、真实OpenGL专项/截图31/0、射击83/0、反馈8/0，退出0且stderr空；没有测量真人公网延迟，不宣称卡顿已修复" },
     { id: "game-movement-presentation", area: "game", phase: 7, status: "pending",
       title: "移动与瞄准显示平滑",
-      summary: "身体移动与旧版同条件对照通过；同屏预览可用，配套联网和手感待验。",
+      summary: "新版枪口与身体移动已配套交付，跨机短验54/0；打开原试玩入口体验手感。",
       details: "10x身体候选已在项目4.7.2复验。原夹具抖动最长停顿16.7→0ms、平均等效落后66.1→79.9ms，稳定不变，250ms断流不变；另一套235px/s夹具额外落后17.26ms。最近六个推进快照决定50–100ms过渡，不是端到端延迟上限。死亡/复活、换局、传送、旧/重复包均有检查，独立5/7帧到包探针14/0。PreviewMovement固定旧提交与当前新版同屏，TAB切stable/jitter/outage，Space/B切强调。5x已交Linux同补丁191/0、12组、9/9、94/0，四项各一次通过；报告与17项证据校验和已核对，此任务结束，不重跑旧协调小试验；Astra整合与交付，用户只做短体验反馈。",
       files: ["examples/shooter/game.gd", "examples/framework/client.gd", "tests/run_movement_presentation.gd", "tests/run_movement_comparison.gd", "tests/run_movement_frame_timing.gd", "PreviewMovement.cmd", "tools/movement_preview.ps1", "tests/support/movement_probe.gd"],
       docs: ["docs/17_framework_shooter_plan.md#movement-integration-result", "docs/25_shooter_room_rules.md#movement-candidate-result"],
-      evidence: "Windows 4.7.2移动191/0、12组比较、帧时序14/0、夹具9/0，枪口94/0、射击83/0、诊断30/0、反馈8/0；真实预览按键8/0、截图可读。双客户端与测试驱动失败/补验见docs/17；尚无新版真人手感结论" },
+      evidence: "Windows 4.7.2移动191/0、12组比较、帧时序14/0、夹具9/0，枪口94/0、射击83/0、诊断30/0、反馈8/0；真实预览按键8/0、截图可读。Windows导出双客户端34/0，真实Windows客户端连接Linux新包短闭环54/0；原账号配置经SEALED升级保留，入口替身57/0与实际Check/Start通过。PlayLinuxPackage沿用，新版真人/公网手感待反馈" },
     { id: "game-turns", area: "game", phase: 0, status: "verified",
       title: "取石子示例（当前第二玩法）",
       summary: "回合制取石子，和射击共用账号与资产服务，可买玉石主题。",

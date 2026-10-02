@@ -11,7 +11,7 @@
 
 | 用途 | 本机目录 | 分支与核查时提交 | 当前边界 |
 |---|---|---|---|
-| 日常开发、最终整合 | `F:\文档\GodotGame\Net\RoomKit` | `main / 4e49aa1`（核查时） | 当前已接收诊断与本地枪口方案；配套目录待更新 |
+| 日常开发、最终整合 | `F:\文档\GodotGame\Net\RoomKit` | `main / 4e49aa1`（核查时） | 当前诊断、枪口与身体方案已交付；最新试玩入口见下文结果 |
 | 本地枪口候选 | `C:\Users\赵江\.codex\worktrees\aim-smoothing-local\RoomKit` | `codex/aim-smoothing-local / 5009f7d` | 实现已接收主线；独立比较入口保留 |
 | dot 枪口候选及复核 | `C:\Users\赵江\.codex\worktrees\aim-smoothing-dot-review\RoomKit` | `codex/aim-smoothing-dot / 5e9ffc6` | 保留为另一候选，未接收主线 |
 
@@ -19,7 +19,7 @@
 
 候选实施入口分别为 [本地实现 d61f513](https://github.com/SchreiberChiang/godot-network-/commit/d61f513c4d96191fd82395224c12f3152a8576c5) 和 [dot 导入 5f7eaca](https://github.com/SchreiberChiang/godot-network-/commit/5f7eaca48f0ceaceb73c4620cfe22fbbea312631)；共同预览与复核分别为 `7a020ca`、`542ffcc`。本地枪口专项 94/0；dot 在 Windows 独立复跑枪口专项 59/0，相关射击/诊断/反馈均通过；共同真实渲染预览已核查。证据仍在各自目录的 `logs/aim-trial/`、`logs/aim-compare/` 与 `logs/dot-review/`。此处候选渲染证据沿用此前复验，本轮未重跑候选渲染或验收真人手感，也不判定速度胜负；新主线的隔离规则测试见下一节。
 
-**本地方案已选择接收，尚未部署，身体移动卡顿仍未修复。** 已有试玩包版本记录为 `427e6a0cf8a8`；笔记本已按用户要求正常停止，见本轮记录。Git 同步只涉及受控源码，不会自动替换 Linux 实例、Client.exe 或忽略目录里的账号/配置。工作区干净也不表示 `data/`、`artifacts/`、`logs/` 可以删除。
+**此前核查时本地方案刚接收、旧服务已停止；现在诊断、枪口与身体改进均已配套交付，见下方整合结果。** 原试玩包版本记录 `427e6a0cf8a8` 保留作历史。Git 同步只涉及受控源码，不会自动替换 Linux 实例、Client.exe 或忽略目录里的账号/配置。工作区干净也不表示 `data/`、`artifacts/`、`logs/` 可以删除。
 
 <a id="active-execution-board"></a>
 ### 当前执行安排：完成一套可试玩的新版本
@@ -76,7 +76,23 @@
 
 **Linux 报告已收到并核对**：5x dot 于 20:13 在笔记本 Mint 22.3 / 官方 Godot 4.7.2 的 `/home/zhao/roomkit/movement-review/20261002T121047Z/source`，从固定 `fd466727` 应用相同补丁，四项各一次：移动 191/0、比较 12 组、原夹具 9/9、枪口 94/0；全部实际退出 0、stderr 空，没有重跑旧 pilot。已核对桌面报告、原始 JSON 与输出、17 项包内校验和和传输 SHA256；另经 SSH 只读计算设备上游戏脚本哈希，与候选 LF 源码 `7ffd9d17…38a05` 一致。Windows 换行形式不同，构建摘要会规范化。
 
-报告与证据已取回 `logs/movement-review-20261002/linux-report.txt`、`linux-evidence.zip`（SHA256 `929c7f9f16a7a0dd4860ab890852335a2c7dfc5ebd6ab1f656a8558336a9ba34`）。原报告宣告“结束候选逻辑复验”，该任务不再派发；下一步 Linux 交付由主线统一执行。尚未验收：新版配套部署、真实移动手感及公网体验。Linux 本次未跑 Windows 新增的 14 条帧时序探针；不把旧枪口小试验冒充移动验证，不再重跑存储全量或长耐久。
+报告与证据已取回 `logs/movement-review-20261002/linux-report.txt`、`linux-evidence.zip`（SHA256 `929c7f9f16a7a0dd4860ab890852335a2c7dfc5ebd6ab1f656a8558336a9ba34`）。原报告宣告“结束候选逻辑复验”，该任务不再派发；之后的配套交付由主线统一完成，见下一节。Linux 本次未跑 Windows 新增的 14 条帧时序探针；不把旧枪口小试验冒充移动验证，不再重跑存储全量或长耐久。
+
+#### 配套交付与原试玩实例更新（同日）
+
+从已提交 `b2320e9` 运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/prepare_deployment.ps1 -ServerPlatform Linux -NoOpen`，退出 **0**，干净交付校验 43 文件通过：`artifacts/deployments/linux-20261002122420-ad4c18f5/`，包含 Server / PlayerClient。Linux 包编号 `20261002122421-8f95e352`，射击身份 `shooter-dev-002-src-0cfea0733c65`。SSH 传输哈希与远端官方包校验通过；无安装或防火墙修改。
+
+隔离命令 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_linux_server_package.ps1 -ContextPath logs/movement-review-20261002/package-context.json`，**54/0、退出 0**。新建假账号、独立 `export-8f95e352` 实例和 LAN 28700 / UDP 28740–28755：源码客户端购买/重放与两种房间、两个真实 Windows Client.exe 注册互见/入退房、注销清理、备份只回滚之后的修改、停止重启后资产保留均通过；停止日志无运行/退出错误。没有请求 FullRound，不声称本轮覆盖五分钟结算或公网；测试实例与转发正常停止。证据 `linux-package-test.stdout/.stderr` 与私有 `data/codex-linux-package-20261002122421-8f95e352-b1837523/`。
+
+之后正式更新原试玩实例，先确认旧包停止，再依次执行新包 `UpdateRoomKit.sh prepare / verify / seal`，**均退出 0、最终 SEALED**。原包 `/home/zhao/roomkit/releases/linux-20261002054746-b5777ad3` 保留；账号、资产、配置、TLS 和备份由更新器复制并校验到新包 `/home/zhao/roomkit/releases/linux-20261002122421-8f95e352`，实例名仍为 `export-b5777ad3`。此步骤是实际保留数据的升级，不再称为“未操作真实实例”；没有重建或删除账号，Windows `data/framework/` 未参与。
+
+快捷入口原先要求实例后缀等于包号，会误拒官方升级保留的旧实例名。现仅在包文件校验及官方更新器返回精确包/实例/日志路径、`SEALED` 都通过后允许这种情况。替身测试 **57/0、退出 0**；复核发现首版替身虚构 `old_instance` 输出字段，已移除该要求，并从生产 Emit 提取真实九字段再测，避免替身与产品契约分叉。真实 `open_linux_package.ps1 -Action Check` 和 `-Action Start -NoBrowser -HoldSeconds 3` 均退出 **0**，后台 SSH 转发可用并正常关闭。
+
+沿用 **PlayLinuxPackage.cmd / StopLinuxPackage.cmd**。新玩家目录 `artifacts/linux-package-player-20261002122421-8f95e352/shooter-windows/` 由同源索引及迁移实例公开配置重新生成，自检哈希匹配；原公网地址与 TCP 28300 / UDP 28400–28431 保留。后台仍只经 SSH 的本机 28691 打开。新管理服务保持运行，游戏服务器由用户在后台启动；玩家沿用原账号，完整目录可再发给朋友。干净交付不含账号、私钥或运行数据。
+
+**当前待人工**：停走/反向/跳跃是否更顺、是否感到额外拖沓；移动时转枪和真实弹道；本机与朋友公网分开反馈。A/B 已完成，C 未验收。下一项只准备赛车范围，等本次反馈后开始双人最小闭环。
+
+本轮整合、预览与驱动三个临时工作树已通过应用归档；旧两份枪口对照目录保留。轻量失败与退出记录归并至 `logs/movement-review-20261002/`，当前交付、旧有效交付与数据迁移输入受保护，不能当作普通测试缓存删除。另已核验一个 109,659,725 字节旧测试玩家目录及 114,280,665 字节临时传输包，保存了文件哈希；两项删除命令均被工具自动策略以 `blocked by policy` 拒绝，未执行、释放 0 字节，目录/文件仍在。没有绕过拒绝，也不把它们记为已清理。
 
 ### 枪口接收与笔记本停服结果（此前检查点）
 
