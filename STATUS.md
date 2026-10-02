@@ -1,6 +1,10 @@
 # 当前状态：RoomKit（2026-10-02）
 
-**最新安排：补丢包与本地网络报告，同时统一 Windows/Linux 启动入口。** 用户报告青岛/重庆两位 Wi-Fi 玩家延迟偏高，广州两位为电信宽带；没有具体数值与同条件日志，原因未确认。N1 交 10x dot 实现客户端诊断及 `client-data/`（含升级保留）；U1 由 Linux dot 在笔记本创建本地 5x Codex 会话实现统一入口；Linux dot 云端另做单车 Blender 能力小样，不接入游戏。固定代码基准 `1a0fcc5`，详见 [任务与边界](docs/17_framework_shooter_plan.md#network-portable-next)。N1/U1/V1 目前记录为安排，未声称功能完成或外部代理已开工；主线自己的实施见下。
+**最新安排：补丢包与本地网络报告，同时统一 Windows/Linux 启动入口。** 用户报告青岛/重庆两位 Wi-Fi 玩家延迟偏高，广州两位为电信宽带；没有具体数值与同条件日志，原因未确认。N1 交 10x dot 实现客户端诊断及 `client-data/`（含升级保留）；U1 由 Linux dot 派往笔记本本地执行；云端另做单车 Blender 小样，不接入游戏。固定代码基准 `1a0fcc5`，详见 [任务与边界](docs/17_framework_shooter_plan.md#network-portable-next)。
+
+**U1 候选已取回，暂不合并。** 补丁、证据与进度文件的两端哈希一致；笔记本实际源码目录、分支和基准已核对，原始日志含一次真实 Linux 启动/状态/关闭。主线在 F 盘独立树原样复跑两套 Windows 测试，均退出 1：符号链接权限、UTF-8 JSON 读取兼容问题；另确认默认 Windows 停服会被整个 artifacts 内的无关链接阻断，需要修正。只读语法和 cmd help 通过，不代表 Windows 服务/导出包验收。任务在普通 Codex 列表里为何不可见、实际模型设置仍未核实；V1 目前仅收到用户转述的模型交付报告。详见 [候选复核](docs/17_framework_shooter_plan.md#u1-candidate-review)。
+
+**C 盘只读清理候选已细分**：明确缓存约 2.716 GiB；另有 Chrome 本机模型 2.950 GiB、Codex 安装/回退候选 2.456 GiB 待核实用途。Claude 虚拟机 10.30 GiB 不能按普通缓存删；WSL 虚拟磁盘在 D 盘（8.60 GiB）。本轮没有删除、停程序或启动 WSL。详见 [清理候选与边界](docs/17_framework_shooter_plan.md#storage-cleanup-candidates)。
 
 **主线本轮亲自实现空间体检入口 `CheckProjectSpace.cmd`**，边界检查 **14/0**，实际从 cmd 运行与 JSON 解析通过。F 盘主仓库约 **6.72 GiB**，主要为构建/日志/数据；C 盘确认的 RoomKit 范围约 **1.23 GiB**，其中六个工作树 **1.17 GiB**，与前次相同。本轮 C 可用读数 **28.93–29.13 GiB**，两次盘点的项目相关八项目录字节未变，不能把其它波动归给本项目。四个标为应用已归档的树仍物理存在；没有删除或启动服务。新重型输出继续放 F 盘。首次 cmd 检查遇到参数默认值阶段的路径解析错误，已修正后重跑；Linux 未运行。详见 [空间体检](docs/17_framework_shooter_plan.md#project-space-check)。
 

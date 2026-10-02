@@ -28,11 +28,48 @@
 
 **U1 的产品决定**：用户已选“同一启动入口，自动识别 Windows / Linux”，不是遥控目标选择页面。目标统一名为 RoomKit、统一动作/输出语义；平台只保留必要的 `.cmd`/`.sh` 轻壳，内部自动识别平台与源码/包。不能声称同一个 EXE 可跨 OS。首次启动打印真实后台地址、所用实例/数据目录；已有默认实例继续沿用，不因为换入口新建一套管理员。Windows `status` 当前不存在，应补只读适配，不能把旧元数据或端口有响应直接当进程身份已确认。不自动安装、合并数据库、开放后台或接管别人的进程。源码与包各验入口，但 Linux 本地通过不替代 Windows 验收。
 
+<a id="u1-candidate-review"></a>
+### U1 候选接收与主线独立复核（2026-10-02）
+
+已从笔记本取回 `U1-candidate.patch`、`U1-evidence.tar.gz`、`U1-progress.txt`，保存到本机忽略目录 `artifacts/dot-unified-entry-20261002/`；三文件 SHA256 与远端一致。补丁 SHA256 为 `3a30b05825808cdfe3f409355e1f881f607c721952c5bab6099fa400d6f8c557`，证据归档为 `165e6209e80c92f0dcfb305f30146745f9be929e53a72513ea35de7bd3be8109`。归档先核对条目为相对路径普通文件，再解入该目录。主线未应用候选；在 F 盘 `artifacts/worktrees/unified-entry-review/`、`codex/unified-entry-review` 独立树按原基准应用并审查。
+
+笔记本实际仓库 `~/roomkit/work/unified-entry-20261002/`、分支 `codex/unified-server-entry`、HEAD `1a0fcc5f97de6b0daa765f5e31b73552c4f18ba4` 已通过 SSH 只读核对；12 个候选文件已暂存。交付报告中的本地任务 ID 为 `01a0fcd8-255a-7178-8fa3-66afb6f03039`，主机为 `zhao-Aspire-E5-571G`。有实际文件和执行记录；不能由此断言任务一定显示在普通 Codex 会话列表，界面不可见原因及 Astra/Ultra/Fast 实际设置均未核实。提交因缺 Git 作者身份失败，补丁交付有效，不为此修改全局身份。
+
+| 检查 | 实际证据与边界 |
+|---|---|
+| 对方 Linux 验收 | 原始日志记录 47 项分派、12 项壳/状态、4 项 Windows 启动器替身，以及一次真实隔离 Linux start/status/HTTP/stop/status，均退出 0；主线核对日志，本轮未重跑 Linux 服务。 |
+| 本机 Windows 只读 | PowerShell 5.1 六个相关脚本解析无错误；`cmd.exe /d /c RoomKit.cmd help` 退出 0，没有启动服务。 |
+| 本机原样复跑 | `powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File tests/test_unified_entry.ps1` 退出 1，在创建符号链接时因需要管理员权限中断；`tests/test_unified_windows_launchers.ps1` 退出 1，UTF-8 中文 JSON 未显式指定读取编码，在 PS 5.1 上解析失败。证据在候选树 `logs/u1-review/`，不算 Windows 全部通过。 |
+| 产品问题 | `tools/run_framework.ps1` 在 stop/status/client 分支前对整个默认 `artifacts` 调用 `Assert-RoomKitTree`；任何无关历史产物/工作树内的链接都会使停服先报错，无法写停止请求，且每次停服扫描全部产物。纯内存目录夹具已复现链接拒绝；没有运行真实停服。 |
+| 未运行 | Windows 真实服务启动/停止、真实 Windows/Linux 导出包构建与运行；本轮无真实数据修改、服务重启或新部署。 |
+
+接收门槛：先把启动/构建路径校验收窄到当前动作真正操作的文件与目录，stop/status 不遍历无关构建历史，同时保留相关路径的链接拒绝；补“无关产物链接不阻断停服、相关敏感目标链接仍拒绝”的定向夹具。再修 Windows 测试的编码与链接能力检测，未支持用例明确记未运行，不要求提权凑通过。最后主线补一次隔离 Windows 服务闭环与包入口验收，再决定合并。已有 Linux 通过项不反复重跑。
+
+V1 仅收到用户转发截图：对方报告 Blender 4.3.2、1792 三角面、4 材质、约 4 米、3.2 MB 的 blend/GLB/两张预览和记录。主线尚未收到并检查模型附件，不把它记为游戏资产验收通过。
+
 ### 本机空间核对与后续约束
 
 首次空间核对时 C 盘可用 **31,072,104,448 字节（28.94 GiB）**，六个 RoomKit 工作树共 **1,257,271,125 字节（1.17 GiB）**；均 Git 干净、没有匹配的项目进程，Git 公共库在 F 盘。四个应用中已归档的树仍物理存在，共 **1.15 GiB**，因此上一轮“应用已归档”不能当作已经释放空间。主要是 `movement-integration/logs/` 里的多份测试 Client.exe，不是源代码/历史本身；两个枪口比较树约 17.65 MiB。本轮只读，未删除；证据 `logs/network-next-20261002/space-audit.json`。这仅解释已知工作树的占用，没有历史容量基线，不能解释 C 盘全部增长或保证以后不满。
 
 新独立工作目录和重型测试/构建都放 F 盘本项目的忽略目录，不再往 C 盘建立本项目新工作树；仍保留现有两份枪口对照入口。全局 Codex 配置不改。OpenAI Docs 技能核对了[官方工作树说明](https://learn.chatgpt.com/docs/environments/git-worktrees)：工作树会各自产生构建/依赖，根位置可在应用设置更改；本轮以实际目录与磁盘读数为准，不依赖归档标签判断释放。此前删除被策略拒绝的旧产物仍未删除，不绕过工具限制。
+
+<a id="storage-cleanup-candidates"></a>
+### C 盘清理候选：只读分类，未执行删除
+
+粗检时 C 盘可用约 28.62 GiB，采样间会变化。用户指定的 Claude `vm_bundles` 共 10.30 GiB，其中根虚拟磁盘约 8.48 GiB、压缩镜像约 1.20 GiB、会话盘约 516 MiB；逐文件分配大小核对与逻辑长度一致。它们是应用虚拟机/会话组成，不按普通缓存处理。WSL 唯一发行版 Ubuntu 当时为 Stopped，虚拟磁盘实际位于 `D:\WSL\ext4.vhdx`（8.60 GiB），C 盘 WSL 程序约 0.82 GiB；未启动发行版、未检查客体内可回收空间，也未压缩磁盘。
+
+| 优先级 | 候选组 | 逻辑大小 | 清理前的条件 |
+|---|---|---:|---|
+| 先处理 | Chrome 明确 Cache/Code Cache/GPUCache 与组件下载缓存 | 1.107 GiB | 退出 Chrome，包括后台进程；只清列出的缓存子目录。 |
+| 先处理 | 微信网页/游戏视图的明确缓存 | 0.782 GiB | 退出 Weixin/WeChatAppEx；保留聊天、用户目录与数据库。 |
+| 先处理 | WeGame 明确浏览器缓存子目录 | 0.605 GiB | 当时未见相关进程，但文件锁未核对；不整删 cache 父目录中的 IndexedDB。 |
+| 使用结束后 | Codex uv 与浏览器缓存 | 0.222 GiB | 当前开发正在使用相关程序，暂不清。 |
+| 继续核实 | Chrome OptGuideOnDeviceModel | 2.950 GiB | 是本机模型，功能用途未确认，移除后可能重新下载。 |
+| 继续核实 | Codex runtime-install / previous 目录 | 2.456 GiB | 名字疑似安装/回退产物，当前引用与恢复用途未核实，不能直接删。 |
+
+前四组约 2.716 GiB，是文件逻辑长度而非保证的物理释放量。Chrome 的 File System/Service Worker/站点库，微信用户数据，Codex 当前运行时、会话、插件和技能均保留。此前六个 RoomKit C 盘树仍约 1.17 GiB，四个归档标签不等于物理已清；新的候选复核树放 F 盘。粗检有不可读目录且跳过链接，系统硬链接也可能重复计数，不能把各目录粗检结果当整盘精确账单。
+
+精确候选路径与元数据仅保存在本机忽略目录 `logs/storage-audit-20261002/cleanup-candidates.json`；全盘粗检、Claude 分配大小与 WSL 路径证据也在同目录。没有读取个人数据库内容、删除文件、停止应用或修改系统设置。本记录列出候选，不把“看起来像缓存”作为删除授权。
 
 <a id="project-space-check"></a>
 ### 主线实施：只读空间体检与补充归因
