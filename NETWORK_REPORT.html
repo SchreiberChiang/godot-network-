@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>RoomKit · 离线网络报告</title>
+<link rel="stylesheet" href="docs/assets/network-report/report.css">
+<script defer src="docs/assets/network-report/core.js"></script>
+<script defer src="docs/assets/network-report/app.js"></script>
+</head>
+<body>
+<header><div class="brand">ROOMKIT <span>D1 / 本地诊断</span></div><span class="badge">完全离线 · 不上传</span></header>
+<main>
+<section class="intro"><p class="eyebrow">从「刚才卡了」找到那一刻</p><h1>网络报告</h1>
+<p>把体验与观测放在一起看。双击此页面，选择客户端的 JSONL 报告即可，无需安装或启动服务。</p></section>
+<section class="upload" aria-label="选择报告">
+<div><label for="files">选择 JSONL 文件，可多选</label><input id="files" type="file" accept=".jsonl,application/x-ndjson" multiple>
+<p>只选 client-data/reports 中的报告，不要选择整个 client-data。最多 8 个文件，每个 8 MiB。</p></div>
+<button id="clear" type="button">清空</button></section>
+<p id="status" role="status" aria-live="polite">尚未选择文件。文件仅在当前页面内存中读取，关闭或清空后不保留。</p>
+<noscript><p class="warning">需要浏览器启用 JavaScript；所有脚本均在本地。</p></noscript>
+<section id="overview" hidden><div class="section-title"><h2>文件并排摘要</h2><span>每列独立统计，不跨机器对时</span></div>
+<div id="comparison" class="table-scroll"></div><div id="file-notices"></div></section>
+<section id="explorer" hidden><div class="section-title"><h2>会话时间线</h2><label>查看会话 <select id="session"></select></label></div>
+<p id="session-info"></p>
+<div class="toolbar"><button id="previous" type="button">← 上个卡顿标记</button><label>刚才卡顿 <select id="marker"></select></label><button id="next" type="button">下个标记 →</button><button id="all" type="button">查看全程</button></div>
+<p id="selection" role="status" aria-live="polite"></p>
+<div class="charts">
+<article><h3>房间 RTT <span>ms · 往返</span></h3><canvas id="rtt-chart" width="1000" height="250" role="img" aria-label="RTT 时间图"></canvas><p id="rtt-caption" class="chart-caption"></p></article>
+<article><h3>快照未更新 / 到达间隔 <span>ms</span></h3><p class="legend"><span>━━ 未更新时长</span><span>┄┄ 到达间隔</span><span>│ 卡顿标记</span></p><canvas id="snapshot-chart" width="1000" height="250" role="img" aria-label="快照未更新时间图"></canvas><p id="snapshot-caption" class="chart-caption"></p></article>
+</div>
+<div id="focus-metrics" class="metric-grid"></div>
+<details id="sample-details"><summary>展开当前窗口的逐条观测与阶段 / 错误类别</summary><p>只展示允许字段；未采集或未成熟的指标显示「未知」。每页最多 100 条。</p><div id="sample-table" class="table-scroll"></div><div class="toolbar"><button id="rows-prev" type="button">上一页</button><span id="rows-page"></span><button id="rows-next" type="button">下一页</button></div></details>
+</section>
+<details class="help"><summary>如何理解这些数值？隐私与读取边界</summary>
+<ul><li>RTT 是 ENet 平滑后的可靠包往返时间，不是单程延迟。摘要中位数是所选文件的秒级观测中位数，至少 10 条才显示，不是逐包分位数。</li>
+<li>可靠发送丢包估计来自 ENet，必须已有成熟样本；它不是所有 UDP 丢包率，也不是下行快照丢失率。未知绝不按 0% 处理。</li>
+<li>快照「未更新」是采样时距最近一次快照的时长；「间隔」是最近两次到达之差。它们不是准确卡顿时长或缺包数量。一次每秒记录可能漏掉短尖峰。</li>
+<li>最慢帧是最近 1 秒的最大帧间隔，不是 GPU 耗时。FPS 与网络指标一起查看，不能据此认定 Wi-Fi、运营商或服务器是根因。</li>
+<li>时间轴按各会话的 monotonic_ms 独立归零。UTC 仅原样参考，不假定不同电脑的时钟同步。跨文件不自动合并会话。标记只是主观反馈时间，附近观测不代表因果。</li>
+<li>读取上限：每个文件 8 MiB、每行 64 KiB、10000 条记录、16 个会话、100000 行；最多 8 个文件。达到记录 / 行数上限停止并提示，不静默抽样。问题仅列前 100 个行号，保留总数。不展示原始坏行、未知字段或任意错误文本。</li>
+<li>只有手动选择的文件会被读取，不扫描目录，不保存到浏览器，不上传，无远程资源。保留 NETWORK_REPORT.html 与 docs/assets/network-report 的相对位置。</li></ul>
+</details>
+<footer>用于定位值得复查的时间段，不自动诊断网络根因</footer>
+</main></body></html>

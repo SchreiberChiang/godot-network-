@@ -1,0 +1,5 @@
+{"utc": "2026-10-02T12:00:00Z", "monotonic_ms": 2000, "session_id": "0123456789abcdef0123456789abcdef", "build": "n1-synthetic", "kind": "sample", "phase": "IN_ROOM", "error": "NONE", "fps": 60, "frame_max_ms": 17, "rtt_ms": 0, "rtt_sample_count": 0, "reliable_loss_percent": 0, "loss_sample_count": 0, "rtt_p95_ms": 0}
+{"utc": "2026-10-02T12:00:00Z", "monotonic_ms": 3000, "session_id": "0123456789abcdef0123456789abcdef", "build": "n1-synthetic", "kind": "sample", "phase": "IN_ROOM", "error": "NONE"}
+{"utc":"2026-10-02T12:00:00Z","monotonic_ms":4000,"session_id":"0123456789abcdef0123456789abcdef","build":"n1-synthetic","kind":"mark","phase":"IDLE","error":"NONE"}
+{"utc": "2026-10-02T12:00:00Z", "monotonic_ms": 5000, "session_id": "0123456789abcdef0123456789abcdef", "build": "n1-synthetic", "kind": "sample", "phase": "CLOSED", "error": "NONE"}
+{"utc": "2026-10-02T12:00:00Z", "monotonic_ms": 1000, "session_id": "fedcba9876543210fedcba9876543210", "build": "n1-synthetic", "kind": "sample", "phase": "IN_ROOM", "error": "NONE", "fps": 58, "frame_max_ms": 21}

@@ -1,0 +1,6 @@
+{"utc": "2026-10-02T12:00:00Z", "monotonic_ms": 5000, "session_id": "0123456789abcdef0123456789abcdef", "build": "<script>globalThis.pwned=1</script>", "kind": "sample", "phase": "<img onerror=alert(1)>", "error": "SYNTHETIC_SECRET_DO_NOT_RENDER", "fps": 59, "frame_max_ms": 20, "unknown_secret": "SYNTHETIC_SECRET_DO_NOT_RENDER", "payload": "<img src=\"https://invalid.example/leak\" onerror=\"globalThis.pwned=1\">"}
+{broken json
+{"kind": "unknown", "secret": "SYNTHETIC_SECRET_DO_NOT_RENDER"}
+{"utc": "2026-10-02T12:00:00Z", "monotonic_ms": 6000, "session_id": "0123456789abcdef0123456789abcdef", "build": "n1-synthetic", "kind": "sample", "phase": "IN_ROOM", "error": "NONE", "fps": "SYNTHETIC_SECRET_DO_NOT_RENDER", "rtt_sample_count": 3, "rtt_ms": -1}
+{"utc": "2026-10-02T12:00:00Z", "monotonic_ms": 5500, "session_id": "0123456789abcdef0123456789abcdef", "build": "n1-synthetic", "kind": "sample", "phase": "IN_ROOM", "error": "NONE", "fps": 30}
+{"utc":"2026-10-02T12:00:00Z","monotonic_ms":7000,"session_id":"0123456789abcdef0123456789abcdef","build":"n1-synthetic","kind":"mark","phase":"IDLE","error":"NONE"}
