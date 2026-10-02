@@ -3,7 +3,7 @@
 <a id="worktree-mainline-20261002"></a>
 ## 当前主线、候选目录与分工（2026-10-02 核查）
 
-**日常只使用 `F:\文档\GodotGame\Net\RoomKit`，它是主线工作目录。** 当前安排以本节和 STATUS 为准；下面按日期保留的旧分工不作为任务指令。GitHub 默认分支已核实为 `main`，核查时本地 `main`、`origin/main` 和 GitHub 主线均为 `4e49aa1f6845bba010a17c7a8d9e896767356011`，三份工作目录都干净。本次只统一文档与路线图，不合并候选、不清理分支、不更新运行服务。
+**日常只使用 `F:\文档\GodotGame\Net\RoomKit`，它是主线工作目录。** 当前安排以本节和 STATUS 为准；下面按日期保留的旧分工不作为任务指令。GitHub 默认分支已核实为 `main`；整理前本地与远端主线同为 `4e49aa1f6845bba010a17c7a8d9e896767356011`，三份工作目录都干净，整理记录已提交为 `778a0f8`。随后用户同意继续，主线仅接收本地枪口实现与专项，不整串合并候选规划。目录表保存核查快照，当前功能结果见下文。
 
 ### 三份工作目录分别是什么
 
@@ -11,15 +11,23 @@
 
 | 用途 | 本机目录 | 分支与核查时提交 | 当前边界 |
 |---|---|---|---|
-| 日常开发、最终整合 | `F:\文档\GodotGame\Net\RoomKit` | `main / 4e49aa1` | 已有客户端诊断；尚未包含枪口候选 |
-| 本地枪口候选 | `C:\Users\赵江\.codex\worktrees\aim-smoothing-local\RoomKit` | `codex/aim-smoothing-local / 5009f7d` | 独立实现、共同离线预览与复核记录；待选择 |
-| dot 枪口候选及复核 | `C:\Users\赵江\.codex\worktrees\aim-smoothing-dot-review\RoomKit` | `codex/aim-smoothing-dot / 5e9ffc6` | 导入 dot 补丁、同机复验与共同离线预览；待选择 |
+| 日常开发、最终整合 | `F:\文档\GodotGame\Net\RoomKit` | `main / 4e49aa1`（核查时） | 当前已接收诊断与本地枪口方案；配套目录待更新 |
+| 本地枪口候选 | `C:\Users\赵江\.codex\worktrees\aim-smoothing-local\RoomKit` | `codex/aim-smoothing-local / 5009f7d` | 实现已接收主线；独立比较入口保留 |
+| dot 枪口候选及复核 | `C:\Users\赵江\.codex\worktrees\aim-smoothing-dot-review\RoomKit` | `codex/aim-smoothing-dot / 5e9ffc6` | 保留为另一候选，未接收主线 |
 
-两个候选都已推送到各自远端分支，不在 GitHub `main` 中。两份工作目录内的 `CompareAim.cmd` 提供相同场景，鼠标转枪、TAB 切旧/新、ESC 退出；它们是离线预览，不连接账号或房间。`F:\文档\roomkit-aim-smoothing-candidate` 是用户提供的补丁/报告目录，不是第四个 Git 工作树。
+两个候选都已推送到各自远端分支；本轮从本地候选定向接收代码与测试，两个候选分支本身均未整串合并。两份工作目录内的 `CompareAim.cmd` 提供相同场景，鼠标转枪、TAB 切旧/新、ESC 退出；它们是离线预览，不连接账号或房间。`F:\文档\roomkit-aim-smoothing-candidate` 是用户提供的补丁/报告目录，不是第四个 Git 工作树。
 
-候选实施入口分别为 [本地实现 d61f513](https://github.com/SchreiberChiang/godot-network-/commit/d61f513c4d96191fd82395224c12f3152a8576c5) 和 [dot 导入 5f7eaca](https://github.com/SchreiberChiang/godot-network-/commit/5f7eaca48f0ceaceb73c4620cfe22fbbea312631)；共同预览与复核分别为 `7a020ca`、`542ffcc`。本地枪口专项 94/0；dot 在 Windows 独立复跑枪口专项 59/0，相关射击/诊断/反馈均通过；共同真实渲染预览已核查。证据仍在各自目录的 `logs/aim-trial/`、`logs/aim-compare/` 与 `logs/dot-review/`。这些沿用此前复验，本次没有重跑 Godot，也不据此宣布真人手感通过或速度胜负。
+候选实施入口分别为 [本地实现 d61f513](https://github.com/SchreiberChiang/godot-network-/commit/d61f513c4d96191fd82395224c12f3152a8576c5) 和 [dot 导入 5f7eaca](https://github.com/SchreiberChiang/godot-network-/commit/5f7eaca48f0ceaceb73c4620cfe22fbbea312631)；共同预览与复核分别为 `7a020ca`、`542ffcc`。本地枪口专项 94/0；dot 在 Windows 独立复跑枪口专项 59/0，相关射击/诊断/反馈均通过；共同真实渲染预览已核查。证据仍在各自目录的 `logs/aim-trial/`、`logs/aim-compare/` 与 `logs/dot-review/`。此处候选渲染证据沿用此前复验，本轮未重跑候选渲染或验收真人手感，也不判定速度胜负；新主线的隔离规则测试见下一节。
 
-**两份均未选择、合并或部署，身体移动卡顿仍未修复。** 已有试玩包版本记录为 `427e6a0cf8a8`；本次未连接 Linux 核查运行状态。Git 同步只涉及受控源码，不会自动替换 Linux 实例、Client.exe 或忽略目录里的账号/配置。工作区干净也不表示 `data/`、`artifacts/`、`logs/` 可以删除。
+**本地方案已选择接收，尚未部署，身体移动卡顿仍未修复。** 已有试玩包版本记录为 `427e6a0cf8a8`；笔记本已按用户要求正常停止，见本轮记录。Git 同步只涉及受控源码，不会自动替换 Linux 实例、Client.exe 或忽略目录里的账号/配置。工作区干净也不表示 `data/`、`artifacts/`、`logs/` 可以删除。
+
+### 枪口接收与笔记本停服结果
+
+选择本地方案的依据是呈现边界更完整：失焦、背包/账号弹窗、busy 和离房不沿用本机覆盖；同 tick 生命周期、死亡次数变化、换局与瞬移均复位。仅从 `d61f513` 接收 `examples/framework/client.gd`、`examples/shooter/game.gd`、`tests/run_aim_presentation.gd`、`tests/run_aim_preview.gd` 与 `PreviewAim.cmd`。主线独立隔离验证 **94/0、83/0、30/0、8/0**，实际退出均 0、stderr 空；四脚本只解析通过。没有改服务器判定、协议、移动或输入频率。自己的显示枪口仍可能领先服务器确认方向，实际弹道保持服务器结果，见 [机制与边界](25_shooter_room_rules.md#aim-presentation-mainline)。
+
+根目录 `PreviewAim.cmd` 是当前主线的离线入口，不需要在两个工作树之间来回找。配套导出与真人联网尚未更新；先用此入口看枪口，人物移动另做。首次射击规则驱动因没有提供服务类隔离参数被拒，未启动引擎；补齐四个隔离参数后 83/0。摘要与命令保存在 `logs/aim-mainline-20261002/`，实际输出在 `data/test-aim-mainline-*-20261002/`；Windows 六个共享数据/配置文件哈希与时间不变。本轮未重跑真实渲染或联机。
+
+用户要求停止笔记本之前的服务：项目停止入口返回 `ROOMKIT_STOPPED instance=export-b5777ad3`、退出 0；随后 SSH 只读核查 RoomKit 引擎/存储进程为 0，相关后台、大厅、控制与房间端口无监听，未清数据或关机。停止证据 `logs/aim-mainline-20261002/linux-stop.json`。
 
 ### 旧分支是否还有遗漏功能
 
@@ -46,7 +54,18 @@ GitHub 当前有五个分支：`main`、两个枪口候选，以及历史 `codex
 
 用户补充 dot 可协调自己的云端电脑与所在的用户本地电脑；这里按该信息规划，笔记本上的实际控制与任务分配方式尚未验收。这是四个工作位置，不自动等于四个同时独立运行的代理。5x 只再使用 30 个百分点、保留 30%；dot 自身是否计入同一周额度未核实。Windows 与 Linux 的账号登录分别维护，不为并行任务来回切台式机账号。
 
-下一步先选择一份枪口候选，再由主线整理接收；人物移动与独立验收分别从固定功能基准 `4e49aa1` 的新分支/目录开始，不从枪口候选分支继续叠加。若先派发人物移动，仍明确主线由本机唯一整合，枪口候选另择其一。笔记本实验使用独立目录，保护当前游戏服务、账号数据、共享工具及实验目录；需要安装或改系统时另定范围。
+枪口已接收；下一步先做笔记本的小型协调实验，再派发人物移动与独立验收。旧移动任务单尚未发出，正式派发时统一更新为整合后的固定主线提交，分别建立新分支/目录，不从两份历史候选目录继续叠加。笔记本实验保护账号数据、共享工具与实验目录；需要安装或改系统时另定范围。
+
+<a id="dot-linux-control-pilot"></a>
+### 给 dot 的 Linux 本地协调小试验（已备任务，未执行）
+
+目标是验证 dot 能否实际协调自己的云端电脑和用户 Linux 笔记本，不以安装 Codex 为前提。先报告真正可用的本地连接工具与笔记本 hostname、系统和 Godot 版本；没有本地控制能力就记录未运行，不能用云端结果代替。
+
+两端分别用全新的源码目录，固定为本轮整合后的同一个完整提交 SHA。Linux 只写 `~/roomkit/dot-control-pilot/<运行号>/`；Godot 先核实 `~/roomkit/tools/godot/4.7.2-stable/` 内实际程序。依赖缺失就报告；下载源码受阻时可以通过已验证的本地通道传源码快照，核对提交/文件清单。两端 HOME/XDG/tmp 指向各自试验目录，避免共享用户缓存。
+
+只在每端各运行一次 `tests/run_aim_presentation.gd` 和 `tests/run_shooter.gd`，共四次执行。它们做呈现与规则/脚本加载检查，不启动 Operator 或托管宿主。保存绝对目录、完整 SHA、实际命令、开始/结束时间、真实退出码与完整输出；分别列通过、失败、未运行。不得启动服务、sudo、安装依赖、修改共享引擎、访问 `experiments/`、自行修复或反复重跑。实验输出按每用途最多保留最后两份，测试源码不删。
+
+只有笔记本实际操作证据和两端相同提交可核实，才算协调实验完成；规则/呈现通过不等于真人听感、画面、联网或部署通过。任务单将固定本轮推送后的完整 SHA，可直接转交；当前没有向 dot 发送任务或操作笔记本实验目录。
 
 后续当前事实只维护主线 STATUS、本节与根目录 ROADMAP 数据。候选分支里的多次账号规划是当时记录，不再分别追加同步，也不整串合并其规划提交来更新主线。
 

@@ -183,6 +183,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_isolated_test.ps
 
 以 `CLIENT_NETWORK_STATS_RESULT passed=... failed=0`、实际退出 0 和无脚本错误为准；检查未知 RTT、真实 ENet 统计、严格状态推进、单调帧间停顿和字体布局。该结果不代表公网延迟、真人流畅度或卡顿修复。新增指标的定义与配套更新限制见 [客户端诊断](25_shooter_room_rules.md#client-diagnostics)。
 
+枪口呈现专项：
+
+```powershell
+$aimRun = Join-Path (Get-Location).Path ('data/test-aim-' + [Guid]::NewGuid().ToString('N'))
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run_isolated_test.ps1 -Script tests/run_aim_presentation.gd -Isolation $aimRun -Log (Join-Path $aimRun 'result')
+```
+
+以 `AIM_PRESENTATION_RESULT cases=15 passed=94 failed=0`、真实退出 0 和无脚本错误为准。覆盖自己的逐帧方向、其他玩家角度插值、±π 边界、过期/重复状态、同 tick 生命周期和死亡复活，不开房或登录。想直接看离线效果，双击根目录 `PreviewAim.cmd`；TAB 切旧/新、ESC 退出。显示/射击方向的边界见 [枪口呈现](25_shooter_room_rules.md#aim-presentation-mainline)。
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode unit
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\run.ps1 -Mode accounts

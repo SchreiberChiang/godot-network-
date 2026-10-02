@@ -6,7 +6,7 @@
 
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
-**分支和本地目录看这里：[主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)。** 日常仍用此项目根目录；两个转枪候选在独立目录，已推送各自分支，尚未合并到主线。
+**分支和本地目录看这里：[主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)。** 日常仍用此项目根目录；主线已接收本地转枪方案，两个历史候选目录继续保留供对照。双击根目录 **PreviewAim.cmd** 可离线看旧/新转枪（TAB 切换、ESC 退出），配套联网试玩目录尚未更新。
 
 配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环。[朋友公网试玩](docs/17_framework_shooter_plan.md#friends-public-preparation) 已收到人工通过反馈；先补客户端诊断定位卡顿，再安排赛车接入。
 
