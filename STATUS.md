@@ -2,7 +2,9 @@
 
 **统一服务器入口 U1 已完成独立验收并接入主线。** Windows 源码与真实导出包管理服务闭环各 **11/0**；Linux 笔记本新导出包完整性、启动、HTTP、状态、停止通过。新增 `RoomKit.cmd` / `RoomKit.sh`，原试玩入口和正在运行的服务器保持不变。主线修复了无关历史目录阻断停服、Windows 包启动命令不返回两处问题；初次失败记录保留。详见 [用法](docs/22_framework_operations.md#unified-entry) 与 [验收](docs/17_framework_shooter_plan.md#u1-mainline-acceptance)。
 
-**N1 已收到，尚未合并。** 用户已手动放入网络诊断/本地数据候选包；110 份清单文件的 SHA256 全部匹配，已在 F 盘独立树审查。正在补 Windows 验收及旧回执迁移边界；对方通过数字不是主线复验结果。V1 单车模型仍只有转述报告，未取得附件。C 盘/WSL 清理按用户要求暂停。
+**N1 网络诊断与本地数据已接入主线，等待换包试玩。** 源码提交 `72aa906`：丢包估计/RTT波动/收发、`client-data` 本地报告、设置和升级保留。Windows 独立复验：指标 60/0+30/0，日志 78/0，真实只读权限 5/0，回执 28/0，升级 117/0（含 NTFS 文件锁），保留 38/0，音效 41/0，生成器→客户端迁移 8/0；真实双客户端入退房、日志与活跃拒绝 **40/0**。主线补了严格回执读取、测试 UTF-8 与详情不透明背景，实际渲染 12/0、截图已看。详见 [结果与限制](docs/17_framework_shooter_plan.md#n1-mainline-acceptance)。
+
+**新同源目录已准备但未部署**：`artifacts/deployments/network-20261002/`，Linux 服务端与 Windows 玩家版本 `56f4b235deea`，45 文件校验、配对/拒绝 18/0、最终 Client.exe 初始化通过；旧 Linux 服务、现用玩家目录及 PlayLinuxPackage 目标未变。下一步按正式更新流程保留账号换包，再请朋友用新客户端采集日志。V1 模型仍待实际附件。C 盘/WSL 清理暂停；仅本轮 F 盘重复测试二进制清掉约 313.45 MiB，清单和失败记录保留。
 
 **C 盘只读清理候选已细分**：明确缓存约 2.716 GiB；另有 Chrome 本机模型 2.950 GiB、Codex 安装/回退候选 2.456 GiB 待核实用途。Claude 虚拟机 10.30 GiB 不能按普通缓存删；WSL 虚拟磁盘在 D 盘（8.60 GiB）。本轮没有删除、停程序或启动 WSL。详见 [清理候选与边界](docs/17_framework_shooter_plan.md#storage-cleanup-candidates)。
 

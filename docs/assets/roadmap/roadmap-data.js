@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "U1统一入口已接入：Windows源码/包各11项闭环，Linux新包真实启停通过；原试玩服务未替换。N1丢包与client-data候选已收到，110项哈希一致，正在补迁移边界和Windows验收。V1模型待附件，空间清理暂停。",
+  baseline: "U1统一入口已接入并推送，Windows与Linux入口隔离验收通过。N1网络诊断/client-data已接入，Windows真实双客户端40/0；最终同源Linux服务器与Windows玩家56f4b235deea已生成，等待隔离跨机短验与正式换包。V1待附件，C盘/WSL清理暂停。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -251,13 +251,13 @@ window.ROADMAP_DATA = {
       files: ["sdk/roomkit/client/room_client.gd", "examples/framework/view.gd", "examples/shooter/game.gd", "tests/run_client_network_stats.gd"],
       docs: ["docs/25_shooter_room_rules.md#client-diagnostics", "docs/17_framework_shooter_plan.md#friends-public-preparation"],
       evidence: "诊断30/0、真实OpenGL专项/截图31/0、射击83/0、反馈8/0，退出0且stderr空；没有测量真人公网延迟，不宣称卡顿已修复" },
-    { id: "client-network-journal", area: "game", phase: 7, status: "pending",
+    { id: "client-network-journal", area: "game", phase: 7, status: "implemented",
       title: "丢包显示与客户端本地报告",
       summary: "让高延迟玩家能交出可比较的日志，设置与运行数据留在客户端目录。",
-      details: "N1交10x dot独立实现：可靠发送丢包估计、RTT波动、ENet收发与现有帧/快照时序分开显示，无样本显示未知。client-data有界日志不含密码令牌，生成新客户端时保留数据、失败完整回退，分发干净目录排除运行数据。青岛Wi-Fi和重庆电信Wi-Fi高延迟仅为用户反馈，另有广州电信宽带玩家；没有数值和同条件记录，原因未明。",
+      details: "已接收10x dot候选并补严格回执、PS5.1编码和详情背景。可靠发送丢包估计不等于所有UDP/下行损失；RTT波动/收发/帧和快照时序分开，无样本不显示实测0。设置、脱敏日志和待确认操作保存在旁边client-data，升级保留；只分享reports。Windows复验完成，新同源目录未切换现用服务，需下一步隔离跨机短验与正式换包。青岛/重庆/广州差异仍需采样，不能凭地区或Wi-Fi断定原因。",
       files: ["sdk/roomkit/client/room_client.gd", "examples/framework/client.gd", "examples/framework/view.gd", "tools/prepare_player_client.ps1"],
-      docs: ["docs/17_framework_shooter_plan.md#network-portable-next", "docs/25_shooter_room_rules.md#client-diagnostics"],
-      evidence: "N1候选已收到，110项文件哈希一致；F盘独立树复验中，旧回执未知/重复字段需补强，未合并或替换玩家目录" },
+      docs: ["docs/17_framework_shooter_plan.md#n1-mainline-acceptance", "docs/25_shooter_room_rules.md#client-diagnostics"],
+      evidence: "Windows指标60/0+30/0、日志78/0、实际只读5/0、升级117/0含真实文件锁、回执28/0(原代码15/13)、迁移串联8/0、保留38/0、音效41/0、真实双客户端40/0；背景补修后真实渲染12/0，最终导出/配对18/0/初始化通过。公网受控丢包及最终新包跨机待验" },
     { id: "unified-server-entry", area: "deliver", phase: 7, status: "verified",
       title: "Windows / Linux 统一服务器入口",
       summary: "RoomKit.cmd / RoomKit.sh 统一动作，自动识别本机系统与源码/包。",
