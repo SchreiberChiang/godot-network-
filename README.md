@@ -6,7 +6,7 @@
 
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
-配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环；[接下来](docs/17_framework_shooter_plan.md#forward-route-20261002) 是朋友试玩，再做赛车接入。
+配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环。[朋友公网试玩](docs/17_framework_shooter_plan.md#friends-public-preparation) 的新实例、配套玩家目录和远程入口已准备；外部玩家连接尚待验收，随后再做赛车接入。
 
 ## 准备服务器和玩家目录
 
@@ -70,7 +70,7 @@ bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 
 ## 独立 Linux 服务器目录（无需 Godot 编辑器）
 
-此前独立包试玩入口 **`PlayLinuxPackage.cmd` / `StopLinuxPackage.cmd`** 保留为历史快捷方式（面板 28691）。旧实例的当前账号和 TLS 配置已清除，旧登录说明与客户端连接配置不能直接复用；须重新初始化并准备匹配的公开配置后再试玩。这两个入口不指向本轮 29191 短验实例，也不是任意服务器的部署工具；Git 克隆不包含本机清单、程序或密码。历史三步说明见 [独立包试玩](docs/17_framework_shooter_plan.md#linux-package-playtest)。
+本机朋友试玩入口 **`PlayLinuxPackage.cmd` / `StopLinuxPackage.cmd`** 已指向阶段 6 的配套服务器新实例，后台通过 SSH 打开 <http://127.0.0.1:28691/>。首次自行设置管理员、启动游戏服务器并创建邀请码；朋友收到完整玩家目录后双击 `Client.exe`。路由器转发 TCP **28300**、UDP **28400–28431** 到笔记本 `192.168.10.105`，Linux 防火墙也需放行；不转发后台或控制端口。玩家目录、三步说明与未验收项见 [朋友试玩准备](docs/17_framework_shooter_plan.md#friends-public-preparation)。旧实例不复用；Git 克隆不包含本机清单、程序、连接配置或密码。
 
 Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；引擎已包含，缺少 pwsh 时用随包 `PrepareEnvironment.sh prepare`，不再下载 Godot 编辑器。系统库仍单独检查。当前目录及实测范围见 [阶段 6](docs/17_framework_shooter_plan.md#stage6-result)。
 

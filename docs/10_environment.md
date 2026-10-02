@@ -8,6 +8,7 @@
 | 项目 | 当前记录与证据边界 |
 |---|---|
 | 设备 | zhao@192.168.10.105；Mint 22.3、x86_64、i5-5200U（2 核 4 线程）、7.7 GB RAM；IP/负载/空闲磁盘需运行前复查 |
+| 朋友公网试玩准备（10-02） | 新导出目录 `~/roomkit/releases/linux-20261002054746-b5777ad3/`，实例 `export-b5777ad3`；使用现有官方 pwsh 7.6.6，未安装新工具。后台仅回环 28691/SSH，大厅 TCP 28300、房间 UDP 28400–28431，双绑定 0.0.0.0、对外 IPv4 在忽略配置。新实例网络、700/600 权限、公开配置与 SSH 后台入口已核对，正常停止后自有残留为 0。未设置管理员；用户反馈路由器已设置，Linux 防火墙放行已授权、待本人输入 sudo 密码，公网朋友未验收。见 [准备结果](17_framework_shooter_plan.md#friends-public-preparation) |
 | 阶段 6 依赖与业务（10-02） | 运行源码 ef0aeb4。WSL2 在 `~/roomkit/stage6/source-ef0aeb4/` 实际离线准备项目内 Godot 4.7.2/pwsh 7.6.6，真实 SQLite 授权 50/0、源码短验 29/0；Mint `~/roomkit/stage6/server-ef0aeb4/` 使用随包引擎并准备项目内 pwsh，导出服务器短验 29/0。两处只绑回环、使用新假数据，均已正常停止；空 HOME 验证不借旧工具发现路径，但系统库已经具备，不等于全新 OS 安装通过 |
 | 项目内工具选择 | 显式 ROOMKIT_GODOT/ROOMKIT_PWSH → 本项目 `artifacts/environment/tools` → 原 `~/roomkit/tools`。prepare 只安装缺少且哈希匹配的官方包，不升级/覆盖共享工具、不装系统包；源码/导出包依赖不同，详见 [阶段结果](17_framework_shooter_plan.md#stage6-result) |
 | 本轮证据/传输 | 笔记本 `~/roomkit/stage6/proof-mint-b47aa6e4/`；WSL `proof-wsl-b47aa6e4/` 为首次驱动拒绝，`proof-wsl-r2-b47aa6e4/` 为成功短验。轻量证据已取回本机 logs/stage6-20261002-b47aa6e4；临时归档暂留，每类一份，清理阻断见专题，不删除原下载包 |
