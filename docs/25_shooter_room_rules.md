@@ -137,3 +137,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_room_rules.ps1
 - 契约与示例：`schemas/{room_rules.schema.json,game_manifest.schema.json,admin_request.schema.json,shooter_config.schema.json,shooter_state.schema.json}`、`examples/managed_messages.example.json`。
 - 验证：`tests/{test_registry_ports.gd,test_shooter.gd,run_shooter.gd,run_shooter_visual.gd,run_managed_contracts.gd,test_admin_room_rules.cjs,test_room_rules.ps1}`。
 - 文档：本文件、`STATUS.md`、`docs/{07_versions_decisions.md,21_managed_protocol.md,22_framework_operations.md,23_branch_files.md}`。前面轮次的未提交修改保持保留。
+
+<a id="aim-comparison-review"></a>
+## 两版候选的本机复核（2026-10-02）
+
+基准均为 `4e49aa1`；主线、真实服务和现有玩家目录不变。dot 原补丁 SHA256 为 `5597e38c72f5c95275bfbde526c01eec25dbd80b90e475d788b5b20c6bc37533`，原始应用 tree 为 `bd96ebcb13fc7298801c21cef5f93c74053dfdfc`（原样导入提交 `5f7eaca`）。65 个清单文件哈希一致。没有将复核入口的改动混入原补丁身份。
+
+Codex 在本机独立跑 dot 的瞄准 59/0、射击 83/0、诊断 30/0、反馈 8/0，实际退出均 0，stderr 空。没有重跑 dot 云端的完整业务套件；云端结果与本机结果分别记录。
+
+两份工作树增加同一份 `tests/run_aim_compare_preview.gd` 与 `CompareAim.cmd`，只兼容候选的不同呈现接口，不改候选实现。固定人物位置、20 Hz 合成快照，左侧鼠标瞄准、右侧合成转向；TAB 切换旧呈现/本候选，ESC 退出。它覆盖游戏绘制路径，不比较生产客户端的弹窗/焦点策略，不连接网络、不读取账号。
+
+同一台 Windows、同一 Godot 4.7.2 真实 OpenGL 渲染，各约 2.5 秒：Codex 298 帧/298 次方向变化，dot 297 帧/296 次变化，退出均 0、stderr 空，截图已查看。帧数差不作为性能排名；这不是公网、导出包或真人手感验收。轻量证据与截图在 dot 复核工作树的 `logs/aim-compare/`、`logs/dot-review/`。
+
+两版核心做法相同：本地逐帧瞄准、远端 50 ms 最短角度过渡、权威射击不变。防护和输入状态处理有差别，目前没有复核出必须退回的缺陷。dot 对快速转向的显示/权威射击时序偏差测量保留；既有位置缓冲与人物移动卡顿都未解决。
+
+本地候选此前记录约 24 分钟交付，含多代理实现与复核，不能代表单个模型速度。dot 未提供可核对的任务起止时间，无法评定速度胜负；断言数量也不作为质量排名。等待用户比较两份入口的手感，再选方案合并与生成同版服务器/客户端。本机受保护的 6 个真实文件哈希与修改时间保持不变；没有 dot 工作树残留引擎进程。
