@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "新版枪口/移动已交付，跨机短验54/0、真人反馈仍少。当前分工：10x dot补丢包与client-data；Linux dot派本地5x Codex做自动识别系统的统一入口，云端另做Blender单车小样。任务已安排不等于开工或通过，代码基准1a0fcc5；本会话统一整合与配套更新。C盘树实占1.17GiB、可用28.94GiB，新重型工作放F盘。详情见docs/17最新任务",
+  baseline: "新版枪口/移动已交付，跨机短验54/0、真人反馈仍少。10x dot补丢包与client-data；Linux dot派本地5x Codex做统一入口，云端另做Blender单车小样，均以实际任务回报为准。主线亲自完成只读空间体检14/0并负责后续整合交付：F盘项目6.72GiB，已确认C盘RoomKit范围1.23GiB，不等于C盘全部占用。5x后续核实Astra/Ultra/Fast并合理分派。详情见docs/17最新任务",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -35,6 +35,13 @@ window.ROADMAP_DATA = {
     { id: 9, label: "以后 / 未排期", hint: "已记录边界，未安排阶段" }
   ],
   nodes: [
+    { id: "project-space-check", area: "ops", phase: 7, status: "verified",
+      title: "只读项目空间体检",
+      summary: "双击 CheckProjectSpace.cmd，查看项目、工作树、RoomKit 用户目录及磁盘余量。",
+      details: "主线亲自实现，读取文件元数据和本仓库Git登记，不删除、不启动服务、不跟链接；字节是逻辑长度，不是物理分配或清理许可。首轮cmd参数默认路径失败已修，实际扫描和JSON通过；14项边界检查通过，Linux未验。盘点F项目6.72GiB、确认C范围1.23GiB；Codex共享数据不能全归项目。新重型输出留在F盘。",
+      files: ["CheckProjectSpace.cmd", "tools/project_space.ps1", "tests/test_project_space.ps1"],
+      docs: ["docs/17_framework_shooter_plan.md#project-space-check"],
+      evidence: "Windows 14/0、实际cmd退出0；六树1.17GiB与前次相同，四个归档标签尚未释放目录；本轮未删除" },
     { id: "small-group-stability", area: "account", phase: 5, status: "pending",
       title: "2–8 人突发登录与会话稳定性",
       summary: "Windows 全员登录与清理通过，Mint/WSL2基础双客户端通过；Linux更多并发待补。",
@@ -254,7 +261,7 @@ window.ROADMAP_DATA = {
     { id: "unified-server-entry", area: "deliver", phase: 7, status: "planned",
       title: "Windows / Linux 统一服务器入口",
       summary: "同名启动功能，自动识别本机系统与源码/包，统一start/status/stop/check。",
-      details: "U1由Linux dot实际在笔记本创建本地5x Codex会话执行，需交任务ID与本机证据；不是只在dot云机工作。复用已有生命周期、安全与默认实例，不另造后台或迁移账号，不是遥控目标选择页。系统保留必要cmd/sh薄壳。Linux本机通过后Windows由主线补验。",
+      details: "U1由Linux dot实际在笔记本创建本地5x Codex会话执行，需交任务ID与本机证据；后续核实Astra/Ultra/Fast设置，负责人亲自实现并分派明确的Sol子任务，已开工会话不重建。复用已有生命周期、安全与默认实例，不另造后台或迁移账号，不是遥控目标选择页。系统保留必要cmd/sh薄壳。Linux本机通过后Windows由主线补验。",
       files: ["tools/run_framework.ps1", "tools/roomkit_linux.sh", "tools/build_framework_release.ps1", "tools/build_linux_server.ps1"],
       docs: ["docs/17_framework_shooter_plan.md#network-portable-next"],
       evidence: "用户已选择统一入口方案；现有两端均可独立启动，但统一入口尚未实施" },
@@ -465,12 +472,12 @@ window.ROADMAP_DATA = {
       files: ["tools/prepare_deployment.ps1"],
       docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002"],
       evidence: "旧包 EXE 的 ZIP 原字节对照、恢复抽测通过；其余仍为候选" },
-    { id: "clean-implementation-worktrees", area: "cleanup", phase: 4, status: "verified",
-      title: "已合并的实施工作树",
-      summary: "两份已合并工作树已归档并移除。",
-      details: "此前两份实施工作树已完整归档并移除，独有Windows交付另存校验；这不包含之后新增的枪口候选。10-02当前登记三份：主线、本地枪口候选和dot枪口候选，均干净；候选未合并、继续保护。七个旧本地分支实施内容已在main，分支名称仅列后续清理候选，本轮未删。",
+    { id: "clean-implementation-worktrees", area: "cleanup", phase: 4, status: "candidate",
+      title: "实施工作树的实际空间与归档",
+      summary: "当前C盘六树仍占1.17GiB，四个已归档标签没有释放实际目录。",
+      details: "此前另两份历史工作树已归档移除，独有交付保留；后来新增的六树以本次实测为准。四个归档树约1.15GiB，主要是movement-integration的测试程序副本；两个枪口比较入口仍保留。应用标签不等于物理删除。当前只读核对、不删除；后续新工作树和大输出放F盘项目忽略目录。",
       files: [],
-      docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002", "docs/17_framework_shooter_plan.md#worktree-mainline-20261002"],
-      evidence: "此前归档完整校验/恢复抽测通过；本轮工作树登记、远端main、祖先/补丁等价及实施blob核查通过，未清理两份待选候选" }
+      docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002", "docs/17_framework_shooter_plan.md#project-space-check"],
+      evidence: "历史清理证据保留；本次磁盘与Git登记复核已纠正过时的三目录说法，没有新释放空间" }
   ]
 };

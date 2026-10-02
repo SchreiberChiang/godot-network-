@@ -24,6 +24,7 @@ Linux 换版本时先停止旧实例，再在新包用 **UpdateRoomKit.sh** 做�
 
 - Windows 10/11，自带 Windows PowerShell 5.1 和系统 `winsqlite3.dll`；不需要 Node、数据库服务或其它后端。
 - 源码运行前可双击 **CheckEnvironment.cmd**，只检查，不下载或开服；Windows 导出包继续用 **CheckFramework.cmd**。
+- 查看项目占用可双击 **[CheckProjectSpace.cmd](CheckProjectSpace.cmd)**：只读列出本仓库、登记的工作树、RoomKit 命名用户目录与磁盘剩余空间，不删除文件、不启动服务。大小为逻辑字节；详细 JSON 用 `CheckProjectSpace.cmd -Json`，统计不完整时退出 2。结果与范围见 [空间体检](docs/17_framework_shooter_plan.md#project-space-check)。
 - 从源码运行需要 Godot **4.7.2**。默认路径：
 
   ```text

@@ -5,15 +5,18 @@
 
 用户补充：青岛一位 Wi-Fi 玩家（运营商未知）、重庆一位电信 Wi-Fi 玩家报告高延迟，另两位为广州电信宽带。尚无 RTT 数字、时刻、日志或同条件对照，不能据此断定是运营商、无线、服务器或显示延迟。先补可比较的本地诊断，再决定是否调整同步。此前移动手感反馈不足，不升级为“所有玩家已通过”。
 
-本轮固定代码基准 `1a0fcc5f97de6b0daa765f5e31b73552c4f18ba4`；之后的主线文档安排不改变该基准。主线只统一整合与验收，三路使用独立目录/分支，不修改彼此未提交内容；主线 STATUS/ROADMAP 由本会话维护。外部交付必须提供候选提交/补丁、真实命令/退出码及未运行项，不直接推 main、重启试玩实例或更换现有玩家目录。此表是待启动任务安排，传送任务文件不等于对方已经执行。
+本轮固定代码基准 `1a0fcc5f97de6b0daa765f5e31b73552c4f18ba4`；后续主线安排不改变外部任务的代码基准。主线同时承担独立实现、候选整合与验收，不只等待回报；三路使用独立目录/分支，不修改彼此未提交内容；主线 STATUS/ROADMAP 由本会话维护。外部交付必须提供候选提交/补丁、真实命令/退出码及未运行项，不直接推 main、重启试玩实例或更换现有玩家目录。此表是任务安排，传送任务文件不等于对方已经执行。
 
 | 任务/执行者 | 明确交付 | 写入边界与终点 |
 |---|---|---|
+| S1：本会话主线 Astra | 项目与登记工作树的只读空间体检入口，分清 C/F 占用及共享 Codex 数据；14/0 与 cmd 实跑已通过 | 新 `CheckProjectSpace.cmd`、`tools/project_space.ps1`、对应边界检查及现有文档；不改 N1 的 retention/客户端文件或 U1 启动脚本，不删除文件。随后继续承担两路功能整合、Windows 验收与配套交付。 |
 | N1：10x dot 云端 | 丢包/RTT波动/ENet收发/连接阶段与本地诊断报告；便携设置与运行数据、生成器升级保留 | `codex/client-network-journal`；客户端 SDK、framework client/view/sound、射击诊断展示的必要接线、新本地数据模块、`prepare_player_client.ps1` 与 retention 防线/客户端说明/对应测试。必要新增文件纳入 `build_framework.ps1`。不改协议、玩法和服务器判定。不与入口任务同时改 `build_framework_release.ps1`。 |
 | U1：Linux 本地 5x Codex，由 Linux dot 创建本地项目/会话并派发 | 同一套 start/status/stop/check/help，识别 Windows/Linux 与源码/导出包，委托已有正式启动器 | `codex/unified-server-entry`；根目录统一入口、独立分派脚本及入口/构建包装、对应新专项。现有生命周期与安全判断保持；不改客户端生产文件、`build_framework.ps1`、客户端生成器。Linux 本地隔离实测；Windows 实机交回本会话验收。 |
 | V1：Linux dot 的云电脑 | 一辆无品牌低模车的 Blender 能力小样、GLB、两张预览、单位/朝向/面数/材质/工具版本说明 | `prototypes/racing_visual/` 的候选交付，最多两版、总量不超过 8 MiB；不接入游戏，不制作整张赛道，不代表赛车玩法开始或美术定稿。先启动 U1 再做云端小样。 |
 
 **Linux dot 的派发要求**：通过已连接笔记本的本地任务能力新建独立项目与会话，实际路径 `~/roomkit/work/unified-entry-20261002/`，用本地 5x Codex 执行 U1。交回本地 task/thread ID、执行主机、目录、基准和第一次本地检查输出；不是只在云电脑开发，也不是让用户代敲全部命令。若本地工作区创建失败，如实返回工具错误，不重复建一串会话、不把云端结果写成本地通过。现有 `~/roomkit/releases/`、实验、账号与防火墙均不操作。5x 两路合计最多再用 30 个百分点、保留 30% 的偏好继续有效；额度口径无法读取时直接报告，不保证替用户精确控额，也不为清额度重复测试。
+
+**后续 5x 调度方式**：用户指定 GPT-6 Astra / Ultra 推理 / Fast 速度，由负责人亲自承担关键实现，优先把明确的只读核查或独立测试交 GPT-6.1 Sol。实际模型、推理及速度分别核实，不可用就交缺项；不擅改全局设置、购买额度或重复创建已有任务。先用 1–2 个有明确交付的子代理，同机只跑一批引擎重任务。OpenAI Docs 技能核对了[速度选项](https://learn.chatgpt.com/docs/agent-configuration/speed)与[子代理](https://learn.chatgpt.com/docs/agent-configuration/subagents)：Fast 与 Ultrafast 不同；具体可用性以当地客户端为准，不根据模型名宣称执行更快。补充已单独送到 `/home/zhao/Desktop/RoomKit-next-20261002/5x-coordination-supplement.txt`，SHA256 `86c5fe2affa6175ba7e67b2115c5a90ab5a7bb70db20bb044acb86775af0cb42` 两端一致，原两份任务单未覆盖；沿用原 U1/V1，不代表任务已开工或已切换。
 
 **N1 的指标口径**：ENet 的 `PEER_PACKET_LOSS / PACKET_LOSS_SCALE * 100` 是可靠发送的丢包估计，不是全部 UDP 或下行快照丢失率；有有效 epoch 更新前显示“统计中/—”。RTT 为往返，波动原始量不冒充标准差；不以服务器 tick 跳号推算丢包。帧间隔/FPS、快照间隔及未更新时长继续单独显示。ENet `pop_statistic()` 只有一个采集方，HUD 和日志读同一缓存；换房/断线重置，未知不显示 0，不发额外探测流量，不调用会断开的 `reset()`。本地 4.7 文档已核对缩放及约 10 秒统计周期，实施方仍须核对固定引擎的 API 行为。
 
@@ -27,9 +30,18 @@
 
 ### 本机空间核对与后续约束
 
-本次 C 盘可用 **31,072,104,448 字节（28.94 GiB）**，六个 RoomKit 工作树共 **1,257,271,125 字节（1.17 GiB）**；均 Git 干净、没有匹配的项目进程，Git 公共库在 F 盘。四个应用中已归档的树仍物理存在，共 **1.15 GiB**，因此上一轮“应用已归档”不能当作已经释放空间。主要是 `movement-integration/logs/` 里的多份测试 Client.exe，不是源代码/历史本身；两个枪口比较树约 17.65 MiB。本轮只读，未删除；证据 `logs/network-next-20261002/space-audit.json`。这仅解释已知工作树的占用，没有历史容量基线，不能解释 C 盘全部增长或保证以后不满。
+首次空间核对时 C 盘可用 **31,072,104,448 字节（28.94 GiB）**，六个 RoomKit 工作树共 **1,257,271,125 字节（1.17 GiB）**；均 Git 干净、没有匹配的项目进程，Git 公共库在 F 盘。四个应用中已归档的树仍物理存在，共 **1.15 GiB**，因此上一轮“应用已归档”不能当作已经释放空间。主要是 `movement-integration/logs/` 里的多份测试 Client.exe，不是源代码/历史本身；两个枪口比较树约 17.65 MiB。本轮只读，未删除；证据 `logs/network-next-20261002/space-audit.json`。这仅解释已知工作树的占用，没有历史容量基线，不能解释 C 盘全部增长或保证以后不满。
 
 新独立工作目录和重型测试/构建都放 F 盘本项目的忽略目录，不再往 C 盘建立本项目新工作树；仍保留现有两份枪口对照入口。全局 Codex 配置不改。OpenAI Docs 技能核对了[官方工作树说明](https://learn.chatgpt.com/docs/environments/git-worktrees)：工作树会各自产生构建/依赖，根位置可在应用设置更改；本轮以实际目录与磁盘读数为准，不依赖归档标签判断释放。此前删除被策略拒绝的旧产物仍未删除，不绕过工具限制。
+
+<a id="project-space-check"></a>
+### 主线实施：只读空间体检与补充归因
+
+入口 `CheckProjectSpace.cmd` 会统计当前仓库、Git 双向指针确认的关联工作树和明确命名的 RoomKit 用户目录。逐目录读取文件元数据，不读取数据库或全局配置，不跟随目录链接；缺失/不可读/登记不一致时报告不完整并退出 2。默认只输出控制台，`-Json` 输出机器可读结果，不产生新构建或大报告目录。这里只报告逻辑文件长度，不等同磁盘分配或“可以删除”；运行中文件变动也可能使快照不完整。
+
+独立只读盘点：F 盘主仓库 **7,213,988,257 字节 / 91,772 文件（6.72 GiB）**；其中 artifacts **3.85 GiB**、logs **1.57 GiB**、data **1.08 GiB**，后者含真实数据与恢复输入，不能整目录删。当前 `.git` 约 **7.06 MiB**，绝大多数空间是 Git 忽略的产物；有 Git 不会自动回收它们。C 盘确认范围 **1,321,863,729 字节（1.23 GiB）**：工作树 **1.17 GiB**、RoomKit Game 用户目录 **0.95 MiB**、RoomKit 命名临时目录 **60.65 MiB**。六个树大小与前次完全相同；此时 C 可用 **29.13 GiB**，较前次增加约 **197.82 MiB**，不能归因为本项目释放。Codex 共享目录元数据总计 **3.21 GiB**（已经包含上述树），余下 **2.04 GiB** 为会话/插件/运行时/缓存等共享开销，不能全部算 RoomKit；体检入口不遍历它们。
+
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_project_space.ps1` **14/0，退出 0**：中文空格、精确字节、读取不修改、Git 双向指针/大小写、从子树发现主检出、TEMP 重叠不双算、链接及祖先拒绝。`cmd.exe /d /c "CheckProjectSpace.cmd -Json"` 实际扫描通过、JSON 可解析，和独立盘点的 C 盘八项字节逐项一致；F 盘增量来自新工具、微型测试与报告。21:53 的 C 剩余空间读数为 **28.93 GiB**；变化不能归给大小未变的这八项目录。首轮 cmd 检查失败：Windows PowerShell 在参数默认表达式阶段没有有效 PSScriptRoot，改为参数绑定后解析再实跑通过。Linux 未运行，不为只读工具重跑游戏回归。原始证据 `logs/storage-audit-20261002/`，当前没有删除或重建真实服务；只保留本轮两份微型测试夹具。
 
 任务单文本放在 `logs/parallel-handoffs/20261002-network-next/`，给 10x dot 与 Linux dot 各一份，另附 U1 本地 Codex 子任务。Linux 两份已经 SSH/SCP 送到 `/home/zhao/Desktop/RoomKit-next-20261002/`，退出 0、SHA256 两端一致（派发单 `6ea589a5…19237`，本地任务 `ae5f6b82…5f4ae`），证据 `logs/network-next-20261002/desktop-sha256.txt`；没有替 dot 启动会话，不把“已送达”写成“已开工”。N1/U1 收到候选后，主线审查、一次定向自动回归、同源两端生成与短试玩，再集中提交推送和更新 ROADMAP；不让四路各自打包/部署一遍。
 
