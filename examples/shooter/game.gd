@@ -37,6 +37,9 @@ var last_results: Array = []
 var last_duration_ms := 0
 # Presentation only: authoritative state and hit detection stay untouched.
 var render_tracks: Dictionary = {}
+var aim_tracks: Dictionary = {}
+var _local_aim_user := ""
+var _local_aim := Vector2.ZERO
 var visual_shots: Array = []
 var last_visual_shot := 0
 var snapshot_age := 0.0
@@ -396,6 +399,8 @@ func world_state(value: Dictionary) -> void:
 		var cues: Array = [] if latest.is_empty() else presentation_cues(latest, value, last_visual_shot)
 		if latest.is_empty():
 			render_tracks.clear()
+			aim_tracks.clear()
+			set_local_aim("", Vector2.ZERO, false)
 			visual_shots.clear()
 			last_visual_shot = 0
 			_diagnostic_tick = -1
@@ -407,6 +412,9 @@ func world_state(value: Dictionary) -> void:
 				_diagnostic_interval_ms = now - _diagnostic_received_ms
 			_diagnostic_tick = int(value.tick)
 			_diagnostic_received_ms = now
+		# Admission, departure and respawn can publish again within the same tick.
+		# Unchanged targets do not restart their blend; accepted life changes do.
+		_update_aim_targets(value)
 		_update_visual_targets(value)
 		latest = value
 		snapshot_age = 0.0
@@ -473,6 +481,8 @@ func advance_visual(delta: float) -> void:
 	snapshot_age += delta
 	for track in render_tracks.values():
 		track.age = minf(float(track.age) + delta, BLEND_SECONDS)
+	for track in aim_tracks.values():
+		track.age = minf(float(track.age) + delta, BLEND_SECONDS)
 	for index in range(visual_shots.size() - 1, -1, -1):
 		var shot: Dictionary = visual_shots[index]
 		shot.age += delta
@@ -484,6 +494,53 @@ func render_position(player: Dictionary) -> Vector2:
 	if track.is_empty():
 		return Vector2(player.x, player.y)
 	return track.from.lerp(track.to, clampf(float(track.age) / BLEND_SECONDS, 0.0, 1.0))
+
+## Presentation only. The caller samples the same direction as send_input,
+## every display frame; neither snapshots nor server hit detection are changed.
+func set_local_aim(user: String, direction: Vector2, active: bool = true) -> void:
+	if server:
+		return
+	var player := player_view(user)
+	if not active or player.get("life_state", "") != "alive" or not direction.is_finite():
+		_local_aim_user = ""
+		_local_aim = Vector2.ZERO
+		return
+	_local_aim_user = user
+	_local_aim = direction.normalized() if direction.length_squared() > 0.0001 else Vector2.RIGHT
+
+func render_aim(player: Dictionary, own_user: String = "") -> Vector2:
+	var confirmed := Vector2(float(player.get("aim_x", 1)), float(player.get("aim_y", 0)))
+	if server:
+		return confirmed
+	if own_user == _local_aim_user and str(player.get("user_id", "")) == own_user and player.get("life_state", "") == "alive" and not _local_aim.is_zero_approx():
+		return _local_aim
+	var track: Dictionary = aim_tracks.get(player.get("user_id", ""), {})
+	if track.is_empty():
+		return confirmed
+	return Vector2.from_angle(lerp_angle(float(track.from), float(track.to), clampf(float(track.age) / BLEND_SECONDS, 0.0, 1.0)))
+
+func _update_aim_targets(value: Dictionary) -> void:
+	var present: Dictionary = {}
+	for player in value.players:
+		var user: String = player.user_id
+		present[user] = true
+		var direction := Vector2(float(player.aim_x), float(player.aim_y))
+		var target := direction.angle()
+		var old: Dictionary = aim_tracks.get(user, {})
+		var previous := player_view(user)
+		var reset: bool = old.is_empty() or old.get("life", "") != player.life_state or int(old.get("deaths", -1)) != int(player.deaths) or int(value.round) != int(latest.get("round", value.round))
+		if not previous.is_empty():
+			reset = reset or Vector2(float(previous.x), float(previous.y)).distance_to(Vector2(float(player.x), float(player.y))) > 100.0
+		if reset or not is_zero_approx(angle_difference(float(old.get("to", target)), target)):
+			var from := target if reset else render_aim(player).angle()
+			aim_tracks[user] = {"from": from, "to": target, "age": 0.0, "life": player.life_state, "deaths": player.deaths}
+		if reset and user == _local_aim_user:
+			set_local_aim("", Vector2.ZERO, false)
+	for user in aim_tracks.keys():
+		if not present.has(user):
+			aim_tracks.erase(user)
+	if not present.has(_local_aim_user):
+		set_local_aim("", Vector2.ZERO, false)
 
 static func tracer_segment(origin: Vector2, end: Vector2, age: float) -> PackedVector2Array:
 	var distance := origin.distance_to(end)
@@ -579,7 +636,7 @@ func draw_on(canvas: CanvasItem, user: String, font: Font) -> void:
 		canvas.draw_rect(Rect2(position + Vector2(-7, -17), Vector2(14, 5)), Color("142638"))
 		canvas.draw_line(position + Vector2(-6, 14), position + Vector2(-7, 22), color.darkened(0.22), 6)
 		canvas.draw_line(position + Vector2(6, 14), position + Vector2(7, 22), color.darkened(0.22), 6)
-		var aim := Vector2(player.aim_x, player.aim_y)
+		var aim := render_aim(player, user)
 		var gun_length := 29.0 if player.weapon == "rifle" else (20.0 if player.weapon == "smg" else 34.0)
 		canvas.draw_line(position + Vector2(0, -5), position + Vector2(0, -5) + aim * gun_length, Color("d8e1e3"), 6)
 		canvas.draw_rect(Rect2(position + Vector2(-22, -37), Vector2(44, 4)), Color("34414d"))

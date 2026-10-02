@@ -498,6 +498,7 @@ func _save_pending() -> bool:
 
 func _process(delta: float) -> bool:
 	if client == null or view == null or closing:
+		_clear_aim_presentation()
 		return false
 	if authenticated and not busy and client.socket.get_ready_state() == WebSocketPeer.STATE_CLOSED:
 		client.close()
@@ -508,6 +509,7 @@ func _process(delta: float) -> bool:
 		if poll_elapsed >= 5 and not busy and not polling:
 			poll_elapsed = 0
 			_poll()
+	_sync_aim_presentation()
 	if client.state == "IN_ROOM" and world != null:
 		var own: String = client.identity.get("user_id", "")
 		_sync_life_view()
@@ -526,6 +528,23 @@ func _process(delta: float) -> bool:
 	if args.has("--close-after-ms") and Time.get_ticks_msec() - client_started >= int(args["--close-after-ms"]):
 		_close()
 	return false
+
+func _clear_aim_presentation() -> void:
+	if world != null and world.has_method("set_local_aim"):
+		world.set_local_aim("", Vector2.ZERO, false)
+
+func _sync_aim_presentation() -> void:
+	if world == null or not world.has_method("set_local_aim"):
+		return
+	if client == null or view == null or closing or client.state != "IN_ROOM":
+		_clear_aim_presentation()
+		return
+	var user: String = client.identity.get("user_id", "")
+	var player: Dictionary = world.player_view(user)
+	var pointer: Vector2 = view.get_local_mouse_position() - view.ARENA_POSITION
+	# Keep the origin identical to the unchanged 30 Hz input calculation.
+	var aim := pointer - Vector2(float(player.get("x", 480)), float(player.get("y", 270)))
+	world.set_local_aim(user, aim, root.has_focus() and not inventory_open and not account_open and not busy)
 
 func _sync_life_view() -> void:
 	if client.state != "IN_ROOM" or world == null or not world.has_method("player_view"):

@@ -304,3 +304,16 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\tests\
 ```
 
 该标记也会通知仍运行的源码对手关闭。UI 夹具关闭自己启动的导出客户端，请求自己的 Operator 停止，核验自己的宿主/房间退出，再恢复本次包中原有的公开连接文件。确认两个脚本均退出 0，且 `FRAMEWORK_UI_FIXTURE_STOPPED` 的 `cleanup_failed=False`、`forced_cleanup=False`、`live_owned=0`；查看 `logs/framework-ui-<id>/fixture-result.json` 保留清理证据。不要用按名称全局结束 Godot/Client/Operator 进程的方式清理，也不要把这一夹具的退出成功当作完整 UI 功能都已验收。
+
+### 枪口呈现候选专项
+
+在 `codex/aim-smoothing-local` 候选目录运行，不连接现有服务。纯逻辑专项：
+
+```powershell
+$aimRun = Join-Path (Get-Location).Path ('data/test-aim-' + [Guid]::NewGuid().ToString('N'))
+powershell -NoProfile -File .\tools\run_isolated_test.ps1 -Script tests/run_aim_presentation.gd -Isolation $aimRun -Log (Join-Path $aimRun 'result')
+```
+
+以 `AIM_PRESENTATION_RESULT cases=15 passed=94 failed=0`、真实退出0、stderr空为本轮结果。射击回归因加载服务脚本被保守识别为服务类，按隔离入口要求传入本次隔离根内的 data-root/games/public-client-dir/operator-log-path 和非28291 panel-port；它只加载脚本做规则验证，不启动服务。
+
+双击候选根目录 `PreviewAim.cmd` 可用真实渲染器看合成20Hz状态：鼠标瞄准、TAB切换、ESC退出。自动取样可用 `tests/run_aim_preview.gd` 的 `--duration-ms=2500`、`--report=<新证据目录/result.json>`、`--screenshot=<新证据目录/result.png>`，传 `--baseline=true` 显示旧呈现；只向显式给出的报告/截图路径写文件，不读取账号或连接配置。计数仅表示合成状态中的方向变化频率，不是联网延迟或性能基准。

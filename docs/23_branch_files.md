@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-10-02 Codex 转枪对照候选（基准 `4e49aa1`，分支 `codex/aim-smoothing-local`）：修改 `examples/shooter/game.gd` 与 `examples/framework/client.gd`，新增 `PreviewAim.cmd`、`tests/run_aim_presentation.gd`、`tests/run_aim_preview.gd`；同步 README、STATUS、docs/17、22、25、本清单与 ROADMAP 数据。只改枪口呈现，不改移动、服务器射击或协议。枪口94/0、射击83/0、诊断30/0、反馈8/0及合成真实渲染对照通过；首次预览配置路径失败保留。候选未合并主线、未换现有服务或玩家目录。见 [对照安排](17_framework_shooter_plan.md#aim-comparison-20261002)。
+
 2026-10-02 Codex 公网试玩反馈与客户端诊断（基准 `main / fbf999e`）：修改 `sdk/roomkit/client/room_client.gd`、`examples/framework/view.gd`、`examples/shooter/game.gd`，新增 `tests/run_client_network_stats.gd`；只增加房间 RTT 与呈现时序/帧间停顿的只读显示，不改玩法或线协议。同步 README、STATUS、SDK README、docs/10、17、22、25、本清单和路线图。诊断最终30/0、真实渲染31/0、反馈8/0、射击83/0，退出0、stderr空；失败夹具和字体布局记录保留。用户观察FPS约120仍感移动/旋转卡，未认定根因；当前Linux服务与配套包不更新，新版人工短验待安排。见 [本轮结果](17_framework_shooter_plan.md#friends-public-preparation)。
 
 2026-10-02 Codex 朋友公网试玩准备（基准 `main / c261fe2`）：修改 `tools/open_linux_package.ps1` 和 `tests/test_linux_package_entry.ps1`，支持已准备配套 Server 的受限路径、公开 IPv4 与大厅端口，启动前核对远端保存网络，旧指针兼容。入口替身 41/0；新 Linux 实例包检查、权限/网络、客户端文件和真实 SSH 后台入口通过。同步 README、STATUS、docs/10、17、22、本清单和路线图。复用同版导出，真实账号和原玩家/交付不变；新配置/程序/证据只在忽略目录。用户反馈路由器已设置，授权的两组 UFW allow 命令退出0，前后状态均为inactive、未改变启用状态；外部朋友试玩未运行，见 [准备结果](17_framework_shooter_plan.md#friends-public-preparation)。
