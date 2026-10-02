@@ -247,7 +247,7 @@ window.ROADMAP_DATA = {
     { id: "game-movement-presentation", area: "game", phase: 7, status: "pending",
       title: "移动与瞄准显示平滑",
       summary: "主线枪口已获用户验证；移动基线与离线预览已完成，身体移动修复待候选。",
-      details: "自己的枪逐帧跟随可操作时的鼠标方向，其他枪走50ms最短角度插值；失焦、弹窗、离房、死亡复活和换局复位，服务器射击判定不变。根目录PreviewAim提供离线旧/新预览。PreviewMovement已提供稳定、抖动、250ms断流的实际显示算法对照；合成120Hz下停顿为0/16.7/250ms，不等于公网根因。身体移动需另验传送和重同步，不把更大显示延迟当成成功。10x移动任务可与Linux控制小试验并行；5x收尾后接独立验收，Windows统一整合。两份移动任务均固定f368df0，尚未派发。",
+      details: "自己的枪逐帧跟随可操作时的鼠标方向，其他枪走50ms最短角度插值；失焦、弹窗、离房、死亡复活和换局复位，服务器射击判定不变。根目录PreviewAim提供离线旧/新预览。PreviewMovement已提供稳定、抖动、250ms断流的实际显示算法对照，TAB输入分发已修复并用真实窗口按键消息验证；合成120Hz下停顿为0/16.7/250ms，不等于公网根因。身体移动需另验传送和重同步，不把更大显示延迟当成成功。10x移动任务可与Linux控制小试验并行；5x收尾后接独立验收，Windows统一整合。两份移动任务均固定f368df0，尚未派发。",
       files: ["examples/shooter/game.gd", "examples/framework/client.gd", "tests/run_aim_presentation.gd", "PreviewAim.cmd"],
       docs: ["docs/17_framework_shooter_plan.md#worktree-mainline-20261002", "docs/25_shooter_room_rules.md#aim-presentation-mainline"],
       evidence: "主线隔离枪口94/0、射击83/0、诊断30/0、反馈8/0，退出0且stderr空，四脚本解析通过；用户反馈转枪验证无问题，联网包未重建，身体移动未修复" },

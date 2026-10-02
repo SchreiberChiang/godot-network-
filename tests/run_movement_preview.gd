@@ -19,6 +19,8 @@ func _initialize() -> void:
 	root.content_scale_size = Vector2i(960, 460)
 	root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 	root.title = "RoomKit movement baseline - offline"
+	# SceneTree is not a Node: its _input method is not dispatched automatically.
+	root.window_input.connect(_input)
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei"])
 	canvas = Control.new()
 	canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -54,6 +56,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_TAB:
 		scenario = (scenario + 1) % scenarios.size()
 		reset()
+		print("MOVEMENT_PREVIEW_SCENARIO ", scenarios[scenario])
 
 func _draw() -> void:
 	canvas.draw_rect(Rect2(0, 0, 960, 460), Color("16202e"))
