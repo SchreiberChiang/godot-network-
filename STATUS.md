@@ -4,7 +4,9 @@
 
 **N2 最终诊断包已换上 Linux，跨机 65/0。** 真实 Windows 成品直接连接 Linux，双人互见、各自网络报告、购买幂等、备份恢复、重启保留通过；正式实例经 PREPARED → VERIFIED → SEALED 保留账号/资产/配置/证书，旧包保留。仍双击 **PlayLinuxPackage.cmd**；版本 `56f4b235deea`。朋友干净目录 `artifacts/friend-clients/network-20261002/shooter-windows/`（12 文件，约104.63 MiB，不含本地运行数据）已配置公网，直接发整个目录。新包朋友实测与公网日志仍待反馈。详见 [N2 交付](docs/17_framework_shooter_plan.md#n2-final-delivery)。
 
-**F1 由主线接手推进**：用户确认 Linux 本地 Codex 暂不能执行，dot 仅完成源码准备和前期审查，尚无驱动或 4/8 人结果。主线已核对笔记本 `linux-concurrency-20261002` 为干净的固定 `0e33fa6`；新建 F 盘独立工作树编写便携验收，再通过现有 SSH 在笔记本跑，各一次严格全员验收。应用修复不作为代码进度，未运行项不计通过。首版剩余门槛见 [收束路线](docs/17_framework_shooter_plan.md#framework-closeout-20261002)。
+**F1 Linux 严格多人已实跑，尚未全通过**：4 人 **89/1**、8 人 **149/1**，两组同时登录、完整同房身份集合、退出清理与所有账号重新登录均通过；各组唯一失败均为 ENet `1456 > 1392` 的 MTU 警告，整体退出 1，没有过滤。离线原始快照测量确认负载随人数增长；下一步修射击快照传输，再做有针对性的复验。源码 SDK 同机证据不代表导出包/公网；真实服务与客户端未换。驱动、首次失败和最终两组证据均保留，见 [F1 结果](docs/17_framework_shooter_plan.md#f1-mainline-result)。
+
+**赛车与清理并行边界**：赛车会话已交 `a4498a0` 纯规则候选（报告 Windows 267/0），主线尚未接收；用户已授权沿用该会话研究二维漂移与三维悬挂，先交 Godot 驾驶原型方案。独立清理会话只盘点项目产物、生成预览清单，不删除当前工作树/数据/交付。主线负责 F1 问题与最终整合。
 
 **车模 V1 已收到并收为能力样本**：5x dot 云端 Blender 制作，ZIP 两端哈希一致；本机核实 1792 三角面/4 材质/四独立轮并查看两张图。车身 16 个退化面待修，尚未验 Godot 导入/驾驶；详见 [模型验收](docs/17_framework_shooter_plan.md#car-v1-acceptance)。
 

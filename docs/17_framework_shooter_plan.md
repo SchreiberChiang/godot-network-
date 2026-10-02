@@ -1,5 +1,33 @@
 # 通用框架与横版射击分支实施计划
 
+<a id="f1-mainline-result"></a>
+## F1 Linux 严格多人主线结果（2026-10-03）
+
+主线已从准备阶段接手并完成实机运行。固定源码 `0e33fa615957f4a29174fe4800d7d05862741746`，与运行时主线 `3899836` 的 host/sdk/examples/schemas/build_framework 内容一致；只新增便携驱动和启动身份回归。笔记本 Godot 4.7.2 official `ed1daf0bf`、PowerShell 7.6.6，源码目录 `/home/zhao/roomkit/work/linux-concurrency-20261002`。新数据、HOME/XDG/TMP/日志放在该树两次运行目录中；使用 TCP 29191/29196/29197 和 UDP 29210–29225，全部回环，不操作正式实例。
+
+真实命令（从上述源码目录执行）：
+
+```sh
+bash tests/support/linux_concurrent_login.sh \
+  /home/zhao/roomkit/tools/godot/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64 \
+  /home/zhao/roomkit/tools/pwsh/7.6.6/pwsh all
+```
+
+| 最终组 | 断言通过/失败 | 同时登录 | 同房完整身份集合 | 逐个重新登录 | 真实退出码 |
+|---|---|---|---|---|---|
+| 4 人 | 89/1 | 4/4 | 4/4 | 4/4 | 1 |
+| 8 人 | 149/1 | 8/8 | 8/8 | 8/8 | 1 |
+
+没有把部分成功算全员成功，没有重复登录重试，也没有把登录大厅冒充入房。两组退出后在线会话和清理队列归零、房间停止、预留端口释放，驱动确认无本次源码的引擎或存储进程残留。各组唯一失败是 Operator 继承的房间 stderr 中 `Sending 1456 bytes unreliably ... MTU (1392)` 警告；保留原文，整体严格失败。没有脚本/资源加载错误。用于记录空数组的 `residual-processes.json` 和 `error-lines.json` 被共用 JSON 帮助函数写成 0 字节，不能独立解析成 JSON；零残留结论依据 result.json/stdout 的实际断言与前后端口记录，并保留此证据格式缺项。
+
+首次尝试也保留：4 人 14/3，8 人 3/5，整体退出 1。驱动过早把 bash 包装器当成最终 Godot，exec 后命令行变化导致所有权检查拒绝清理；8 人组因此被前置检查拒绝，没有开始并发验收。已改为等待 argv[0] 精确匹配引擎再保存身份。只通过该客户端自己的关闭命令回收，没有扩大终止范围。新增 `tests/test_linux_concurrent_identity.ps1` 纯替身回归 10/0、退出 0，包含旧条件失败对照。最终批次 `linux-concurrent-20261002T161809Z-m05GeG` 各组完成一次，不为消耗额度反复压测。
+
+**MTU 定向分析**：原游戏快照复制到 F 盘隔离工程，纯内存捕获实际 RPC 序列化，不创建网络连接。合成空闲状态 3/4/8 人 RPC 为 1457/1865/3497 字节；每玩家 Variant 约 408 字节，重复 14 个键、身份名称，shots/last_results 还会增长。它证明负载问题，但不是对现场报文的逐字节复现。压缩可缩小常见快照，合法大样本仍可超过 MTU；修复需约束传输负载，保持完整状态与乱序/缺片边界。尚未改生产协议，不将改成可靠发送或屏蔽警告视为修复，也不据此认定朋友卡顿的唯一原因。
+
+轻量证据：`logs/f1-mainline-20261003/` 的 evidence-summary、verified-evidence 与 mtu-review。传回归档 11162 字节、60 份证据，路径/类型/大小/SHA256 全匹配；归档 SHA256 `9857824fe2418e435d3328ab24e3e17d7d48878e5f48d036d961a98f1922a765`。没有收集账号库、密码、令牌或 bootstrap。未验多人跨机/公网、导出包、备份重叠、长耐久；N2 现用包、真实数据和客户端不变。
+
+**当前并行安排**：独立赛车会话提交 `a4498a0`（基准 `3899836`，分支 `codex/racing-rules`，未合并），交付报告为 Windows 267/0 纯规则；主线已核对提交范围，尚未完成代码接收。用户随后授权该会话研究 Pretty Fly Games 的 [二维街机驾驶](https://www.youtube.com/watch?v=DVHcOS1E5OQ) 与 Toyful Games 的 [车辆物理](https://www.youtube.com/watch?v=CdPYlj5uZeI)，形成 Godot 离线驾驶原型方案，先不实现联机或改宿主。独立清理会话只写 `logs/cleanup-review-20261003/` 盘点和预览清单，不删除活动产物。主线继续负责 MTU 修复范围与各候选接收。
+
 <a id="d1-mainline-acceptance"></a>
 ## D1 离线报告查看器主线验收（2026-10-03）
 
@@ -25,7 +53,7 @@ ZIP 50924 字节，SHA256 `75e552cc099da35ca6c8c0d136847d3a1900595f6b4f37a6cc4e4
 
 完整任务单在本机 `logs/parallel-handoffs/20261002-closeout/`。F1 已送至 `/home/zhao/Desktop/RoomKit-closeout-20261002/5x-F1-linux-concurrency.txt`，两端 SHA256 `b1f9a729df39716277a295d775974e16f261d7865f890f33f42a180568e10e11`；送达不代表已开工。D1 交付路径明确为台式机 `artifacts/dot-network-viewer-candidate/RoomKit-D1-candidate.zip`；F1 交付 Linux 同一桌面目录的 `RoomKit-F1-candidate.zip` 和报告。跨端保存失败即返回准确错误并给附件，不重复建任务。外部不推 main，主线验收后整合。
 
-**10-03 实际进度修正**：D1 已按上节接入；N2 已完成下文交付。用户确认笔记本本地 Codex 执行通道正在修复，F1 仅完成源码准备与前期审查，没有驱动、4/8 人结果或补丁。主线接手，在 F 盘独立树实现测试，再通过已有 SSH 到笔记本验收；用户侧暂不重复启动 F1。只读核查远端目录干净、HEAD 为 `0e33fa6`、分支 `codex/linux-concurrency-acceptance`，放行标记存在；正式管理服务仍在 28691，F1 预留端口未监听。开跑前再次检查实例、端口和负载，严格区分全员登录与同房互见。
+**10-03 实际进度修正**：D1 已按上节接入；N2 已完成下文交付。笔记本本地 Codex 执行受阻，外部 F1 只完成准备。主线随后接手并实跑：全员登录与同房互见通过，因快照 MTU 警告尚未全通过，精确结果及首次失败见 [F1 结果](#f1-mainline-result)。用户侧暂不重复启动 F1。
 
 完成首版按三个终点推进，不按虚构百分比计算：
 
