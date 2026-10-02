@@ -1,6 +1,6 @@
 # 当前状态：RoomKit（2026-10-02）
 
-**阶段 7 已准备，朋友公网试玩待验收**：新的 Linux 导出实例、匹配的 Windows 玩家目录与 `PlayLinuxPackage.cmd` 已就绪；管理员由用户首次设置。用户已反馈路由器转发设置完成，Linux 防火墙尚待核查/放行，没有外网朋友连接证据。下一步补齐网络放行并让 1–2 位朋友短验，再做赛车；合作种田和云端后置。详见 [准备结果](docs/17_framework_shooter_plan.md#friends-public-preparation) 与 [后续路线](docs/17_framework_shooter_plan.md#forward-route-20261002)。
+**阶段 7 已准备，朋友公网试玩待验收**：新的 Linux 导出实例、匹配的 Windows 玩家目录与 `PlayLinuxPackage.cmd` 已就绪；管理员由用户首次设置。用户已反馈路由器转发设置完成；sudo 允许规则命令成功，UFW 前后均为 `inactive`，保持未启用。下一步让 1–2 位朋友从外网短验，再做赛车；合作种田和云端后置。详见 [准备结果](docs/17_framework_shooter_plan.md#friends-public-preparation) 与 [后续路线](docs/17_framework_shooter_plan.md#forward-route-20261002)。
 
 ## 本轮：朋友试玩准备
 
@@ -10,7 +10,9 @@
 
 新实例验证后正常停止，自有残留进程为 0；下次由 PlayLinuxPackage 启动。原真实文件哈希/时间 **6/6 不变**，原干净交付 **43 文件**再次校验通过，新玩家生成物已登记，按用途默认保留两份。
 
-未运行：外部朋友注册/同房互见/购买/退房重登、GitHub 发布与下载、防火墙规则核查和修改。一次准备脚本因 UTF-8 无 BOM 被 PowerShell 5.1 解析失败，未执行任何步骤；补 BOM 后成功，失败输出保留。用户自报路由器设置完成，不算外部连通证据。
+网络准备：用户本人输入 sudo 密码后，只执行 TCP 28300、UDP 28400–28431 的 IPv4 UFW allow 命令，脚本退出 **0**；源脚本两端哈希一致。取回的 `ufw-before.txt` / `ufw-after.txt` 均为 **inactive**，未启用防火墙、未修改其它端口；没有单独读取持久化规则，也不代表其它过滤或公网连通已通过。首次 `sudo -n` 因需密码返回 1，之后窗口操作成功，输出分别保留。
+
+未运行：外部朋友注册/同房互见/购买/退房重登、GitHub 发布与下载。一次准备脚本因 UTF-8 无 BOM 被 PowerShell 5.1 解析失败，未执行任何步骤；补 BOM 后成功，失败输出保留。用户自报路由器设置完成，不算外部连通证据。
 
 ## 此前：新机准备与持续开房
 

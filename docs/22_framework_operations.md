@@ -52,7 +52,7 @@ Linux 导出服务器普通目录的构建、依赖、启停与自动验收见 [
 
 本机独立包真人入口为 **PlayLinuxPackage.cmd**，结束用 **StopLinuxPackage.cmd**；当前已准备的新实例和玩家目录见 [朋友公网试玩](17_framework_shooter_plan.md#friends-public-preparation)，此前验收见 [独立包试玩](17_framework_shooter_plan.md#linux-package-playtest)。入口防护专项：`powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_linux_package_entry.ps1`，只创建假工程，不运行引擎/远端服务；测试期间本地 28691 必须空闲。
 
-朋友从外网连接时，路由器转发 **TCP 28300 → 192.168.10.105:28300**、**UDP 28400–28431 → 同机同范围**。Linux 防火墙也需放行这两组；具体规则尚未核查/修改。后台 28691 只通过 SSH 打开，控制 28301 仅回环，两者不转发公网。路由器的 DDNS 域名不能直接填作当前只允许 IPv4 的房间对外地址；动态 WAN 地址变化后需重新同步公开配置。实际能否连通由外网朋友验收，不能用本机公网回连或 TCP 能通代替 UDP 入房。
+朋友从外网连接时，路由器转发 **TCP 28300 → 192.168.10.105:28300**、**UDP 28400–28431 → 同机同范围**；防火墙启用时也需允许这两组。本次用户已反馈路由器设置完成，授权的 UFW allow 命令成功；笔记本 UFW 当前为 **inactive**，未改变启用状态，未单独核对持久化规则。后台 28691 只通过 SSH 打开，控制 28301 仅回环，两者不转发公网。路由器的 DDNS 域名不能直接填作当前只允许 IPv4 的房间对外地址；动态 WAN 地址变化后需重新同步公开配置。实际能否连通由外网朋友验收，不能用本机公网回连或 TCP 能通代替 UDP 入房。
 
 Windows 需要 Godot 4.7.2；默认路径是 `D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`。不需要 Node、外部数据库服务或旧项目。脚本参数 `-Godot` 可以指定另一个引擎路径，但更换版本后应重新验证。
 

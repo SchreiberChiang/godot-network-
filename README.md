@@ -70,7 +70,7 @@ bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 
 ## 独立 Linux 服务器目录（无需 Godot 编辑器）
 
-本机朋友试玩入口 **`PlayLinuxPackage.cmd` / `StopLinuxPackage.cmd`** 已指向阶段 6 的配套服务器新实例，后台通过 SSH 打开 <http://127.0.0.1:28691/>。首次自行设置管理员、启动游戏服务器并创建邀请码；朋友收到完整玩家目录后双击 `Client.exe`。路由器转发 TCP **28300**、UDP **28400–28431** 到笔记本 `192.168.10.105`，Linux 防火墙也需放行；不转发后台或控制端口。玩家目录、三步说明与未验收项见 [朋友试玩准备](docs/17_framework_shooter_plan.md#friends-public-preparation)。旧实例不复用；Git 克隆不包含本机清单、程序、连接配置或密码。
+本机朋友试玩入口 **`PlayLinuxPackage.cmd` / `StopLinuxPackage.cmd`** 已指向阶段 6 的配套服务器新实例，后台通过 SSH 打开 <http://127.0.0.1:28691/>。首次自行设置管理员、启动游戏服务器并创建邀请码；朋友收到完整玩家目录后双击 `Client.exe`。路由器转发 TCP **28300**、UDP **28400–28431** 到笔记本 `192.168.10.105`，防火墙启用时也需允许这两组；不转发后台或控制端口。本次路由器设置已由用户反馈完成，笔记本 UFW 未启用，规则命令成功；外网连接待朋友验证。玩家目录、三步说明与未验收项见 [朋友试玩准备](docs/17_framework_shooter_plan.md#friends-public-preparation)。旧实例不复用；Git 克隆不包含本机清单、程序、连接配置或密码。
 
 Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；引擎已包含，缺少 pwsh 时用随包 `PrepareEnvironment.sh prepare`，不再下载 Godot 编辑器。系统库仍单独检查。当前目录及实测范围见 [阶段 6](docs/17_framework_shooter_plan.md#stage6-result)。
 
