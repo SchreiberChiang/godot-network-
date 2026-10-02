@@ -1,5 +1,8 @@
 # 当前状态：RoomKit（2026-10-02）
 
+协作分配更新：台式机已切10x（本机核实剩99%），负责整合；10x dot做移动呈现候选、5x dot做独立夹具，Linux准备独立5x验收。任务单已备但未发送，Linux尚未安装；见 [首批任务单](docs/17_framework_shooter_plan.md#four-way-current-assignment)。
+
+
 ## 同机候选对照复核
 
 两版均可通过本工作树的 **CompareAim.cmd** 离线比较；TAB 看旧/新，ESC 退出。dot 在本机独立复验 59/83/30/8 均 0 失败，两版相同真实渲染夹具通过，真实文件 6/6 不变。核心做法接近，尚未评定真人手感；dot 已补报 23 分 33 秒，本地记录约 24 分 15 秒，口径略不同且仅一次，不判定速度胜负。候选单独提交推送，不合并主线、不更新现有服务。完整范围见 [同机复核](docs/25_shooter_room_rules.md#aim-comparison-review)。
