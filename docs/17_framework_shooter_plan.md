@@ -127,6 +127,18 @@ bash NEW/RoomKit.sh start --instance demo
 
 首轮只读核对因 ZIP 条目使用反斜杠而找不到对应条目，在删除之前停止；兼容两种路径分隔符并要求唯一匹配后完成。当前 Linux 交付 40 文件、保留 Windows 交付 50 文件再次校验通过，真实库/标记/公开配置哈希与时间 **5/5 不变**。没有运行旧包、连接笔记本或开展玩法测试。旧包自身的启动/校验会因缺 EXE 失败，这是本轮记录过的留存状态，不能当作仍可直接启动的回退包。
 
+#### 第四轮执行结果：测试副本与旧 Linux 程序去重
+
+用户问剩余内容能否继续清理，本轮检查后扩展到后台/退房/分离启动测试输出、四份 Windows 包测试副本、提交客户端测试副本、三份早期 Linux 试制包、早期配套部署和旧试制客户端。只删除与保留交付引擎逐字节一致的 `.exe` / `.x86_64` 文件，其它文件不动；没有删除完整测试目录。
+
+共移除 **60 个重复程序，约 5.57 GiB**。872 个其它文件删除前后哈希一致，包含报告、截图、PCK、SQLite、配置和日志。原始 SQLite/Godot 扩展实验 `logs/g-prototype/` 未纳入此轮，真实数据/事件副本不动。被处理的历史输出新增说明，不能再直接运行，重放需先恢复程序。
+
+恢复映射在 `data/cleanup-history-20261002-duplicates-round4/manifest.json`，结果在同目录 `result.json`。Windows 原字节保留于 `artifacts/deployments/windows-retained-20261002/Server/Operator.exe`，Linux 原字节保留于 `artifacts/deployments/linux-20261001193714-dbbe8381/Server/Operator.x86_64`；逐文件记录 SHA256 和长度，未新增二进制归档。`logs/cleanup-round1/restore-duplicate-program.ps1 -RelativePath <清单原路径> -Destination <项目内不存在的绝对目标路径>` 校验来源后恢复单文件，不覆盖现有文件；Windows/Linux 各一件抽测通过。上述来源现承担恢复职责，后续清理前须转移恢复映射，不能随意删除。
+
+当前交付 Linux 40 文件、Windows 50 文件校验通过；真实库/标记/公开配置哈希与时间 **5/5 不变**。全项目约 **7.88 GiB**：artifacts 4.03、logs 2.13、data 1.52，另有当前客户端和源码等。四轮合计释放约 **19.15 GiB**；数字按文件长度，不等同于磁盘分配空间。没有连接 Linux 或重新运行玩法测试。
+
+仍可讨论的体积包括七份旧 Windows ZIP 约 1.49 GiB、SQLite 原型试验依赖约 1.25 GiB、隔离更新测试的程序副本及历史源码包。它们不是一律不能清理：旧 ZIP 已承担第三轮恢复职责，需先转换恢复来源；原型依赖须区分下载/库副本与冷导入失败证据，再去重，不能把报告与基线一起删除。
+
 <a id="linux-package-playtest"></a>
 ## Linux 独立包真人试玩入口（Codex，2026-10-02）
 
