@@ -6,7 +6,7 @@
 
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
-配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过；下一步在 Linux 复验，再准备朋友试玩和赛车。
+配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过，Mint/WSL2 已补基础短验；[后续路线](docs/17_framework_shooter_plan.md#forward-route-20261002) 按依赖准备与授权回收 → 朋友试玩 → 赛车接入安排，当前为规划。
 
 ## 准备服务器和玩家目录
 
