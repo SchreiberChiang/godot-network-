@@ -140,14 +140,16 @@ function RateKeys([string]$Username) {
     $ip=TextValue 'client_ip' 1 64
     return @(('ip:'+[RoomKitPasswords]::Digest($ip)),('user:'+[RoomKitPasswords]::Digest($Username)))
 }
-function CheckRate($Keys) {
-    [void](Query 'DELETE FROM rate_limits WHERE window_start<=?' @([string]($now-900)))
+function CheckRate($Keys,[switch]$ReadOnly) {
+    # Login's preflight must not obtain a write lock just to reject a request
+    # already limited. The write transaction calls this again authoritatively.
+    if (-not $ReadOnly) { [void](Query 'DELETE FROM rate_limits WHERE window_start<=?' @([string]($now-900))) }
     foreach($key in $Keys) {
         $limit=if ($key.StartsWith('ip:')) {20} else {5}
-        $rows=Query 'SELECT failures FROM rate_limits WHERE rate_key=?' @($key)
+        $rows=Query 'SELECT failures FROM rate_limits WHERE rate_key=? AND window_start>?' @($key,[string]($now-900))
         if ($rows.Count -and [int]$rows[0]['failures'] -ge $limit) { Fail 'RATE_LIMITED' }
     }
-    if ([long](Query 'SELECT count(*) AS total FROM rate_limits')[0]['total'] -ge 10000) { Fail 'RATE_LIMITED' }
+    if ([long](Query 'SELECT count(*) AS total FROM rate_limits WHERE window_start>?' @([string]($now-900)))[0]['total'] -ge 10000) { Fail 'RATE_LIMITED' }
 }
 function FailRate($Keys,[string]$Code,[string]$Action) {
     foreach($key in $Keys) {
@@ -163,6 +165,13 @@ function NewPassword([string]$Password) {
 function CheckPassword($Row,[string]$Password) {
     if ($Row['algorithm'] -ne 'pbkdf2-sha256' -or [int]$Row['iterations'] -ne $iterations) { Fail 'STORAGE_UNAVAILABLE' }
     return [RoomKitPasswords]::Verify($Password,$Row['salt'],[int]$Row['iterations'],$Row['password_hash'])
+}
+function SameCredentials($Before,$Current) {
+    if ($null -eq $Before -or $null -eq $Current) { return $false }
+    foreach($field in 'user_id','algorithm','iterations','salt','password_hash') {
+        if (-not [string]::Equals([string]$Before[$field],[string]$Current[$field],[StringComparison]::Ordinal)) { return $false }
+    }
+    return $true
 }
 try {
     if ($RequestJson) {
@@ -194,6 +203,22 @@ try {
         $result=@{ok=$true;code='';sqlite_version=(Query 'SELECT sqlite_version() AS version')[0]['version']}
     } else {
         if ((Query 'PRAGMA user_version')[0]['user_version'] -ne '1') { Fail 'DATABASE_NOT_INITIALIZED' }
+        $loginSnapshot=$null; $loginVerified=$false
+        if ($op -eq 'account.login') {
+            $loginUsername=Username
+            $loginPassword=TextValue 'password' 8 128
+            $loginKeys=RateKeys $loginUsername
+            CheckRate $loginKeys -ReadOnly
+            $loginRows=Query 'SELECT * FROM accounts WHERE username=?' @($loginUsername)
+            # Do the expensive, unchanged KDF without holding SQLite's only
+            # write lock. Never make this stale snapshot the audit actor.
+            if ($loginRows.Count) {
+                $loginSnapshot=$loginRows[0]
+                $loginVerified=CheckPassword $loginSnapshot $loginPassword
+            } else {
+                [void][RoomKitPasswords]::Derive($loginPassword,'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',$iterations)
+            }
+        }
         # One transaction serializes setup, invite consumption, duplicate login,
         # rate limits and credential/session revocation across helper processes.
         [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
@@ -254,9 +279,10 @@ try {
                 $keys=RateKeys $username
                 CheckRate $keys
                 $rows=Query 'SELECT * FROM accounts WHERE username=?' @($username)
-                $valid=$false
-                if ($rows.Count) { $valid=CheckPassword $rows[0] $password }
-                else { [void][RoomKitPasswords]::Derive($password,'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',$iterations) }
+                # Recheck both rate limits and the credentials while writes are
+                # serialized. Reset/delete/recreation during verification cannot
+                # turn an old password check into a new session. No retry/KDF replay.
+                $valid=$loginVerified -and $rows.Count -gt 0 -and (SameCredentials $loginSnapshot $rows[0])
                 if (-not $valid) { $result=FailRate $keys 'AUTH_FAILED' $op; break }
                 $actor=$rows[0]
                 if ([long]$actor['ban_until'] -eq -1 -or [long]$actor['ban_until'] -gt $now) { $result=FailRate $keys 'ACCOUNT_BANNED' $op; break }

@@ -1,5 +1,7 @@
 # 本轮分支修改文件
 
+2026-10-02 Codex 小规模联机修复（基准 `main / e44e47a`）：修改 `tools/account_store.ps1`、`host/core/account_service.gd`、`host/operator.gd`，缩短登录写锁、加入有界账号准入与原预算传递、修复关停时晚登录清理。新增 `tests/test_account_login_lock.ps1`、`tests/run_operator_account_admission.gd`、`tests/run_operator_shutdown_cleanup.gd`；修改 `tests/run_accounts.gd`、`tests/run_operator_backup_wait.gd`、`tests/run_operator_logout_cleanup.gd`、`tests/test_concurrent_login.ps1`、`tests/test_operator_backup_login.ps1`。同步 README、STATUS、docs/17、21、22、本清单及路线图。Windows 严格 2/4/8 人、真实断线重连与备份重叠通过；Linux、朋友设备和旧包更新未运行，真实数据与玩家目录不变。完整差异、旧失败和新证据见 [收尾结果](17_framework_shooter_plan.md#small-group-windows-result)。
+
 2026-10-02 Codex 小规模联机稳定性启动（基准 `main / 1198ecb`）：修改 `tests/test_concurrent_login.ps1`，增加严格全员成功模式、私有分项结果和 Operator 退出检查；同步 README、STATUS、docs/17、22、本清单及路线图。2 人、4 人通过；8 人两轮均只成功 5 人，失败保留，下一步处理写锁竞争与工作名额满。生产代码、协议、数据库格式和玩家交付未改；新源码副本中的固定错误码探针仅在忽略目录，不进入提交。见 [首轮基线](17_framework_shooter_plan.md#small-group-stability)。
 
 2026-10-02 Codex 配套部署与 Linux 离线更新（实施基准 `main / 8cddf26`）：新增 `PrepareDeployment.cmd`、`OpenDeployment.cmd`、`tools/prepare_deployment.ps1`、`tools/check_deployment.ps1`、`tools/open_deployment.ps1`、`tools/update_linux_package.sh`、`tools/update_linux_package.ps1`、`tests/test_deployment_pair.ps1`、`tests/test_linux_package_update.ps1`、`tests/test_linux_deployment_integration.ps1`；修改两个服务端构建脚本和 `tools/prepare_player_client.ps1`，同步 README、STATUS、CHANGELOG、docs/01、17、22、本清单、历史归档与路线图。阶段说明见 [交付记录](17_framework_shooter_plan.md#deployment-stage-result)。二进制、私有测试数据、依赖和证据在忽略目录；不更新正式实例，不删除清理候选、不发布 Release。

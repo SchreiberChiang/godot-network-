@@ -17,7 +17,7 @@ class FakeAccounts extends RefCounted:
 	var delay_ms := 0
 	var calls: Array = []          # tokens passed to session.logout
 	var committed: Dictionary = {}
-	func execute(request: Dictionary) -> Dictionary:
+	func execute(request: Dictionary, _deadline_ms: int = 0) -> Dictionary:
 		lock.lock()
 		calls.append(str(request.get("token", "")))
 		var reply: Dictionary = replies[0] if replies.size() == 1 else replies.pop_front()

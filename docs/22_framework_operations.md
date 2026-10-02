@@ -89,7 +89,21 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_concurrent_lo
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_concurrent_login.ps1 -Clients 8 -PanelPort 29491 -RequireAll
 ```
 
-每组必须全员成功，退出后清理队列归零、无清理失败，每个账号还能逐一重新登录。分项结果保存在该隔离目录的 `logs/result.json`；总退出码非零就不算通过。`after_ms` 是驱动看到结果的时间，不能当作各玩家的独立登录延迟；这些是同机真实 WSS 突发登录，不代替 Linux、朋友设备或压力下的长期验收。
+每组必须全员成功，后台实际在线玩家集合须与全部存活客户端的身份一致。注册、突发登录和逐一复登的每次退出后，都要确认在线人数及清理的 pending/running/failed 归零；全部客户端须有符合预期的真实退出码且错误输出为空。分项结果保存在该隔离目录的 `logs/result.json`；总退出码非零就不算通过。`after_ms` 是驱动看到结果的时间，不能当作各玩家的独立登录延迟；这些是同机真实 WSS 突发登录，不代替 Linux、朋友设备或压力下的长期验收。
+
+定位与边界专项：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/test_account_login_lock.ps1
+$r = Join-Path (Get-Location) ('data/account-admission-' + [guid]::NewGuid().ToString('N'))
+$a = "--data-root=$r/data;--games=$r/games.json;--public-client-dir=$r/public;--operator-log-path=$r/operator.log;--panel-port=30091"
+./tools/run_isolated_test.ps1 -Script tests/run_operator_account_admission.gd -Isolation $r -Log "$r/result" -TestArgs $a
+$r = Join-Path (Get-Location) ('data/shutdown-cleanup-' + [guid]::NewGuid().ToString('N'))
+$a = "--data-root=$r/data;--games=$r/games.json;--public-client-dir=$r/public;--operator-log-path=$r/operator.log;--panel-port=30091"
+./tools/run_isolated_test.ps1 -Script tests/run_operator_shutdown_cleanup.gd -Isolation $r -Log "$r/result" -TestArgs $a
+```
+
+写锁专项复制真实存储助手，在真实密码验证后设置有限屏障，另一个 SQLite 连接只有 300 毫秒锁等待：覆盖改密、封禁、限流、删除、同名重建及新身份读取。准入和关停专项使用生产处理器与替身，不启动服务或数据库，不替代真实多客户端验收。关停同时核对 `SHUTDOWN_CLEANUP_RESULT` / 私有结果中的 failed，不能只看退出码。真实备份登录驱动 `tests/test_operator_backup_login.ps1` 另核对同一玩家的登录审计增量恰好一条，包含失败重发检查；其隔离游戏索引与实际等待日志仍是必需证据。
 
 ### 基础回归（`tools/run.ps1`）
 

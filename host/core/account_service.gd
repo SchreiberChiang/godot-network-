@@ -37,10 +37,10 @@ func _initialize_posix(directory: String) -> Dictionary:
 		return Wire.failure("PRIVATE_DATA_FAILED")
 	return result
 
-func execute(request: Dictionary) -> Dictionary:
+func execute(request: Dictionary, deadline_ms: int = 0) -> Dictionary:
 	if Validator.validate_file(request, "res://schemas/account_request.schema.json") != "":
 		return Wire.failure("INVALID_ACCOUNT_REQUEST")
-	return _dispatch(request)
+	return _dispatch(request, deadline_ms)
 
 func authenticate(credential: String, _now: int = 0) -> Dictionary:
 	# Time is read inside the backend, never accepted from a client or caller.
@@ -68,7 +68,7 @@ func close_deletion(job_id: String) -> Dictionary:
 func prewarm() -> Dictionary:
 	return _dispatch({"op": "session.authenticate", "token": "0".repeat(64)})
 
-func _dispatch(request: Dictionary) -> Dictionary:
+func _dispatch(request: Dictionary, deadline_ms: int = 0) -> Dictionary:
 	if root.is_empty():
 		return Wire.failure("STORAGE_UNAVAILABLE")
 	# Only session.authenticate uses the resident worker in this stage: it is safe to
@@ -80,7 +80,18 @@ func _dispatch(request: Dictionary) -> Dictionary:
 			return reply
 	# Passwords and tokens go to the helper over stdin only; no request file is
 	# written, so a host crash mid-call leaves no secret in the data directory.
-	var result := Helper.execute_input("account_store.ps1", ["-Database", database], JSON.stringify(request), 30000)
+	# Internal monotonic deadline, never supplied by a network payload. Recompute
+	# on this worker immediately before launching, so admission/thread delay does
+	# not grant a fresh 30-second helper budget. Windows pipe startup/reaping still
+	# has its existing overhead; this is not a hard wall-clock return guarantee.
+	var remaining_ms := 30000
+	if deadline_ms > 0:
+		remaining_ms = mini(remaining_ms, deadline_ms - Time.get_ticks_msec())
+		# The Windows helper accepts budgets of at least 100 ms. Never round
+		# up a shorter remainder and accidentally grant time past the deadline.
+		if remaining_ms < 100:
+			return Wire.failure("RATE_LIMITED")
+	var result := Helper.execute_input("account_store.ps1", ["-Database", database], JSON.stringify(request), remaining_ms)
 	if str(result.get("code", "")).begins_with("HELPER_"):
 		return Wire.failure("STORAGE_UNAVAILABLE")
 	return result

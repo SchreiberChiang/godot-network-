@@ -8,7 +8,7 @@ class FakeAccounts extends RefCounted:
 	var lock := Mutex.new()
 	var calls: Array = []
 	var login_delay_ms := 0
-	func execute(request: Dictionary) -> Dictionary:
+	func execute(request: Dictionary, _deadline_ms: int = 0) -> Dictionary:
 		var op := str(request.op)
 		lock.lock()
 		calls.append(op)

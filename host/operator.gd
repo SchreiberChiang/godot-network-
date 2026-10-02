@@ -35,6 +35,7 @@ const LOGOUT_REPLY_WAIT_MS := 8000
 const BACKUP_WAIT_LIMIT_MS := 10000
 const MAX_BACKUP_WAITERS := 64
 const MAX_ACCOUNT_REQUESTS := MAX_BACKUP_WAITERS + 8
+const ACCOUNT_REQUEST_LIMIT_MS := 30000
 var accounts = Accounts.new()
 var assets = Assets.new()
 var results = Results.new()
@@ -576,7 +577,8 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 			request_bus.respond(peer_id, request_id, result)
 		return
 	var account_op: bool = action == "account.execute" and payload.get("op", "") in ["account.register", "account.login", "account.change_password", "account.rename"]
-	var context: Dictionary = {"bus": request_bus, "cancelled": false}
+	var context: Dictionary = {"bus": request_bus, "cancelled": false,
+		"epoch": maintenance_epoch, "deadline_ms": Time.get_ticks_msec() + ACCOUNT_REQUEST_LIMIT_MS}
 	var context_key := _account_context_key(request_bus, peer_id, request_id)
 	if account_op:
 		if account_requests.size() >= MAX_ACCOUNT_REQUESTS or account_requests.has(context_key):
@@ -590,6 +592,8 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 		admission = await _wait_for_backup(context, peer_id) if account_op else Wire.failure("STORAGE_UNAVAILABLE")
 	elif account_op and _account_request_cancelled(context, peer_id):
 		admission = Wire.failure("CONTROL_UNAVAILABLE")
+	if admission.ok and account_op:
+		admission = await _wait_for_account_worker(context, peer_id)
 	if not admission.ok:
 		if account_op:
 			account_requests.erase(context_key)
@@ -600,7 +604,9 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 	match action:
 		"account.execute":
 			if payload.get("op", "") in ["account.register", "account.login", "session.logout", "account.change_password", "account.rename"]:
-				result = await _work(accounts.execute.bind(payload))
+				# Admission and _work's increment run on the same main loop with no
+				# await between them. Queued accounts never occupy a storage worker.
+				result = await _work(accounts.execute.bind(payload, int(context.deadline_ms)))
 				if result.ok and payload.op == "account.login":
 					player_tokens[result.token] = result.identity.user_id
 					if _account_request_cancelled(context, peer_id):
@@ -649,6 +655,32 @@ func _end_storage_maintenance() -> void:
 	storage_maintenance = false
 	maintenance_kind = ""
 
+## A bounded admission wait, not a replay. The original account budget also
+## covers any backup wait; the service recomputes it when its worker starts.
+## Missed maintenance windows are refused, including a restore that completed
+## before this coroutine woke. Only an observed new backup may be waited out.
+func _wait_for_account_worker(context: Dictionary, peer_id: String) -> Dictionary:
+	while true:
+		if _account_request_cancelled(context, peer_id):
+			return Wire.failure("CONTROL_UNAVAILABLE")
+		if quitting:
+			return Wire.failure("STORAGE_MAINTENANCE")
+		if Time.get_ticks_msec() >= int(context.deadline_ms):
+			return Wire.failure("RATE_LIMITED")
+		if maintenance_epoch != int(context.epoch):
+			if maintenance_epoch != int(context.epoch) + 1 or not storage_maintenance or maintenance_kind != "backup":
+				return Wire.failure("STORAGE_MAINTENANCE")
+			context.epoch = maintenance_epoch
+		if storage_maintenance:
+			var admitted: Dictionary = await _wait_for_backup(context, peer_id)
+			if not admitted.ok:
+				return admitted
+			continue
+		if worker_count < 8:
+			return {"ok": true}
+		await process_frame
+	return Wire.failure("RATE_LIMITED")
+
 ## Wait on main-loop frames, without a storage worker. Execute once only if
 ## this exact backup window ended before the deadline.
 func _wait_for_backup(context: Dictionary, peer_id: String) -> Dictionary:
@@ -658,7 +690,7 @@ func _wait_for_backup(context: Dictionary, peer_id: String) -> Dictionary:
 		return Wire.failure("RATE_LIMITED")
 	backup_waiters += 1
 	var started := Time.get_ticks_msec()
-	var deadline := started + BACKUP_WAIT_LIMIT_MS
+	var deadline := mini(started + BACKUP_WAIT_LIMIT_MS, int(context.get("deadline_ms", started + BACKUP_WAIT_LIMIT_MS)))
 	var epoch := maintenance_epoch
 	var result: Dictionary
 	print("OPERATOR_BACKUP_WAIT t=", started, " event=queued waiting=", backup_waiters)
@@ -1033,6 +1065,11 @@ func _shutdown() -> void:
 		await _host_command("server.stop", {"immediate": true})
 		while host_owned or host_closing:
 			await process_frame
+	# An in-flight login may finish after its host disappeared and only then
+	# enqueue token cleanup. Drain account replies before inspecting cleanup;
+	# otherwise an initially empty queue lets that late session escape shutdown.
+	while worker_count > 0 or not account_requests.is_empty():
+		await process_frame
 	# Pending clean-up keeps its own deadline (35 s per job); what is left after that
 	# is logged as failed by the clean-up itself.
 	var cleanup_end := Time.get_ticks_msec() + SessionCleanup.JOB_DEADLINE_MS + 1000

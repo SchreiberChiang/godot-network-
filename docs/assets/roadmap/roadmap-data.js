@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "小规模联机稳定性推进，基准 main @ 1198ecb；当前提交用 git log -1 核实；验收范围以 STATUS 和 docs/17 顶部为准",
+  baseline: "小规模联机 Windows 收尾，修复基准 main @ e44e47a；当前提交用 git log -1 核实；Linux 与朋友设备另验，范围以 STATUS 和 docs/17 顶部为准",
   statuses: {
     verified:    { label: "已验证", hint: "在条目注明的环境通过指定自动验收；不等于所有平台或场景通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -28,17 +28,17 @@ window.ROADMAP_DATA = {
     { id: 2, label: "阶段 2：主线与试玩体验", hint: "GitHub 主线、按清单清理、独立射击客户端、后台 UI、基础音效" },
     { id: 3, label: "阶段 3：跨平台完整服务器", hint: "Linux 完整后台与服务器，Windows 仍可一键运行" },
     { id: 4, label: "阶段 4：部署与更新", hint: "配套目录和 Linux 离线更新已验证；自动安装、Windows 迁移和启动失败自动回退另排" },
-    { id: 5, label: "阶段 5：小规模联机稳定性", hint: "当前推进 2/4/8 人登录、掉线重连与备份重叠；Windows 基线先行" },
+    { id: 5, label: "阶段 5：小规模联机稳定性", hint: "Windows 2/4/8 人、重连与备份重叠通过；下一步 Linux 同提交复验" },
     { id: 9, label: "以后 / 未排期", hint: "已记录边界，未安排阶段" }
   ],
   nodes: [
     { id: "small-group-stability", area: "account", phase: 5, status: "pending",
       title: "2–8 人突发登录与会话稳定性",
-      summary: "先补严格并发登录验收，再验证掉线重连和真实备份重叠。",
-      details: "每组全部成功才算通过，容量拒绝如实记失败；退出后会话须清理，每个账号可重新登录。先用全新 Windows 隔离环境，Linux 与朋友设备复验另列，不放宽认证、不扩大登录重试。",
-      files: ["tests/test_concurrent_login.ps1", "tests/test_operator_backup_login.ps1", "tests/test_asset_response_loss.ps1"],
-      docs: ["docs/17_framework_shooter_plan.md#small-group-stability"],
-      evidence: "Windows 严格基线：2/2、4/4 成功，各检查 8/0；8 人两轮均 5/8、7/1，写锁竞争和工作名额满待修；退出清理及 8/8 逐一重登通过，Linux/重连/备份重叠本轮未复验" },
+      summary: "Windows 已全员登录、清理与重连通过；Linux 开机后复验同一提交。",
+      details: "登录先在写锁外验密码，签发会话时重新核对完整凭据、封禁和限流。工作名额满时有限等待，退出时收完晚登录的令牌清理。验收核对全部客户端存活、后台实际在线身份和完整清理；备份重叠通过真实审计确认只执行一次。密码强度与重试范围未改，Linux/朋友设备/新分发包仍待验证。",
+      files: ["tools/account_store.ps1", "host/core/account_service.gd", "host/operator.gd", "tests/test_account_login_lock.ps1", "tests/run_operator_account_admission.gd", "tests/run_operator_shutdown_cleanup.gd", "tests/test_concurrent_login.ps1", "tests/test_operator_backup_login.ps1", "tests/test_asset_response_loss.ps1"],
+      docs: ["docs/17_framework_shooter_plan.md#small-group-windows-result", "docs/21_managed_protocol.md#登录验证与工作预算2026-10-02"],
+      evidence: "Windows 2/4/8 人全部成功：35/0、55/0、95/0，8 人另有 95/0；断线重连25/0、真实备份重叠16/0（等待1009 ms、登录审计仅一次）；旧5/8失败及写锁/关停新旧对照保留，Linux待复验" },
     // ---------- 账号 ----------
     { id: "acc-register", area: "account", phase: 0, status: "verified",
       title: "邀请码注册与登录",

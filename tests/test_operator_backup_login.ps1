@@ -39,13 +39,35 @@ function WaitOffline {
     $until=[DateTime]::UtcNow.AddSeconds(25)
     do {
         $state=Rk-Api 'status'
-        if($state.ok -and @($state.payload.players).Count -eq 0 -and
+        if (-not $state.ok -or $null -eq $state.payload -or
+            'players' -notin @($state.payload.PSObject.Properties.Name) -or
+            $null -eq $state.payload.players -or $null -eq $state.payload.session_cleanup) {
+            throw 'status did not return a valid player and cleanup snapshot'
+        }
+        foreach($key in 'pending','running','failed') {
+            if ($key -notin @($state.payload.session_cleanup.PSObject.Properties.Name) -or
+                $null -eq $state.payload.session_cleanup.$key) { throw 'status did not return complete cleanup counters' }
+        }
+        if(@($state.payload.players).Count -eq 0 -and
            $state.payload.session_cleanup.pending -eq 0 -and
            $state.payload.session_cleanup.running -eq 0 -and
            $state.payload.session_cleanup.failed -eq 0){return $true}
         Start-Sleep -Milliseconds 100
     }while([DateTime]::UtcNow -lt $until)
     return $false
+}
+function ReadLoginAudit([string]$UserId) {
+    $reply=Rk-Api 'audit.list'
+    if (-not $reply.ok -or $null -eq $reply.payload -or
+        'entries' -notin @($reply.payload.PSObject.Properties.Name) -or $null -eq $reply.payload.entries) {
+        throw 'audit.list did not return a valid entries snapshot'
+    }
+    # The merged account audit names the successful login target as user_id.
+    # A rejected duplicate can have an empty target but the same actor_id, so
+    # include that actor in a second count to detect valid-credential replays.
+    $target=@($reply.payload.entries | Where-Object { $_.action -ceq 'account.login' -and $_.user_id -ceq $UserId })
+    $related=@($reply.payload.entries | Where-Object { $_.action -ceq 'account.login' -and ($_.user_id -ceq $UserId -or $_.actor_id -ceq $UserId) })
+    return @{target=$target;related=$related}
 }
 function ReadConsole {
     $stream=New-Object IO.FileStream($console,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
@@ -68,7 +90,8 @@ try {
     $credentials=$account.Clone(); $credentials.register=$true; $credentials.invite_code=$invitation.payload.invite_code
     $client=Rk-StartClient $Godot $project $evidence 'register' 'turns' $connection $games.turns.manifest $credentials
     $ready=Rk-WaitReport $client {param($r) $r.phase -eq 'LOBBY' -and $r.ok} 90
-    Check ($null -ne $ready) 'real WSS player registers and logs in'
+    Check ($null -ne $ready -and -not $client.process.HasExited -and [string]$ready.user_id -ne '') 'real WSS player registers and logs in with a live process and player identity'
+    $playerId=[string]$ready.user_id
     Check (Rk-StopClient $client) 'registration client closes with exit code zero'
     $client=$null
     Check (WaitOffline) 'previous session is cleaned before the overlap trial'
@@ -77,6 +100,8 @@ try {
     $http.Timeout=[TimeSpan]::FromSeconds(65)
     $http.DefaultRequestHeaders.ExpectContinue=$false
     for($trial=1;$trial -le 3 -and $observed -eq 0;$trial++) {
+        Check (WaitOffline) ('trial '+$trial+' begins with no online session or cleanup')
+        $beforeAudit=ReadLoginAudit $playerId
         $before=(ReadConsole).Length
         $request=New-Object System.Net.Http.HttpRequestMessage([Net.Http.HttpMethod]::Post,($script:RkApiUrl+'/api'))
         $request.Headers.Authorization=New-Object Net.Http.Headers.AuthenticationHeaderValue('Bearer',$script:RkToken)
@@ -88,10 +113,15 @@ try {
         $credentials=$account.Clone(); $credentials.register=$false
         $client=Rk-StartClient $Godot $project $evidence ('login-'+$trial) 'turns' $connection $games.turns.manifest $credentials
         $ready=Rk-WaitReport $client {param($r) $r.phase -eq 'LOBBY' -and $r.ok} 90
-        Check ($null -ne $ready) ('trial '+$trial+' original login completes without client retry')
+        Check ($null -ne $ready -and -not $client.process.HasExited -and [string]$ready.user_id -ceq $playerId) ('trial '+$trial+' original login reaches the lobby with its registered identity and a live process')
         $reply=$task.GetAwaiter().GetResult()
         $body=$reply.Content.ReadAsStringAsync().GetAwaiter().GetResult()|ConvertFrom-Json
         Check ($reply.IsSuccessStatusCode -and $body.ok) ('trial '+$trial+' real SQLite backup succeeds')
+        $afterAudit=ReadLoginAudit $playerId
+        Check ($afterAudit.target.Count -eq ($beforeAudit.target.Count+1) -and
+            @($afterAudit.target | Where-Object { $_.code -cne 'OK' }).Count -eq 0) ('trial '+$trial+' persists exactly one new successful player login audit')
+        Check ($afterAudit.related.Count -eq ($beforeAudit.related.Count+1) -and
+            @($afterAudit.related | Where-Object { $_.code -cne 'OK' }).Count -eq 0) ('trial '+$trial+' has no additional login replay or rejected duplicate in its player audit')
         $tail=(ReadConsole).Substring($before)
         $waits=@([regex]::Matches($tail,'OPERATOR_BACKUP_WAIT t=\d+ event=finished code=OK ms=(\d+) waiting=\d+'))
         if($waits.Count -gt 0){$observed++; Write-Output ('BACKUP_LOGIN_WAIT trial='+$trial+' ms='+$waits[0].Groups[1].Value)}else{Write-Output ('BACKUP_LOGIN_NO_OVERLAP trial='+$trial)}

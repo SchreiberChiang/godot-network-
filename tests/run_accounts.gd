@@ -21,6 +21,9 @@ func _run() -> void:
 		finish()
 		return
 	check(not call_api({"op": "setup.status"}).initialized, "initial setup required")
+	var budget_request := {"op": "account.login", "username": "budget_user", "password": PASSWORD, "client_ip": "127.0.0.2"}
+	check(service.execute(budget_request, Time.get_ticks_msec() - 1).code == "RATE_LIMITED", "expired internal login budget is refused before starting its helper")
+	check(service.execute(budget_request, Time.get_ticks_msec() + 50).code == "RATE_LIMITED", "a remainder below the wrapper minimum is refused instead of rounded up or misreported")
 	check(service.execute({"op": "account.login", "username": "bad", "password": PASSWORD}).code == "INVALID_ACCOUNT_REQUEST", "network origin required for rate-limited operation")
 	check(service.execute({"op": "account.login", "username": "bad", "password": PASSWORD, "client_ip": "local", "role": "admin"}).code == "INVALID_ACCOUNT_REQUEST", "claimed role rejected by schema")
 	check(register("before_setup", "0".repeat(32)).code == "SETUP_REQUIRED", "registration cannot precede admin setup")
