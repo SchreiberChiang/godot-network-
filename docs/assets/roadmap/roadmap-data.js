@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "阶段7已获公网试玩人工反馈；main现已接收本地枪口呈现与诊断，身体移动未修改，配套试玩包未更新。笔记本游戏服务已按用户要求停止；dot云端/本地协调小试验任务已备但未执行。当前提交用git log -1核实，目录和分工以docs/17顶部为准",
+  baseline: "阶段7已获公网试玩人工反馈；main现已接收本地枪口呈现与诊断，用户反馈转枪验证无问题，身体移动未修改，配套试玩包未更新。笔记本游戏服务已按用户要求停止；dot协调小试验任务已放在笔记本桌面，未执行。当前提交用git log -1核实，目录和分工以docs/17顶部为准",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -246,11 +246,11 @@ window.ROADMAP_DATA = {
       evidence: "诊断30/0、真实OpenGL专项/截图31/0、射击83/0、反馈8/0，退出0且stderr空；没有测量真人公网延迟，不宣称卡顿已修复" },
     { id: "game-movement-presentation", area: "game", phase: 7, status: "pending",
       title: "移动与瞄准显示平滑",
-      summary: "主线已接收本地枪口方案；身体移动、配套更新与真人手感待完成。",
+      summary: "主线枪口已获用户验证无问题反馈；身体移动与配套联网更新待完成。",
       details: "自己的枪逐帧跟随可操作时的鼠标方向，其他枪走50ms最短角度插值；失焦、弹窗、离房、死亡复活和换局复位，服务器射击判定不变。根目录PreviewAim提供离线旧/新预览。两份历史候选仍保留；身体移动需另验断流、传送和重同步，不把更大显示延迟当成成功。dot协调小试验已备，移动与独立验收任务暂未派发。",
       files: ["examples/shooter/game.gd", "examples/framework/client.gd", "tests/run_aim_presentation.gd", "PreviewAim.cmd"],
       docs: ["docs/17_framework_shooter_plan.md#worktree-mainline-20261002", "docs/25_shooter_room_rules.md#aim-presentation-mainline"],
-      evidence: "主线隔离枪口94/0、射击83/0、诊断30/0、反馈8/0，退出0且stderr空，四脚本解析通过；本轮未重建或验收联机/真人画面，身体移动未修复" },
+      evidence: "主线隔离枪口94/0、射击83/0、诊断30/0、反馈8/0，退出0且stderr空，四脚本解析通过；用户反馈转枪验证无问题，联网包未重建，身体移动未修复" },
     { id: "game-turns", area: "game", phase: 0, status: "verified",
       title: "取石子示例（当前第二玩法）",
       summary: "回合制取石子，和射击共用账号与资产服务，可买玉石主题。",
