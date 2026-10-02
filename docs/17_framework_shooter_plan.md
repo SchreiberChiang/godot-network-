@@ -139,6 +139,17 @@ bash NEW/RoomKit.sh start --instance demo
 
 仍可讨论的体积包括七份旧 Windows ZIP 约 1.49 GiB、SQLite 原型试验依赖约 1.25 GiB、隔离更新测试的程序副本及历史源码包。它们不是一律不能清理：旧 ZIP 已承担第三轮恢复职责，需先转换恢复来源；原型依赖须区分下载/库副本与冷导入失败证据，再去重，不能把报告与基线一起删除。
 
+#### 第五轮执行结果：不参与当前开发的依赖与旧包
+
+用户授权删除不影响当前开发的内容。本轮核对主工程/构建脚本：godot-sqlite 未接入 host、SDK、当前打包和客户端，位于独立原型中。它的 iOS 静态库不参与当前 Windows/Linux 开发，但确属历史原型输入，不能把移除后的目录称为完整原始输入。
+
+- 六份过期 Windows ZIP 的全部文件成员已解压计算哈希，81 个唯一对象合并到 `data/cleanup-history-20261002-noncore-round5/objects.zip`（约 41 MiB）后移除旧 ZIP。保留当前 `framework-release.json` 指向的 aa019dbc ZIP、解压目录及两套当前配套交付。旧 ZIP 容器的原始字节布局不保留，各成员原字节完整保留；不能声称可重建出原容器 SHA256。
+- 32 个 iOS `.a` 文件与官方 v4.9 下载包逐字节一致，已移除。官方包 `logs/g-prototype/download/addons.zip`（SHA256 `95e91b72…cb0`）、当前 Windows/Linux `.dll`/`.so` 和许可、失败日志、源码与 `.godot` 冷导入缓存均保留。重放完整原实验输入前需按映射从官方 ZIP 补回 iOS 库。没有改实验代码或重新导入，不能把这轮清理当作崩溃修复验收。
+- 原路径、旧 ZIP 成员和官方库条目映射在同目录 `manifest.json`。第三轮 `recovery-objects.json` 已切换到集中对象包；`logs/cleanup-round1/restore-bundle-exe.ps1` 可继续恢复历史 EXE，抽测通过。iOS 库从官方 ZIP 恢复一件并核对哈希，抽测通过。以上合计净释放约 **2.26 GiB**。
+- `data/deployment-update-2e3ab445a2e9/new.tar`、`old.tar` 及 `data/deployment-update-5cc032ae2d7c/final-server.tar` 是历史更新测试输入，不是当前运行库。完整 TAR 原字节已压缩到 `data/cleanup-history-20261002-test-input-tars-round5/objects.zip`（约 337 MiB），清掉未压缩副本，另省约 **0.50 GiB**。恢复脚本、路径/哈希清单和结果在同目录，实际恢复一件通过；重放旧测试前先恢复。
+
+本轮净释放约 **2.77 GiB**。真实库/标记/公开配置哈希与时间 **5/5 不变**；当前 Linux 40 文件、Windows 50 文件再次校验通过。没有删除用户数据、连接笔记本或运行服务/玩法回归。全项目按文件长度约 **5.12 GiB**；五轮累计释放约 **21.93 GiB**。Git 跟踪的 435 个文件合计约 **5.93 MiB**，说明核心源码并不大。剩余体积主要为当前可用程序、备份/事件副本和压缩证据输入，不能把它们当作同一种源码缓存。
+
 <a id="linux-package-playtest"></a>
 ## Linux 独立包真人试玩入口（Codex，2026-10-02）
 
