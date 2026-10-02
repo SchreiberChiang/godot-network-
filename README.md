@@ -59,21 +59,23 @@ bash tools/roomkit_linux.sh status
 bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 ```
 
+依赖齐备后可直接克隆 GitHub 主线、在 Linux 本机准备游戏并启动，无需 Windows 预构建。`2076e1b` 在 Mint 22.3 与 WSL2 Ubuntu 24.04.3 的全新目录各完成一次双客户端短闭环 **29/0**，未沿用旧账号和配置；不代表零依赖安装或任意 Linux/云服务器已通过，见 [克隆验收](docs/17_framework_shooter_plan.md#fresh-clone-linux-wsl)。
+
 每个实例的数据、游戏索引、公开配置和 HOME/XDG/tmp 都在 `data/instance-<名>/`（默认 `l3`），默认只绑定 127.0.0.1；端口可以用 `--panel-port`、`--lobby-port`、`--control-port`、`--udp-range`、`--bind` 指定，但只在实例第一次创建时生效。已在一台 x86_64 笔记本上完成同机及 Windows 客户端直连 Linux 的局域网自动验收；公网尚未验收，独立导出目录的入口见下一节。
 
-本机专用的 Linux 联机客户端：双击 **`OpenLinuxPlayerClient.cmd`** 打开独立目录，再双击其中的 `Client.exe`。它连接笔记本测试实例，保留原 `PlayerClient`；生成的程序和连接配置不进入 Git。邀请码、启停和复验说明见 [Linux 跨机试玩](docs/17_framework_shooter_plan.md#linux-lan)。
+此前的 Linux 联机客户端入口 **`OpenLinuxPlayerClient.cmd`** 保留为历史快捷方式，保留原 `PlayerClient`；旧试玩账号和连接配置已清除，须重新初始化实例并生成匹配的公开配置后才能使用。生成的程序和连接配置不进入 Git。历史验收见 [Linux 跨机试玩](docs/17_framework_shooter_plan.md#linux-lan)。
 
-**从台式机打开 Linux 后台：双击根目录 `OpenLinuxManagement.cmd`，保持窗口打开。** 入口建立 SSH 转发，再在浏览器打开 <http://127.0.0.1:28491/>；按回车或关闭入口窗口只断开这次转发，不停 Linux 服务。后台只监听笔记本自己的回环地址，不能直接打开 `http://192.168.10.105:28491/`。网址填在浏览器地址栏，不是 SSH 终端命令；测试管理员与 Windows 管理员不同，信息在本机私有 `data/codex-linux-lan-20261001224135-8dd5ca/admin.json`。入口不启动远程服务，SSH 认证不可用时明确报错，不修改 SSH 配置。说明见 [后台访问与下一阶段](docs/17_framework_shooter_plan.md#linux-management-entry)。
+**从台式机打开此前 Linux 后台：双击根目录 `OpenLinuxManagement.cmd`，保持窗口打开。** 入口建立 SSH 转发并打开 <http://127.0.0.1:28491/>，关闭只断转发、不停服务；后台仅监听笔记本回环，不能直接用笔记本 IP:28491。入口不启动远程服务，也不指向本轮 29191 的短验实例。旧试玩账号及连接配置已按授权清除，历史 admin.json 不再有效；再次试玩需初始化实例并取得新的公开配置。说明见 [后台入口](docs/17_framework_shooter_plan.md#linux-management-entry) 和 [本轮边界](docs/17_framework_shooter_plan.md#fresh-clone-linux-wsl)。
 
 ## 独立 Linux 服务器目录（无需 Godot 编辑器）
 
-本机真人试玩：双击根目录 **`PlayLinuxPackage.cmd`**，它启动已准备的独立测试包，打开后台、匹配客户端目录和私有登录说明。后台用 <http://127.0.0.1:28691/>（保持入口窗口打开），玩家直接双击目录内 `Client.exe`。全部结束后双击 **`StopLinuxPackage.cmd`**。这两个入口仅用于本机已准备的测试实例，不是任意服务器的部署工具；Git 克隆不包含本机清单、程序或密码。三步说明见 [独立包试玩](docs/17_framework_shooter_plan.md#linux-package-playtest)。
+此前独立包试玩入口 **`PlayLinuxPackage.cmd` / `StopLinuxPackage.cmd`** 保留为历史快捷方式（面板 28691）。旧实例的当前账号和 TLS 配置已清除，旧登录说明与客户端连接配置不能直接复用；须重新初始化并准备匹配的公开配置后再试玩。这两个入口不指向本轮 29191 短验实例，也不是任意服务器的部署工具；Git 克隆不包含本机清单、程序或密码。历史三步说明见 [独立包试玩](docs/17_framework_shooter_plan.md#linux-package-playtest)。
 
 Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；仍需已有的 **pwsh 7.6.6** 和系统 **libsqlite3.so.0**，脚本不安装依赖。当前目录及实测范围见 [Linux 独立目录](docs/17_framework_shooter_plan.md#linux-server-directory)。
 
 在目录内依次运行 `bash CheckPackage.sh` → `bash RoomKit.sh start --instance demo`；状态用 `bash RoomKit.sh status --instance demo`，停止用 `bash RoomKit.sh stop --instance demo`。默认只绑定回环，新实例的端口与对外地址可在首次启动时设置；重启沿用保存配置。后台通过本机浏览器或同号 SSH 转发访问。玩家仍使用版本匹配的 Windows 客户端。
 
-**Linux 可以自己独立启动**，不用先开 Windows 台式机。复制干净普通包、依赖已准备好后，在 Linux 本机运行上面的命令，再用该 Linux 的浏览器打开打印的地址。台式机的 `PlayLinuxPackage.cmd` 只是当前测试实例的远程快捷方式。全新电脑需选自己的平台包：Windows 包自带引擎并使用系统 PowerShell/SQLite；Linux 包还需兼容的 pwsh 和系统库。当前没有自动安装全部依赖的通用入口，不能把现有笔记本通过当作任意全新电脑一键部署通过。
+**Linux 可以自己独立启动**，不用先开 Windows 台式机。复制干净普通包、依赖已准备好后，在 Linux 本机运行上面的命令，再用该 Linux 的浏览器打开打印的地址。台式机的 `PlayLinuxPackage.cmd` 只是此前已准备实例的远程快捷方式。全新电脑需选自己的平台包：Windows 包自带引擎并使用系统 PowerShell/SQLite；Linux 包还需兼容的 pwsh 和系统库。当前没有自动安装全部依赖的通用入口，不能把现有笔记本通过当作任意全新电脑一键部署通过。
 
 运行会产生私有账号库、密钥与日志；给别人分发应使用 Windows 构建出的干净目录，不能复制已经运行过的目录。其它发行版、ARM、公网和开机服务另行验收。
 

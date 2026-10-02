@@ -11,13 +11,16 @@
 | 主线引擎 | ~/roomkit/tools/godot/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64，official ed1daf0bf；不替换 |
 | 正式存储运行时 | ~/roomkit/tools/pwsh/7.6.6/pwsh；系统 libsqlite3.so.0；不接实验扩展 |
 | 主线源码/证据 | ~/roomkit/src/<快照>/、incoming/<运行号>/、runs/<运行号>/；库在该源码快照 data/，不用真实库 |
+| GitHub 干净克隆（10-02） | Mint 与 WSL2 各克隆 `2076e1b` 至 `~/roomkit/clones/clean-clone-20261002-a512ec93/`，初始无缓存/旧数据，各一次短闭环 29/0，退出 0；已停止且无测试残留。详见 docs/17 的 fresh-clone-linux-wsl |
+| WSL2 实际环境（10-02） | Ubuntu 24.04.3 LTS、用户 ubuntu；系统 SQLite/ICU 74/OpenSSL 3 已有。同一套官方 Godot 4.7.2/pwsh 7.6.6 包校验后解压至新 `~/roomkit/tools/`，未装系统包/改全局配置；新增调试目录约 333 MiB。只验回环，不算云端或 WSL 对外联机通过 |
+| 旧试玩账号清理（10-02） | 两份已停实例 `src/572c3563ac02-lan-8dd5ca/data/instance-lan-8dd5ca/`、`releases/linux-20261001164710-0b536417/data/instance-export-0b536417/` 的当前库/配置/TLS/公开连接与运行标记已删除；历史备份、审计、源码/工具保留。旧凭据说明失效 |
 | 旁路实验 | ~/roomkit/experiments/sqlite-import-lab/；另一 AI 负责，最新仅报告准备补丁、未编译；本轮未进入核查 |
 | Codex 独立复验 | codex-l2b1-7f1a0ba8-r2 已新建 incoming/src/runs 并完成；16 步失败 1 步（既有 unit），退出 1 |
 | SSH | 保留主机指纹核验；历史 retry-02 经用户输入密码完成测试。本轮 `BatchMode=yes` 已成功认证，没有修改 SSH 或读取认证配置，不在聊天/文件保存密码 |
 | L3 同机验收（10-01，Claude） | `20261001060258-bdccea`：45 步失败 1 步（60 分钟耐久 75/78 周期）。运行前系统盘 439G 已用 46G、内存可用约 5.8 GB；耐久时 6–8 客户端 CPU 常 93–100%（同机另有 sunshine、ZCode 等）。正式入口 `tools/roomkit_linux.sh`，实例在源码快照 `data/instance-l3/`，只绑 127.0.0.1；每轮新源码目录带 `-r<后缀>`。只读辅助：`tools/linux_progress.sh`、`tools/linux_fetch_evidence.sh`（`ssh … "bash -s" < 脚本`） |
 | L3 独立复验（10-01，Codex） | `20261001203131-57358f`：C/D/E 功能通过，完整对局 47/0、60 分钟 82/82，自动备份两次成功，一次登录等待 1542 ms；原始 38 步因 HOME 目录项变化失败 1 步，退出 1，详见 docs/17。`20261001221221-79ad35` 新快照验证结果服务退出补修：集成 133/0、引用/回执 9/0、真实备份登录 13/0，退出 0，后台错误输出 0 |
 | Windows → Linux LAN（10-01，Codex） | 同一提交 `572c356`，Windows 192.168.10.100（以太网）直连 Linux 192.168.10.105（wlp3s0）；最终 38/0、退出 0，含源码 SDK 与导出的 Client.exe 双人 WSS/DTLS 入退房；详细边界见 docs/17 的 linux-lan。未改防火墙或 TUN |
-| Linux 管理入口（10-01，Codex） | `OpenLinuxManagement.cmd` 建立 Windows 127.0.0.1:28491 → Linux 127.0.0.1:28491 SSH 转发并打开浏览器；当前服务 status 核对运行中。笔记本 IP:28491 不作为管理入口，未改监听/防火墙；管理员与 Windows 后台不同 |
+| Linux 管理入口（10-01，Codex） | `OpenLinuxManagement.cmd` 建立 Windows 127.0.0.1:28491 → Linux 127.0.0.1:28491 SSH 转发；当时服务运行中，后已停止，本轮旧账号/配置已清除。它不指向新短验的 29191；笔记本 IP:28491 不作为管理入口，未改监听/防火墙 |
 | Linux 导出目录（10-02，Codex） | 四个 ELF/PCK 从官方 release 模板导出，包内程序在新 releases/ 目录实际运行；完整业务 64/0（源码 SDK 的五分钟结算、真实 Client.exe 入退房分列），末次停止无进程/监听/启动文件残留，权限 700/600。包内仍使用现有 pwsh 7.6.6；当前干净目录及版权补齐后的复验见 docs/17 的 linux-server-directory |
 | 尚不支持的结论 | 不能声称公网、其它发行版、ARM或导出包长期耐久通过；跨机完整五分钟结算仅源码 SDK 客户端，真实 Client.exe 不扩大为完整实战验收；不代表突发并发登录或长期部署可靠性 |
 

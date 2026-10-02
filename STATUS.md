@@ -1,11 +1,17 @@
 # 当前状态：RoomKit（2026-10-02）
 
+## 本轮补验：GitHub 干净克隆与 WSL2
+
+同一提交 `main / 2076e1b` 在 Mint 22.3 笔记本和 WSL2 Ubuntu 24.04.3 真实克隆，各只跑一次短闭环，均 **29/0、退出 0**。新目录无旧账号/配置/缓存，两个真实无窗口 SDK 客户端完成注册、WSS 登录、购买与幂等重放、DTLS 双人入退房、注销重登和资产保留；正式入口正常停止，Git 干净，无测试进程/监听、权限异常或服务脚本错误。依赖已准备，不能算零依赖安装、云服务器或 Linux 严格 4/8 人专项通过，详见 [克隆与发行版边界](docs/17_framework_shooter_plan.md#fresh-clone-linux-wsl)。
+
+按授权清掉两份旧 Linux 试玩实例的当前账号/资产库和连接配置，历史备份/证据/工具/实验保留，不迁入新克隆；旧试玩凭据失效。删除一份可恢复的重复引擎释放 **70.3 MiB**，WSL 新调试环境另占约 **333 MiB**。Windows 真实文件哈希/时间 **6/6 不变**。两份新源码实例已停止，本轮只验两次，不跑长耐久。
+
 <a id="status-validation"></a>
 ## 当前推进：2–8 人小规模联机稳定性
 
 修复基准 `main / e44e47a`。**Windows 严格 2/4/8 人全员登录通过，检查分别 35/0、55/0、95/0，均退出 0**；8 人另有一轮 95/0。退出清理归零，每个账号都能重新登录。登录密码验证已移出写锁，签发会话前仍在事务内核对完整凭据、限流、封禁和重复登录；工作名额满时有限等待，密码强度与重试范围不变。关停时晚登录的令牌清理也已修复。此前两次仅成功 5/8 的失败及新旧代码对照均保留。
 
-真实 WSS 断线/资产重放 **25/0**，真实 SQLite 备份重叠 **16/0**（等待 1009 ms，登录审计只新增一条）；账号 **87/0**、删除 **83/0** 及相关定向回归通过。真实文件哈希/时间 **6/6 不变**，未换玩家目录或旧分发包；只记 Windows 同机通过。下一步 Linux 开机后用同一提交复验，再准备朋友试玩。命令、失败和未运行范围见 [收尾结果](docs/17_framework_shooter_plan.md#small-group-windows-result)。
+真实 WSS 断线/资产重放 **25/0**，真实 SQLite 备份重叠 **16/0**（等待 1009 ms，登录审计只新增一条）；账号 **87/0**、删除 **83/0** 及相关定向回归通过。真实文件哈希/时间 **6/6 不变**，未换玩家目录或旧分发包；这些专项只记 Windows 同机通过。Linux 同提交基础双客户端短闭环现已补验，严格 4/8 人和备份重叠等未在本轮补跑。命令、失败和未运行范围见 [收尾结果](docs/17_framework_shooter_plan.md#small-group-windows-result)。
 
 ## 已交付：配套部署目录与 Linux 离线更新首版
 
@@ -29,7 +35,7 @@ Linux 新包已实际迁入隔离旧包的账号、资产、证书、端口与�
 
 **清理收尾**：五轮累计净释放约 **21.93 GiB**，项目约 **5.12 GiB**；Git 跟踪的 435 个文件仅约 **5.93 MiB**。当前交付、真实数据及备份保留；重复程序、过期附件、旧包和未用 iOS 库已清理或转为压缩恢复输入。当前 Linux/Windows 交付再次校验通过，真实文件哈希/时间 5/5 不变，程序/库/TAR 恢复抽测通过；没有运行玩法回归。具体边界和恢复映射见 [第五轮记录](docs/17_framework_shooter_plan.md#第五轮执行结果不参与当前开发的依赖与旧包)；此前摘要原文保存在 [历史](docs/archive/status_history.md#cleanup-before-round5-summary)。
 
-**接下来**：本轮小规模稳定性的 Windows 部分已完成，Linux 复验后再准备朋友获取和赛车示例。用户此前仅反馈本机整体试玩正常，尚未给别人；不扩展为朋友设备、公网或长期耐久通过。用户明确今晚不关机，本轮不发起 Windows 关机。
+**接下来**：Windows 小规模稳定性与 Mint/WSL2 干净克隆基础短验已完成，优先完善依赖检测/准备入口，再安排朋友获取和赛车；Linux 更多并发及专项仍未补跑。用户此前仅反馈本机整体试玩正常，尚未给别人；不扩展为朋友设备、云端、公网或长期耐久通过。不发起关机。
 
 **服务状态**：本轮隔离实例及原 Linux LAN 实例已正常停止，相关监听释放；Windows 无项目引擎进程。下次开机需明确启动服务，后台入口不代替开服。两台关机已获用户授权；Linux 系统要求本人在交互 SSH 窗口验证 sudo，未绕过。
 
@@ -37,9 +43,9 @@ Linux 新包已实际迁入隔离旧包的账号、资产、证书、端口与�
 
 基准 `main / 572c356`，两台设备用同一提交的新源码目录：Windows `192.168.10.100` → Linux `192.168.10.105`。最终 **38/0、退出 0**：真实 WSS 注册/登录、购买及重复请求不重复扣款、选枪、DTLS/UDP 双人入退房和互见；导出的 `Client.exe` 也在新的目录里完成双人注册、入退房。房间资源与会话清理均已确认。管理后台仅通过 SSH 访问回环端口，玩家连接直接走局域网；未安装、未改防火墙或代理。证据、首轮失败和范围见 [跨机验收](docs/17_framework_shooter_plan.md#linux-lan)。
 
-本机入口：`OpenLinuxPlayerClient.cmd` 打开此前 LAN 服务的独立客户端目录；真人画面/听感、公网、其它发行版仍未验收。导出服务器的新验证见顶部，不把两个实例混称。
+历史入口：`OpenLinuxPlayerClient.cmd` 打开此前 LAN 服务的独立客户端目录；旧账号和连接配置已清除，重新初始化并生成匹配的公开配置后才能使用。真人画面/听感、公网、其它发行版仍未验收。导出服务器的新验证见顶部，不把两个实例混称。
 
-**Linux 后台访问入口**：`OpenLinuxManagement.cmd` 建立同号回环 SSH 转发并打开台式机浏览器的 `http://127.0.0.1:28491/`；Linux 后台不能直接用笔记本 IP 访问。真实面板 API/HTML、监听归属、占用拒绝和入口关闭后的 SSH 清理已检查。它继续指向此前 LAN 实例，不自动切到导出包。用法见 [后台入口](docs/17_framework_shooter_plan.md#linux-management-entry)。
+**历史 Linux 后台入口**：`OpenLinuxManagement.cmd` 建立同号回环 SSH 转发并打开台式机浏览器的 `http://127.0.0.1:28491/`；Linux 后台不能直接用笔记本 IP 访问。真实面板 API/HTML、监听归属、占用拒绝和入口关闭后的 SSH 清理已检查。它继续指向此前 LAN 实例，不自动切到导出包或本轮 29191 短验实例；旧账号已清除，再用时须重新初始化。用法见 [后台入口](docs/17_framework_shooter_plan.md#linux-management-entry)。
 
 ### 此前同机收尾结果（保留证据边界）
 
@@ -69,11 +75,11 @@ Linux（笔记本，Godot 4.7.2 官方版 + pwsh 7.6.6）：源码完整服务�
 | 新 Linux 包的 UpdateRoomKit.sh | 停服后的迁入、校验与确认；只撤销未确认且没变动的候选，详见首版交付 |
 | `tools/roomkit_linux.sh start\|stop\|status` | Linux 源码启动隔离实例；用法见 [README](README.md#linux-源码启动) |
 | `tools/build_linux_server.ps1` → Linux 普通目录 | 导出独立服务端；包内先 CheckPackage.sh，再 RoomKit.sh start/stop/status；当前目录及依赖见 docs/17 |
-| PlayLinuxPackage.cmd / StopLinuxPackage.cmd | 本机已准备的独立包试玩 / 正常停止；面板 28691，通过 SSH 打开 |
+| PlayLinuxPackage.cmd / StopLinuxPackage.cmd | 历史独立包快捷方式；面板 28691，旧账号和 TLS 已清除，须重新准备 |
 | PreparePlayerClient.cmd → PlayerClient/ | 生成完整玩家目录，直接双击 Client.exe；源码更新后需重新生成并与服务配对 |
 | StartPlayerClient.cmd / StartShooterClient.cmd | 已生成客户端入口 / 源码客户端入口 |
-| OpenLinuxPlayerClient.cmd | 打开本机单独准备的 Linux 联机客户端；无需替换原 PlayerClient，详见 docs/17 |
-| OpenLinuxManagement.cmd | SSH 转发后打开 Linux 后台；保持入口窗口打开，关闭不停止远程服务 |
+| OpenLinuxPlayerClient.cmd | 历史客户端目录；旧连接配置须重新生成，不替换原 PlayerClient |
+| OpenLinuxManagement.cmd | 历史 LAN 后台 SSH 转发入口；不启动服务、不指向本轮 29191，旧账号须重新初始化 |
 | clients/shooter-windows/、旧 Release 附件、独立 ZIP | 未随 Linux 工作重新生成；不作为最新源码交付，Release 仍暂缓 |
 | ROADMAP.html | 离线项目地图；执行状态以本文及 docs/17 顶部为准 |
 

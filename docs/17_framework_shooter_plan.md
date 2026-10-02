@@ -1,5 +1,31 @@
 # 通用框架与横版射击分支实施计划
 
+<a id="fresh-clone-linux-wsl"></a>
+## GitHub 干净克隆与发行版补验（2026-10-02）
+
+用户授权清除旧 Linux 试玩账号/配置后从 GitHub 全新克隆，另在 WSL2 验证并简单清空间；本轮只验一两次，不跑长耐久。发行版通用性仅讨论，没有更换笔记本系统或部署云资源。
+
+两边均真正 `git clone --single-branch --branch main https://github.com/SchreiberChiang/godot-network-.git`，HEAD 为 `2076e1b2161f8fbd2d95ee102655ca021362ca5c`、438 个受控文件，初始无 `.godot/data/artifacts/run`。经仓库 `tools/roomkit_linux.sh` 启动，首次由本机 pwsh 执行 `tools/build_framework.ps1`；未复制 Windows 预构建游戏或旧数据库/配置，未改生产代码。
+
+| 环境 | 依赖准备 | 一次短闭环 | 收尾 |
+|---|---|---|---|
+| Mint 22.3 笔记本 | 复用已装 Godot 4.7.2 official ed1daf0bf、pwsh 7.6.6、系统 SQLite | **29/0**；启动 14.52 s，流程 48.70 s | 正式 stop 退出 0；Git 干净、无测试进程/监听、权限异常或服务脚本错误 |
+| WSL2 Ubuntu 24.04.3 LTS | 系统库已有；同一套官方 Godot/pwsh 原包从笔记本传入，哈希核对后解压至用户项目目录 | **29/0**；启动 14.30 s，流程 33.54 s | 正式 stop 退出 0；Git 干净、无测试进程/监听、权限异常或服务脚本错误 |
+
+各一次、两个真实无窗口 SDK 客户端：新管理员/邀请码、注册/WSS 登录、发币、购买与相同请求重放只扣一次、选枪、UDP 绑定后 READY、DTLS 双人入房互见、退房、注销重登资产保留、正常退出及房间/会话清理。只证明**依赖齐备后源码基础业务通过**；没有新增真实 Client.exe、真人画面/听感、完整五分钟结算、耐久、Linux 严格 4/8 人、WSL 对外联机或云服务器证据。WSL 的 NAT/镜像网络与真实服务器不同，本轮只用回环，未改网络、SSH、防火墙或 TUN。
+
+两边源码路径为各自 `~/roomkit/clones/clean-clone-20261002-a512ec93/`，实例为其中 `data/instance-gitfresh/`；回环面板 **29191**、大厅 **29100**、控制 **29101**、UDP **29240–29255**。测试后均已停止，不是用户当前试玩服务。证据在本机 `logs/clean-clone-20261002-a512ec93/` 的 `mint-proof.out`、`mint-run/result.json`、`wsl-run/console.txt`、`wsl-run/result.json` 和两份 `*-clients/`；WSL result SHA256 为 `888a6344b2118ff52913b477431669b7e35117061684db4d0081b3d35875237e`。临时 `short_acceptance.ps1` 仅编排仓库已跟踪的 portable/client_harness 和 `tests/run_framework_clients.gd`，不替换实现、不安装依赖。
+
+**清理**：前置只读核实两份旧实例停止、无 Godot/pwsh，目标与祖先无链接。仅逐文件删除 `~/roomkit/src/572c3563ac02-lan-8dd5ca/data/instance-lan-8dd5ca/` 和 `~/roomkit/releases/linux-20261001164710-0b536417/data/instance-export-0b536417/` 内当前账号/资产库、保存配置、TLS、公开连接及运行标记，共 17 个文件，清单见 `remote-prepare.out`。历史备份/审计/验收保留，不进入新克隆；工具、原下载包、源码及实验不删不扫。旧凭据与公开连接已失效，旧快捷入口仍指向旧实例，不能当作本轮短验实例或直接复用历史私人说明。
+
+本机 `logs/l2-wsl/run/roomkit.x86_64` 与安装模板 SHA256 一致，只删除该可恢复重复文件，释放 **73,703,800 字节 / 70.3 MiB**；PCK、脚本和证据保留，恢复源见 `wsl-duplicate-cleanup.json`。WSL 新调试环境另占约 **333 MiB**，不是净释放空间；本机两份传输用临时原包已删除，笔记本原包保留。Windows 真实库/旧 operator.json/共享连接/证书/索引的哈希和时间 **6/6 不变**。
+
+**发行版讨论**：WSL2 是 Linux 运行环境，本机发行版是 Ubuntu；Mint 22.3 官方包基础为 Ubuntu Noble。业务源码复用一套，依赖、CPU 架构、权限和网络分别检查，不能扩展为任意发行版/ARM 支持。[WSL2 官方说明](https://learn.microsoft.com/en-us/windows/wsl/compare-versions)、[Mint 版本表](https://linuxmint.com/download_all.php)。
+
+建议未来云端首验以 **Ubuntu 24.04 LTS / x86_64** 为目标，Mint 保留实体机验收、WSL2 做开发调试；只是建议，当前没有云机验收。PowerShell 官方支持 Ubuntu LTS 不等于 RoomKit 已支持全部此类机器。[PowerShell Linux 支持](https://learn.microsoft.com/en-us/powershell/scripting/install/linux-overview)、[WSL 网络](https://learn.microsoft.com/en-us/windows/wsl/networking)。
+
+**下一步**：补清楚的依赖检测/准备入口，再验证干净目标机部署；尚不能宣称仅 GitHub 文件就能零依赖安装。Linux 源码无需 Windows 预构建，独立包/Windows 玩家程序/地址与证书/首次管理员仍按交付说明准备。按用户限制本轮收尾，不追加全量回归、长压测或云任务。
+
 <a id="small-group-stability"></a>
 ## 当前推进：2–8 人小规模联机稳定性（2026-10-02）
 
@@ -210,6 +236,8 @@ bash NEW/RoomKit.sh start --instance demo
 <a id="linux-package-playtest"></a>
 ## Linux 独立包真人试玩入口（Codex，2026-10-02）
 
+**当前提示（2026-10-02）**：本节保留当时的入口和验收。旧试玩库、账号及 TLS 配置已清除，历史私有登录说明和客户端连接配置不能直接复用；再次使用须重新初始化并生成匹配的公开配置。本轮新实例及范围见 [GitHub 干净克隆补验](#fresh-clone-linux-wsl)。
+
 在 `main / 4bbafc8` 的已验收产物上补入口，不重建服务器或客户端、不改协议/数据库。根目录 **PlayLinuxPackage.cmd** 调用 `tools/open_linux_package.ps1`，读取忽略目录里的 `artifacts/linux-package-playtest.json`：固定笔记本 `zhao@192.168.10.105`、包 `20261001164710-0b536417`、实例 `export-0b536417`、回环面板 28691、玩家大厅 28700。不会把原 28491 LAN 入口切到新实例。
 
 2026-10-02 用户反馈已在本机试玩、整体无可见问题，尚未给其他人分发；只记录整体体验，朋友设备和真人多人仍待验证。当前后续任务见 [部署与更新安排](#next-delivery-stage)。
@@ -273,6 +301,8 @@ bash RoomKit.sh stop --instance demo # 请求退出，不发信号
 <a id="linux-management-entry"></a>
 ## Linux 后台入口与分发计划（Codex，2026-10-01；执行结果见上）
 
+**当前提示（2026-10-02）**：下述为此前 LAN 实例的历史记录，该实例已停止并清除当前账号和配置。旧管理员说明不再有效；入口不指向本轮 29191 短验实例，本轮验收后也已停止服务。再次试玩须重新初始化，见 [本轮补验](#fresh-clone-linux-wsl)。
+
 ### 台式机怎样打开后台
 
 当前笔记本实例 `lan-8dd5ca` 的管理地址是 **Linux 本机的 `http://127.0.0.1:28491/`**，只监听回环，主机名和 Origin 校验保持原样。Windows 源码后台的 28291 与它不同；台式机直接访问 `192.168.10.105:28491` 不会到达管理服务。把网址粘到 bash 终端会被当成程序路径，不是浏览器访问。
@@ -305,6 +335,8 @@ bash RoomKit.sh stop --instance demo # 请求退出，不发信号
 
 <a id="linux-lan"></a>
 ## Windows → Linux 局域网交付（Codex，2026-10-01）
+
+**当前提示（2026-10-02）**：历史联机证据保留，但该旧实例的当前账号和连接配置已清除，旧私人说明及已生成客户端配置不能直接复用。再次试玩须重新初始化并发布匹配的公开配置；本轮 [干净克隆补验](#fresh-clone-linux-wsl) 不包含 Windows 跨机联机。
 
 **结论**：基础跨设备链路已实测通过。基准为已推送 `main / 572c356`，源码归档 SHA256 `d7dfdf8a965a5b5abeee18fb08a160513786e9a15ddb6540a8dd22be083389aa`；Windows 和 Linux 分别解包到新目录，射击版本同为 `shooter-dev-002-src-70b8f5366f78`，取石子版本同为 `turns-managed-dev-001-src-6c031a3e2b26`。生产服务器、SDK、协议、构建算法没有改动，当前轮只增加跨机驱动、便捷入口和记录。
 
