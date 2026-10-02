@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "阶段7已获公网试玩人工反馈；main现已接收本地枪口呈现与诊断，用户反馈转枪验证无问题，身体移动未修改，配套试玩包未更新。笔记本游戏服务已按用户要求停止；dot双端协调小试验已交报告并核对：两端各瞄准94/0、射击83/0；只验逻辑，不等于联网。当前提交用git log -1核实，目录和分工以docs/17顶部为准",
+  baseline: "Astra主线实际推进，Sol辅助，dot交候选和独立复验。阶段7当前顺序：移动候选4.7.2复验→同源Windows玩家/Linux服务端→短试玩；之后赛车最小双人闭环。移动三合一包已接收并通过哈希/应用检查，尚未应用或运行；枪口和诊断已进主线，现有试玩包未更新。当前提交用git log -1核实，目录和责任见docs/17执行表",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -246,10 +246,10 @@ window.ROADMAP_DATA = {
       evidence: "诊断30/0、真实OpenGL专项/截图31/0、射击83/0、反馈8/0，退出0且stderr空；没有测量真人公网延迟，不宣称卡顿已修复" },
     { id: "game-movement-presentation", area: "game", phase: 7, status: "pending",
       title: "移动与瞄准显示平滑",
-      summary: "主线枪口已获用户验证；移动基线与离线预览已完成，身体移动修复待候选。",
-      details: "自己的枪逐帧跟随可操作时的鼠标方向，其他枪走50ms最短角度插值；失焦、弹窗、离房、死亡复活和换局复位，服务器射击判定不变。根目录PreviewAim提供离线旧/新预览。PreviewMovement已提供稳定、抖动、250ms断流的实际显示算法对照，TAB输入分发已修复并用真实窗口按键消息验证；合成120Hz下停顿为0/16.7/250ms，不等于公网根因。用户反馈stable效果较好；本地Codex先补停走、反向、跳跃、死亡复活、传送与重复旧快照验收，5x复用已有基线独立复验，不重复造同类工具。候选通过后定向整合并更新配套交付，不把更大显示延迟当成成功。10x移动任务可与Linux控制小试验并行；5x收尾后接独立验收，Windows统一整合。两份移动任务均固定f368df0；10x候选已给完成截图，实际补丁待接收，5x双端小试验已核对，可接独立复验。",
+      summary: "枪口已获离线人工反馈；移动三合一候选已收到，待4.7.2复验和配套试玩。",
+      details: "自己的枪逐帧跟随鼠标，其他枪走50ms最短角度插值，生命周期复位，服务器射击判定不变。PreviewMovement含stable/jitter/outage，用户反馈stable较好。10x候选基于f368df0，只改身体呈现和两个测试；已核对哈希、相关基准代码与git apply --check，未应用或运行。候选报告4.6.3下jitter停顿减少但显示落后增加约17ms，短断流未解决，不能和本机不同夹具数字横比。Astra负责4.7.2同条件裁决，Sol补独立缺口，5x协调Linux一次复验；复用191条候选断言、不重写同类测试；Windows/Linux各做一次目标引擎复验，不重跑双端控制小试验。通过后生成同源两端，用户检查停走/反向/跳跃、转枪/射击/复活和诊断；再接赛车。",
       files: ["examples/shooter/game.gd", "examples/framework/client.gd", "tests/run_aim_presentation.gd", "PreviewAim.cmd", "PreviewMovement.cmd", "tests/support/movement_probe.gd", "tests/run_movement_baseline.gd"],
-      docs: ["docs/17_framework_shooter_plan.md#worktree-mainline-20261002", "docs/25_shooter_room_rules.md#aim-presentation-mainline"],
+      docs: ["docs/17_framework_shooter_plan.md#active-execution-board", "docs/25_shooter_room_rules.md#aim-presentation-mainline"],
       evidence: "主线隔离枪口94/0、射击83/0、诊断30/0、反馈8/0，退出0且stderr空，四脚本解析通过；用户反馈转枪验证无问题，联网包未重建，身体移动未修复" },
     { id: "game-turns", area: "game", phase: 0, status: "verified",
       title: "取石子示例（当前第二玩法）",
