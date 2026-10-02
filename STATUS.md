@@ -6,7 +6,7 @@
 
 日常入口仍是 `F:\文档\GodotGame\Net\RoomKit` 的 `main`。10-02 工作树核查已记录到 `778a0f8`；**主线现已接收本地枪口方案，身体移动尚未修改，配套试玩包尚未更新**。两份候选目录继续保留供对照；七个旧本地分支的实施内容均已在 main，不是七项待合并功能。
 
-人物移动两份任务单暂未派发；Linux 笔记本的 dot 云端/本地协调小试验任务已放在 `/home/zhao/Desktop/RoomKit-dot任务单.txt`，固定功能提交 `735a419`，未执行。台式机保持主线整合。目录、候选证据、旧分支和当前分工统一见 [主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)，历史候选文档不作为当前分配指令。
+人物移动两份任务单已更新到统一基准 `f368df0`，暂未派发：10x dot 的呈现任务可与 Linux 小试验并行，5x 先完成小试验再接独立验收。Linux 小试验任务已放在 `/home/zhao/Desktop/RoomKit-dot任务单.txt`，继续固定 `735a419`，未收到执行结果。台式机负责范围、验收标准和最终整合。当前分工见 [主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)，历史候选文档不作为当前分配指令。
 
 ## 本轮：接收枪口方案，停止笔记本服务
 
