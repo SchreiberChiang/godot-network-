@@ -48,6 +48,16 @@ var _diagnostic_tick := -1
 var _diagnostic_received_ms := -1
 var _diagnostic_interval_ms := -1
 const BLEND_SECONDS := 0.05
+# Body-only arrival smoothing: steady 20 Hz stays at 50 ms. Recent jitter can
+# extend a new transition to at most 100 ms, at the cost of extra display lag.
+# This is not a remote clock, queued snapshot playback or movement prediction.
+const POSITION_BLEND_MAX := 0.1
+const POSITION_INTERVAL_COUNT := 6
+const POSITION_CADENCE_RESET := 0.25
+var _position_intervals: Array[float] = []
+var _position_arrival_age := 0.0
+var _position_tick := -1
+var _position_blend_seconds := BLEND_SECONDS
 const TRACER_SPEED := 7000.0
 const TRACER_LENGTH := 18.0
 
@@ -456,6 +466,7 @@ static func presentation_cues(old: Dictionary, value: Dictionary, seen_shot: int
 	return cues
 
 func _update_visual_targets(value: Dictionary) -> void:
+	_update_position_cadence(value)
 	var present: Dictionary = {}
 	for player in value.players:
 		var user: String = player.user_id
@@ -463,11 +474,16 @@ func _update_visual_targets(value: Dictionary) -> void:
 		var target := Vector2(player.x, player.y)
 		var from := render_position(player)
 		var old: Dictionary = render_tracks.get(user, {})
+		var previous := player_view(user)
 		# Death, respawn and teleports must never glide through the map.
-		if old.get("life", "") != player.life_state or from.distance_to(target) > 100.0:
+		# Compare confirmed positions: display lag alone is not a teleport.
+		var reset: bool = old.is_empty() or old.get("life", "") != player.life_state or int(old.get("deaths", -1)) != int(player.deaths) or int(value.round) != int(latest.get("round", value.round))
+		if not previous.is_empty():
+			reset = reset or Vector2(float(previous.x), float(previous.y)).distance_to(target) > 100.0
+		if reset:
 			from = target
-		if old.get("to", Vector2.INF) != target or old.get("life", "") != player.life_state:
-			render_tracks[user] = {"from": from, "to": target, "age": 0.0, "life": player.life_state}
+		if reset or old.get("to", Vector2.INF) != target:
+			render_tracks[user] = {"from": from, "to": target, "age": 0.0, "duration": _position_blend_seconds, "life": player.life_state, "deaths": player.deaths}
 	for user in render_tracks.keys():
 		if not present.has(user):
 			render_tracks.erase(user)
@@ -477,10 +493,32 @@ func _update_visual_targets(value: Dictionary) -> void:
 		last_visual_shot = int(shot.id)
 		visual_shots.append({"from": Vector2(shot.x, shot.y), "to": Vector2(shot.end_x, shot.end_y), "age": 0.0})
 
+func _update_position_cadence(value: Dictionary) -> void:
+	if latest.is_empty() or int(value.round) != int(latest.get("round", value.round)):
+		_position_intervals.clear()
+		_position_tick = -1
+		_position_blend_seconds = BLEND_SECONDS
+	# Same-tick lifecycle publications are valid, but not new cadence samples.
+	if int(value.tick) <= _position_tick:
+		return
+	if _position_tick >= 0:
+		if _position_arrival_age >= POSITION_CADENCE_RESET:
+			_position_intervals.clear()
+		else:
+			_position_intervals.append(_position_arrival_age)
+			if _position_intervals.size() > POSITION_INTERVAL_COUNT:
+				_position_intervals.pop_front()
+	_position_blend_seconds = BLEND_SECONDS
+	for interval in _position_intervals:
+		_position_blend_seconds = maxf(_position_blend_seconds, minf(interval, POSITION_BLEND_MAX))
+	_position_arrival_age = 0.0
+	_position_tick = int(value.tick)
+
 func advance_visual(delta: float) -> void:
 	snapshot_age += delta
+	_position_arrival_age += delta
 	for track in render_tracks.values():
-		track.age = minf(float(track.age) + delta, BLEND_SECONDS)
+		track.age = minf(float(track.age) + delta, float(track.duration))
 	for track in aim_tracks.values():
 		track.age = minf(float(track.age) + delta, BLEND_SECONDS)
 	for index in range(visual_shots.size() - 1, -1, -1):
@@ -493,7 +531,7 @@ func render_position(player: Dictionary) -> Vector2:
 	var track: Dictionary = render_tracks.get(player.user_id, {})
 	if track.is_empty():
 		return Vector2(player.x, player.y)
-	return track.from.lerp(track.to, clampf(float(track.age) / BLEND_SECONDS, 0.0, 1.0))
+	return track.from.lerp(track.to, clampf(float(track.age) / float(track.duration), 0.0, 1.0))
 
 ## Presentation only. The caller samples the same direction as send_input,
 ## every display frame; neither snapshots nor server hit detection are changed.

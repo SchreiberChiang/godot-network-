@@ -4,7 +4,7 @@
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 
-**离线查看人物移动：双击 `PreviewMovement.cmd`**，TAB 切换稳定更新、抖动和断流，ESC 退出。它使用当前游戏显示算法与合成轨迹，不启动服务器；测量定义见 [移动基线](docs/25_shooter_room_rules.md#movement-baseline)。
+**离线比较人物移动：双击 `PreviewMovement.cmd`**，旧版和新版同屏显示；TAB 切换稳定更新、抖动和断流，Space / B 切换强调行，ESC 退出。它使用固定旧提交与当前游戏的真实显示算法、同一合成轨迹，不启动服务器。新版减少快照抖动造成的短暂停顿，会增加少量显示落后；机制及测量见 [移动比较](docs/25_shooter_room_rules.md#movement-candidate-result)。
 
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
