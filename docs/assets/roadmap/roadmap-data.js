@@ -249,7 +249,7 @@ window.ROADMAP_DATA = {
       summary: "枪口呈现候选已完成无窗口验证，真实手感待验；移动方案另行观察。",
       details: "用户单人感觉移动/枪口卡，但观察FPS约120。自己的枪方向可按鼠标逐帧呈现，其他人的方向做最短角度插值；服务器继续独立确认射击与命中。人物缓冲插值另验断流、传送和重同步，自己的移动预测/输入确认与校正若需要再单独设计，不把玩法写进核心，不凭平均FPS直接改协议。",
       files: ["examples/shooter/game.gd", "examples/framework/client.gd", "examples/framework/view.gd"],
-      docs: ["docs/25_shooter_room_rules.md#aim-smoothing-candidate", "docs/25_shooter_room_rules.md#aim-comparison-review"],
+      docs: ["docs/25_shooter_room_rules.md#aim-smoothing-candidate", "docs/25_shooter_room_rules.md#aim-comparison-review", "docs/25_shooter_room_rules.md#aim-comparison-timing", "docs/17_framework_shooter_plan.md#two-account-plan-20261002"],
       evidence: "固定4e49aa1候选：瞄准59/0、射击83/0；合成120Hz方向每秒20变120次。未合并/部署/真人验收；快转可领先权威射线，移动预测未改" },
     { id: "game-turns", area: "game", phase: 0, status: "verified",
       title: "取石子示例（当前第二玩法）",
