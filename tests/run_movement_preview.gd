@@ -13,6 +13,7 @@ var scenario_names := ["稳定更新", "到达抖动", "250ms 快照断流"]
 var selected := 1
 var canvas: Control
 var font := SystemFont.new()
+var highlight: StyleBoxFlat
 var total := 0.0
 var auto_stop := 0.0
 var screenshot := ""
@@ -51,6 +52,10 @@ func _initialize() -> void:
 	# SceneTree does not receive Node input callbacks automatically.
 	root.window_input.connect(_input)
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei"])
+	highlight = StyleBoxFlat.new()
+	highlight.bg_color = Color("23354d")
+	highlight.border_color = Color("95b5df")
+	highlight.set_border_width_all(1)
 	canvas = Control.new()
 	canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	canvas.draw.connect(_draw)
@@ -129,20 +134,13 @@ func _draw() -> void:
 	for row in range(4):
 		var y := 210.0 + row * 90.0
 		if row == selected:
-			canvas.draw_style_box(highlight_box(), Rect2(20, y - 45, 920, 77))
+			canvas.draw_style_box(highlight, Rect2(20, y - 45, 920, 77))
 		canvas.draw_string(font, Vector2(35, y - 20), ("▶ " if row == selected else "") + names[row], HORIZONTAL_ALIGNMENT_LEFT, -1, 18, colors[row])
 		canvas.draw_line(Vector2(80, y + 8), Vector2(820, y + 8), Color("455269"), 2)
 		canvas.draw_circle(Vector2(values[row], y + 8), 12, colors[row])
 		canvas.draw_string(font, Vector2(830, y + 14), "%.1f px" % values[row], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, colors[row])
 	canvas.draw_string(font, Vector2(30, 563), "高 FPS 不等于每帧位置变化；流畅度与位置落后需要同时观察。", HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color.WHITE)
 	canvas.draw_string(font, Vector2(30, 589), "仅验证合成呈现；没有网络、物理输入或真人手感验收。", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("bac6d8"))
-
-func highlight_box() -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = Color("23354d")
-	box.border_color = Color("95b5df")
-	box.set_border_width_all(1)
-	return box
 
 func _finalize() -> void:
 	if old_probe != null: old_probe.close()

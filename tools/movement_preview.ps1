@@ -66,6 +66,14 @@ function Get-BytesHash([byte[]]$Bytes) {
     finally { $sha.Dispose() }
 }
 
+function Quote-PreviewArguments($Values) {
+    # Windows command-line quoting preserves Unicode/spaces, embedded quotes
+    # and trailing backslashes; PowerShell 5.1 has no ProcessStartInfo.ArgumentList.
+    foreach ($value in $Values) {
+        '"' + ([string]$value -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+    }
+}
+
 # One immutable baseline plus one reused runtime directory. There are no
 # per-run builds/copies or growing histories, and no deletion of prior data.
 Ensure-LocalDirectory $baselineRoot
@@ -105,6 +113,8 @@ if ($Screenshot) {
     $arguments += '--screenshot=' + $Screenshot
 }
 $savedEnvironment = @{}
+$engineProcess = $null
+$engineExit = 1
 try {
     foreach ($key in @('APPDATA', 'LOCALAPPDATA', 'TMP', 'TEMP', 'XDG_DATA_HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME')) {
         $savedEnvironment[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
@@ -112,9 +122,15 @@ try {
         Ensure-LocalDirectory $path
         [Environment]::SetEnvironmentVariable($key, $path, 'Process')
     }
-    & $Godot @arguments
-    $engineExit = $LASTEXITCODE
+    $quotedArguments = @(Quote-PreviewArguments $arguments)
+    # This process is the requested interactive preview, so its window is visible.
+    $engineProcess = Start-Process -FilePath $Godot -WorkingDirectory $project -ArgumentList $quotedArguments -WindowStyle Normal -PassThru
+    # Retain the handle immediately, including for a very short-lived GUI process.
+    $null = $engineProcess.Handle
+    $engineProcess.WaitForExit()
+    $engineExit = $engineProcess.ExitCode
 } finally {
+    if ($null -ne $engineProcess) { $engineProcess.Dispose() }
     foreach ($key in $savedEnvironment.Keys) { [Environment]::SetEnvironmentVariable($key, $savedEnvironment[$key], 'Process') }
 }
 exit $engineExit
