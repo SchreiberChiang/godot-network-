@@ -5,14 +5,27 @@ const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const SPEED := 120.0
 const DURATION := 3.0
 const STEP := 1.0 / 120.0
-var world = Game.new()
-var authority = Game.new()
+var world
+var authority
 var packets: Array = []
 var next_packet := 0
 var elapsed := 0.0
 var error := ""
 
-func setup(scenario: String) -> void:
+func setup(scenario: String, game_script: Script = null, shared_packets: Array = []) -> void:
+	# Defaults preserve the baseline runner. A/B uses the actual injected script
+	# and copies one packet sequence; neither side reimplements interpolation.
+	close()
+	world = Game.new() if game_script == null else game_script.new()
+	packets = []
+	next_packet = 0
+	elapsed = 0.0
+	error = ""
+	if not shared_packets.is_empty():
+		packets = shared_packets.duplicate(true)
+		advance(0.0)
+		return
+	authority = Game.new()
 	authority.server = true
 	authority.admit({"user_id": "u1", "display_name": "Moving"}, 2)
 	authority.admit({"user_id": "u2", "display_name": "Stationary"}, 3)
@@ -92,5 +105,7 @@ func measure() -> Dictionary:
 		"error": error}
 
 func close() -> void:
-	world.free()
-	authority.free()
+	if is_instance_valid(world): world.free()
+	if is_instance_valid(authority): authority.free()
+	world = null
+	authority = null
