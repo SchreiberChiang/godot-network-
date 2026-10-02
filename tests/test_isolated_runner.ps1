@@ -18,11 +18,12 @@ $script:passed = 0; $script:failed = 0
 function Check([bool]$Condition, [string]$Name) { if ($Condition) { $script:passed++; Write-Output "PASS $Name" } else { $script:failed++; Write-Output "FAIL $Name" } }
 function Probe([string]$Name, [string]$Text) { $path = Join-Path $probeDir $Name; [IO.File]::WriteAllText($path, $Text); return "res://tests/.runner-probe-$id/$Name" }
 # One runner call; returns @{code; out; invoked}.
-function Run([string]$Script, [string]$Isolation, [string]$Log, [string]$TestArgs = '', [string]$CopyIn = '') {
+function Run([string]$Script, [string]$Isolation, [string]$Log, [string]$TestArgs = '', [string]$CopyIn = '',[int]$TimeoutSeconds=1800) {
     Remove-Item -LiteralPath $invoked -ErrorAction SilentlyContinue
     $call = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $runner, '-Script', $Script, '-Isolation', $Isolation, '-Log', $Log, '-Godot', $standIn, '-Project', $Project)
     if ($TestArgs) { $call += @('-TestArgs', $TestArgs) }
     if ($CopyIn) { $call += @('-CopyIn', $CopyIn) }
+    if($TimeoutSeconds -ne 1800){$call+=@('-TimeoutSeconds',[string]$TimeoutSeconds)}
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     $out = & powershell @call 2>&1
@@ -37,7 +38,7 @@ function Refused([hashtable]$Result, [string]$Why = '') { return $Result.code -e
 try {
     [void][IO.Directory]::CreateDirectory($work)
     [void][IO.Directory]::CreateDirectory($probeDir)
-    [IO.File]::WriteAllText($standIn, "@echo off`r`necho %* > `"$invoked`"`r`nexit /b 0`r`n")
+    [IO.File]::WriteAllText($standIn, "@echo off`r`necho %* > `"$invoked`"`r`necho FAKE_RESULT passed=3 failed=0`r`nexit /b 0`r`n")
 
     # ---- probe scripts (never run by a real engine) ----
     $plain = Probe 'plain.gd' "extends SceneTree`n"
@@ -117,7 +118,37 @@ try {
 
     # ---- ordinary tests ----
     $iso = Fresh; $r = Run $plain $iso "$iso\log"; Check ($r.code -eq 0 -and $r.invoked -and $r.out -match 'service_like=False') 'an ordinary test runs with only a new isolation folder and log'
+    Check ($r.out -match 'ARTIFACT_RETENTION_UNMANAGED' -and -not(Test-Path -LiteralPath (Join-Path $iso '.roomkit-test-owner.json'))) 'legacy nested isolation naming remains compatible and is explicitly unmanaged'
     $iso = Fresh; $r = Run 'res://tests/run_posix_operator.gd' $iso "$iso\log"; Check (Refused $r -and $r.out -match 'needs --data-root') 'the real Linux Operator test is service-like and refused without isolated arguments'
+
+    # ---- managed direct test roots and bounded evidence ----
+    $managed=@()
+    foreach($number in 1..3){
+        $iso=Join-Path $Project ("data/test-isolated-runner-$id-$number")
+        $managed+=$iso;$r=Run $plain $iso "$iso\log"
+        Check ($r.code -eq 0 -and $r.invoked -and -not($r.out -match 'RETENTION_SKIPPED')) ("managed stand-in run $number completes normally")
+    }
+    Check (-not(Test-Path -LiteralPath $managed[0]) -and (Test-Path -LiteralPath $managed[1]) -and (Test-Path -LiteralPath $managed[2])) 'managed test directories keep only the latest two runs'
+    $ledger=Join-Path $Project 'artifacts/retention-ledger'
+    $records=@(Get-ChildItem -LiteralPath $ledger -Filter '*.json' -File|ForEach-Object {Get-Content -LiteralPath $_.FullName -Encoding UTF8 -Raw|ConvertFrom-Json}|Where-Object {@($_.paths) -contains $managed[0]})
+    $archived=$records|Select-Object -First 1
+    Check ($archived.state -eq 'pruned' -and $archived.summary.exit_code -eq 0 -and $archived.summary.counts[0].passed -eq 3 -and $archived.summary.counts[0].failed -eq 0) 'pruned run preserves exit and structured counts in the ledger'
+    Check (@($archived.snapshot|Where-Object {$_.path.EndsWith('log.stdout') -and $_.sha256.Length -eq 64}).Count -eq 1 -and @($archived.snapshot|Where-Object {$_.path.EndsWith('log.stderr') -and $_.sha256.Length -eq 64}).Count -eq 1) 'stdout and stderr original hashes survive pruning'
+    Check ((Test-Path -LiteralPath (Join-Path $managed[2] '.roomkit-test-owner.json')) -and (Test-Path -LiteralPath (Join-Path $managed[2] 'log.stdout'))) 'retained run keeps owned marker and original output files'
+
+    $failedProbe=Probe 'failed.gd' "extends SceneTree`n"
+    [IO.File]::WriteAllText($standIn,"@echo off`r`necho %* > `"$invoked`"`r`necho FAKE_RESULT passed=3 failed=1`r`nexit /b 7`r`n")
+    $failureRoot=Join-Path $Project "data/test-isolated-runner-failure-$id"
+    $r=Run $failedProbe $failureRoot "$failureRoot\log"
+    $failureRecord=@(Get-ChildItem -LiteralPath $ledger -Filter '*.json' -File|ForEach-Object {Get-Content -LiteralPath $_.FullName -Encoding UTF8 -Raw|ConvertFrom-Json}|Where-Object {@($_.paths) -contains $failureRoot})|Select-Object -First 1
+    Check ($r.code -eq 7 -and $failureRecord.outcome -eq 'failure' -and $failureRecord.summary.exit_code -eq 7 -and $failureRecord.summary.counts[0].failed -eq 1) 'nonzero test exit is preserved and registered as failure'
+
+    $timeoutProbe=Probe 'timeout.gd' "extends SceneTree`n"
+    [IO.File]::WriteAllText($standIn,"@echo off`r`necho %* > `"$invoked`"`r`n:waiting`r`ngoto waiting`r`n")
+    $timeoutRoot=Join-Path $Project "data/test-isolated-runner-timeout-$id"
+    $r=Run $timeoutProbe $timeoutRoot "$timeoutRoot\log" '' '' 1
+    $timeoutRecord=@(Get-ChildItem -LiteralPath $ledger -Filter '*.json' -File|ForEach-Object {Get-Content -LiteralPath $_.FullName -Encoding UTF8 -Raw|ConvertFrom-Json}|Where-Object {@($_.paths) -contains $timeoutRoot})|Select-Object -First 1
+    Check ($r.code -eq 124 -and $timeoutRecord.outcome -eq 'failure' -and $timeoutRecord.summary.exit_code -eq 124 -and $timeoutRecord.summary.timed_out -and $timeoutRecord.summary.process_confirmed_stopped) 'timeout returns 124 and is registered only after the stand-in process exits'
 } finally {
     # Remove the junctions themselves first (never their targets), then make sure
     # no link is left before anything is removed recursively.

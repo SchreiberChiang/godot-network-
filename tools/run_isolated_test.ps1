@@ -37,7 +37,7 @@ $Project = [IO.Path]::GetFullPath($Project).TrimEnd('\')
 $ServicePattern = 'host/operator\.gd|host/managed_host\.gd|host/main\.gd|host/main\.tscn|Operator\.exe|ManagedHost\.exe'
 $EngineClasses = @('SceneTree', 'MainLoop', 'Object', 'RefCounted', 'Reference', 'Resource', 'Node', 'Node2D', 'Node3D', 'Control', 'CanvasItem', 'CanvasLayer')
 
-function Refuse([string]$Reason) { Write-Output ('REFUSED ' + $Reason); exit 64 }
+function Refuse([string]$Reason) { $script:runnerExitCode=64; Write-Output ('REFUSED ' + $Reason); exit 64 }
 
 # res://... or a plain path -> normalised absolute path; refuses '..' segments.
 function Resolve-Checked([string]$Value, [string]$What) {
@@ -161,18 +161,62 @@ foreach ($source in $copies) {
     Assert-NoLink $from 'copied file'
     if (-not (Test-Path -LiteralPath $from -PathType Leaf)) { Refuse "file to copy '$source' does not exist" }
 }
-[void][IO.Directory]::CreateDirectory($isolationPath)
-foreach ($source in $copies) {
-    $from = Resolve-Checked $source 'copied file'
-    $to = Join-Path $isolationPath ([IO.Path]::GetFileName($from))
-    if (Test-Path -LiteralPath $to) { Refuse "two files to copy share the name $([IO.Path]::GetFileName($from))" }
-    Copy-Item -LiteralPath $from -Destination $to
+$retentionManaged=([IO.Path]::GetDirectoryName($isolationPath) -ieq $dataRoot -and [IO.Path]::GetFileName($isolationPath) -match '^(test-|isolated-|acceptance-|retention-test-).+')
+if($retentionManaged){
+    . (Join-Path $PSScriptRoot 'artifact_retention.ps1')
+    New-RoomKitArtifactTestRoot -ProjectRoot $Project -Path $isolationPath|Out-Null
+}else{
+    [void][IO.Directory]::CreateDirectory($isolationPath)
+    Write-Output 'ARTIFACT_RETENTION_UNMANAGED legacy_or_nested_isolation_name'
 }
-[void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($logPath))
-$argumentList = @('--headless', '--path', $Project, '--script', $resource, '--', ('--isolation=' + $isolationPath)) + $arguments
-Write-Output ("RUN {0} service_like={1} isolation={2}" -f $resource, $serviceLike, $isolationPath)
-$process = Start-Process -FilePath $Godot -ArgumentList $argumentList -RedirectStandardOutput ($logPath + '.stdout') -RedirectStandardError ($logPath + '.stderr') -NoNewWindow -PassThru
-$null = $process.Handle
-if (-not $process.WaitForExit($TimeoutSeconds * 1000)) { $process.Kill(); Write-Output 'exit=TIMEOUT'; exit 124 }
-Write-Output ('exit=' + $process.ExitCode)
-exit $process.ExitCode
+$script:runnerExitCode=1
+$process=$null;$confirmedStopped=$true;$timedOut=$false
+try{
+    foreach ($source in $copies) {
+        $from = Resolve-Checked $source 'copied file'
+        $to = Join-Path $isolationPath ([IO.Path]::GetFileName($from))
+        if (Test-Path -LiteralPath $to) { Refuse "two files to copy share the name $([IO.Path]::GetFileName($from))" }
+        Copy-Item -LiteralPath $from -Destination $to
+    }
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($logPath))
+    $argumentList = @('--headless', '--path', $Project, '--script', $resource, '--', ('--isolation=' + $isolationPath)) + $arguments
+    Write-Output ("RUN {0} service_like={1} isolation={2}" -f $resource, $serviceLike, $isolationPath)
+    # Keep the established argument behavior; this retention change does not
+    # change command-line encoding or the test's arguments.
+    $process = Start-Process -FilePath $Godot -ArgumentList $argumentList -RedirectStandardOutput ($logPath + '.stdout') -RedirectStandardError ($logPath + '.stderr') -NoNewWindow -PassThru
+    $null = $process.Handle
+    $confirmedStopped=$false
+    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        $timedOut=$true;$script:runnerExitCode=124
+        try{$process.Kill();$confirmedStopped=$process.WaitForExit(3000)}catch{$confirmedStopped=$process.HasExited}
+        Write-Output 'exit=TIMEOUT'
+    }else{
+        $confirmedStopped=$true;$script:runnerExitCode=$process.ExitCode
+        Write-Output ('exit=' + $script:runnerExitCode)
+    }
+}finally{
+    if($null -ne $process){
+        try{if($process.HasExited){$confirmedStopped=$true}}catch{}
+        $process.Dispose()
+    }
+    if($retentionManaged -and $confirmedStopped){
+        try{
+            $counts=@()
+            if(Test-Path -LiteralPath ($logPath+'.stdout') -PathType Leaf){
+                $text=[IO.File]::ReadAllText($logPath+'.stdout')
+                foreach($match in [regex]::Matches($text,'(?m)\b([A-Z][A-Z0-9_]*_RESULT)\s+passed=(\d+)\s+failed=(\d+)')){
+                    $counts+=@{suite=$match.Groups[1].Value;passed=[int]$match.Groups[2].Value;failed=[int]$match.Groups[3].Value}
+                    if($counts.Count -gt 32){$counts=@($counts|Select-Object -Last 32)}
+                }
+            }
+            $name=[IO.Path]::GetFileNameWithoutExtension($scriptPath).ToLowerInvariant() -replace '[^a-z0-9.-]','-'
+            $category='isolated-test-'+$name
+            if($category.Length -gt 64){$category=$category.Substring(0,64)}
+            $outcome=if($script:runnerExitCode -eq 0){'success'}else{'failure'}
+            $summary=@{script=$resource;exit_code=$script:runnerExitCode;timed_out=$timedOut;process_confirmed_stopped=$confirmedStopped;counts=$counts;stdout=($logPath+'.stdout');stderr=($logPath+'.stderr');failure_code=$(if($timedOut){'TEST_TIMEOUT'}elseif($script:runnerExitCode -ne 0){'TEST_NONZERO_EXIT'}else{''})}
+            Register-RoomKitArtifact -ProjectRoot $Project -Category $category -Paths @($isolationPath) -Outcome $outcome -Summary $summary|Out-Null
+            Invoke-RoomKitArtifactRetention -ProjectRoot $Project -Category $category|Out-Null
+        }catch{Write-Warning 'ARTIFACT_RETENTION_SKIPPED test_registration_or_cleanup_failed'}
+    }elseif($retentionManaged){Write-Warning 'ARTIFACT_RETENTION_SKIPPED test_process_not_confirmed_stopped'}
+}
+exit $script:runnerExitCode
