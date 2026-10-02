@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "阶段6运行源码 main @ ef0aeb4：依赖准备、七天授权回收与两份生成物策略已完成；阶段7已获朋友公网试玩通过反馈，移动与枪口卡顿待定位，先加客户端诊断再安排赛车。当前提交用git log -1核实，范围以STATUS和docs/17顶部为准",
+  baseline: "10-02核查功能主线 main @ 4e49aa1，与GitHub默认主线一致；阶段7已获公网试玩人工反馈，客户端诊断已实现，两个枪口候选已复验但未选择/合并/部署，身体移动未修改。新任务暂未派发，计划在Linux笔记本实验dot协调云端与本地任务。当前文档提交用git log -1核实，目录和分工以docs/17顶部为准",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -244,13 +244,13 @@ window.ROADMAP_DATA = {
       files: ["sdk/roomkit/client/room_client.gd", "examples/framework/view.gd", "examples/shooter/game.gd", "tests/run_client_network_stats.gd"],
       docs: ["docs/25_shooter_room_rules.md#client-diagnostics", "docs/17_framework_shooter_plan.md#friends-public-preparation"],
       evidence: "诊断30/0、真实OpenGL专项/截图31/0、射击83/0、反馈8/0，退出0且stderr空；没有测量真人公网延迟，不宣称卡顿已修复" },
-    { id: "game-movement-presentation", area: "game", phase: 7, status: "planned",
+    { id: "game-movement-presentation", area: "game", phase: 7, status: "pending",
       title: "移动与瞄准显示平滑",
-      summary: "先改善枪口的低频显示，再按时序观察选择移动方案。",
-      details: "用户单人感觉移动/枪口卡，但观察FPS约120。自己的枪方向可按鼠标逐帧呈现，其他人的方向做最短角度插值；服务器继续独立确认射击与命中。人物缓冲插值另验断流、传送和重同步，自己的移动预测/输入确认与校正若需要再单独设计，不把玩法写进核心，不凭平均FPS直接改协议。",
+      summary: "两份枪口候选已同机复验，待选择；人物移动尚未修改。",
+      details: "本地与dot枪口候选分别在独立工作树和远端分支，提供相同CompareAim离线预览；均未合并main、部署或通过真人手感验收。候选让自己的枪逐帧跟随鼠标，其他枪走最短角度插值，服务器射击判定不变。身体移动需另验断流、传送与重同步，不把更大显示延迟当成成功。移动实现与独立验收的任务单暂未派发。",
       files: ["examples/shooter/game.gd", "examples/framework/client.gd", "examples/framework/view.gd"],
-      docs: ["docs/25_shooter_room_rules.md#client-diagnostics"],
-      evidence: "代码确认枪口未做角度插值、自己的位置无预测；优化尚未实施" },
+      docs: ["docs/17_framework_shooter_plan.md#worktree-mainline-20261002", "docs/25_shooter_room_rules.md#client-diagnostics"],
+      evidence: "沿用候选复验：本地枪口94/0，dot在Windows复验59/0，相关回归与共同渲染预览通过；本轮仅核查Git和文档，未跑Godot或连接设备，不宣称移动已修复" },
     { id: "game-turns", area: "game", phase: 0, status: "verified",
       title: "取石子示例（当前第二玩法）",
       summary: "回合制取石子，和射击共用账号与资产服务，可买玉石主题。",
@@ -447,9 +447,9 @@ window.ROADMAP_DATA = {
     { id: "clean-implementation-worktrees", area: "cleanup", phase: 4, status: "verified",
       title: "已合并的实施工作树",
       summary: "两份已合并工作树已归档并移除。",
-      details: "提交补丁已合并、工作树干净；全部文件哈希归档，独有 Windows 交付另存并校验。Git 长路径失败留下的已注销残留核验后清除，当前只登记主树。",
+      details: "此前两份实施工作树已完整归档并移除，独有Windows交付另存校验；这不包含之后新增的枪口候选。10-02当前登记三份：主线、本地枪口候选和dot枪口候选，均干净；候选未合并、继续保护。七个旧本地分支实施内容已在main，分支名称仅列后续清理候选，本轮未删。",
       files: [],
-      docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002"],
-      evidence: "归档完整校验、恢复抽测及 Git 登记核对通过；见 docs/17 第一轮清理结果" }
+      docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002", "docs/17_framework_shooter_plan.md#worktree-mainline-20261002"],
+      evidence: "此前归档完整校验/恢复抽测通过；本轮工作树登记、远端main、祖先/补丁等价及实施blob核查通过，未清理两份待选候选" }
   ]
 };
