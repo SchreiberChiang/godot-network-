@@ -57,6 +57,8 @@ if(-not(Test-Path -LiteralPath $Godot -PathType Leaf) -or -not(Test-Path -Litera
 $editorVersion=(& $Godot --headless --version | Out-String).Trim()
 if($LASTEXITCODE -ne 0 -or $editorVersion -notmatch '^4\.7\.2\.stable\.(steam|official)\.ed1daf0bf$'){throw 'The export editor must be the tested Godot 4.7.2 ed1daf0bf build.'}
 if((Get-FileHash -LiteralPath $template -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'd9f79ab89b5ae369aeed11c6052d402e8218cd503bf85b4a235f9c30c46a7c63'){throw 'Linux template differs from the tested Godot 4.7.2 official template.'}
+$buildOutcome='failure'
+try {
 [void][IO.Directory]::CreateDirectory($work);[void][IO.Directory]::CreateDirectory($bundle)
 $hostProject=Join-Path $work 'host-project'
 $sourceFiles=New-Object Collections.ArrayList
@@ -157,10 +159,23 @@ WriteUtf8 (Join-Path $bundle 'SHA256SUMS.txt') (($checksums -join "`n")+"`n")
 WriteUtf8 (Join-Path $work 'build-result.json') (@{bundle=$bundle;work=$work;source_index=$sourceIndex;build=$id;source_commit=$base;files=@($checksums).Count;shooter=$games.shooter.manifest.build_id;turns=$games.turns.manifest.build_id}|ConvertTo-Json)
 Write-Output ('LINUX_SERVER_DIRECTORY '+$bundle)
 Write-Output ('LINUX_BUILD_EVIDENCE '+$work)
+$buildOutcome='success'
+} finally {
 # Retention is available when integrated with the project artifact manager.
 $retention=Join-Path $PSScriptRoot 'artifact_retention.ps1'
 if(Test-Path -LiteralPath $retention -PathType Leaf){
-    . $retention
-    Register-RoomKitArtifact -ProjectRoot $project -Category 'linux-server-build' -Paths @($work) -Outcome success -Summary @{bundle=$bundle;build=$id;source_commit=$base}
-    Invoke-RoomKitArtifactRetention -ProjectRoot $project -Category 'linux-server-build' -ProtectedPaths @($bundle,$sourceIndex)
+    try {
+        . $retention
+        if(Test-Path -LiteralPath $work -PathType Container){
+            Register-RoomKitArtifact -ProjectRoot $project -Category 'linux-server-build' -Paths @($work) -Outcome $buildOutcome -Summary @{bundle=$bundle;build=$id;source_commit=$base}|Out-Null
+            Invoke-RoomKitArtifactRetention -ProjectRoot $project -Category 'linux-server-build' -ProtectedPaths @($bundle,$sourceIndex)|Out-Null
+        }
+        # Paired deliveries own the whole parent; do not independently delete
+        # their Server child and invalidate the parent's immutable fingerprint.
+        if($bundle.StartsWith((Join-Path $project 'artifacts/deployments')+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -eq $false -and (Test-Path -LiteralPath $bundle -PathType Container)){
+            Register-RoomKitArtifact -ProjectRoot $project -Category 'linux-server-directory' -Paths @($bundle) -Outcome $buildOutcome -Summary @{build=$id;source_commit=$base}|Out-Null
+            Invoke-RoomKitArtifactRetention -ProjectRoot $project -Category 'linux-server-directory' -ProtectedPaths @($bundle)|Out-Null
+        }
+    }catch{Write-Warning 'ARTIFACT_RETENTION_SKIPPED linux_build_registration_or_cleanup_failed'}
+}
 }

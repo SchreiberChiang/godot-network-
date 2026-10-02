@@ -111,7 +111,9 @@ if [ "$need_godot" -eq 0 ] && [ "$need_pwsh" -eq 0 ]; then echo 'ROOMKIT_ENVIRON
 # An explicit override is user-owned. Do not silently replace it with local tools.
 [ "$need_godot" -eq 0 ] || [ -z "${ROOMKIT_GODOT:-}" ] || fail 'ROOMKIT_GODOT points to a missing executable; correct or unset the override'
 [ "$need_pwsh" -eq 0 ] || [ -z "${ROOMKIT_PWSH:-}" ] || fail 'ROOMKIT_PWSH points to a missing executable; correct or unset the override'
-for command in mkdir chmod mktemp cp mv rm tar unzip; do command -v "$command" >/dev/null || fail "missing preparation command $command"; done
+for command in mkdir chmod mktemp cp mv rm; do command -v "$command" >/dev/null || fail "missing preparation command $command"; done
+if [ "$need_godot" -eq 1 ]; then command -v unzip >/dev/null || fail 'unzip is required to prepare the source engine'; fi
+if [ "$need_pwsh" -eq 1 ]; then command -v tar >/dev/null || fail 'tar is required to prepare PowerShell'; fi
 [ "$offline" -eq 1 ] || command -v curl >/dev/null || fail 'curl is required for downloads; use --offline with official archives'
 if [ "$need_godot" -eq 1 ]; then guard_path "$godot_target"; [ ! -e "$godot_target" ] || fail 'existing Godot tool directory is incomplete; preserved for review'; [ "$offline" -eq 0 ] || [ -n "$godot_archive" ] || fail 'offline preparation needs --godot-archive'; fi
 if [ "$need_pwsh" -eq 1 ]; then guard_path "$pwsh_target"; [ ! -e "$pwsh_target" ] || fail 'existing PowerShell tool directory is incomplete; preserved for review'; [ "$offline" -eq 0 ] || [ -n "$pwsh_archive" ] || fail 'offline preparation needs --pwsh-archive'; fi
