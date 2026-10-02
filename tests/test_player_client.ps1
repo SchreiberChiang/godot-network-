@@ -11,9 +11,15 @@ $runId=[Guid]::NewGuid().ToString('N')
 $evidence=Join-Path $project ('logs\player-client-'+$runId)
 $out=Join-Path $evidence 'out'
 $repoCopy=Join-Path $out 'repository-copy'
-$fresh=Join-Path ([IO.Path]::GetTempPath()) ('RoomKit 玩家 客户端-'+$runId)
+# A sibling fixture stays outside the repository even when TMP/TEMP are in logs/.
+$externalParent=[IO.Path]::GetDirectoryName($project)
+$externalRoot=Join-Path $externalParent ('RoomKit-player-client-test-'+$runId)
+$externalOwned=$false
+$fresh=Join-Path $externalRoot 'RoomKit 玩家 客户端'
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $utf8=New-Object Text.UTF8Encoding($false)
+[Console]::OutputEncoding=$utf8
+$OutputEncoding=$utf8
 $script:passed=0; $script:failed=0
 function Check([bool]$condition,[string]$name) { if($condition){$script:passed++;Write-Output ('PASS '+$name)}else{$script:failed++;Write-Output ('FAIL '+$name)} }
 function Quote($values) { foreach($value in $values){'"'+([string]$value -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"'} }
@@ -21,15 +27,50 @@ function Tree([string]$Directory) {
     if(-not (Test-Path -LiteralPath $Directory)) { return '' }
     return ((Get-ChildItem -LiteralPath $Directory -Recurse -File -Force | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($Directory.Length)+'='+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }) -join ';')
 }
+function AssertExternalFixture {
+    $full=[IO.Path]::GetFullPath($externalRoot).TrimEnd('\','/')
+    $expected=Join-Path $externalParent ('RoomKit-player-client-test-'+$runId)
+    if($runId -notmatch '^[0-9a-f]{32}$' -or $full -ine $expected -or $full -ieq $project -or $full.StartsWith($project+'\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe external player-client fixture boundary.' }
+    $probe=$full
+    while($probe) {
+        if((Test-Path -LiteralPath $probe) -and ((Get-Item -LiteralPath $probe -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw ('External fixture has a linked ancestor: '+$probe) }
+        $probe=[IO.Path]::GetDirectoryName($probe)
+    }
+    if(Test-Path -LiteralPath $full) {
+        if(Get-ChildItem -LiteralPath $full -Recurse -Force | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }) { throw 'External fixture contains a link; cleanup refused.' }
+    }
+}
 $script:prepareRun=0
 function Prepare([string[]]$Extra) {
     $script:prepareRun++
     $log=Join-Path $evidence ('prepare-'+$script:prepareRun+'.log')
-    $ErrorActionPreference='Continue' # expected refusals arrive on stderr
-    $output=& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $project 'tools\prepare_player_client.ps1') -Godot $Godot @Extra 2>&1 | ForEach-Object { [string]$_ }
-    $code=$LASTEXITCODE
-    $output | Set-Content -Encoding UTF8 $log
-    return @{code=$code;text=($output -join "`n")}
+    # Set both ends explicitly: PowerShell 5.1 native capture otherwise uses the
+    # console code page and can corrupt Chinese diagnostics before log writing.
+    $parameters=@{Godot=$Godot}
+    for($i=0;$i -lt $Extra.Count;$i++) {
+        if($Extra[$i] -notmatch '^-[A-Za-z][A-Za-z0-9]*$') { throw ('Invalid Prepare parameter: '+$Extra[$i]) }
+        $name=$Extra[$i].Substring(1)
+        if($i+1 -lt $Extra.Count -and $Extra[$i+1] -notmatch '^-[A-Za-z][A-Za-z0-9]*$') { $i++; $parameters[$name]=$Extra[$i] }
+        else { $parameters[$name]=$true }
+    }
+    $payload=@{script=(Join-Path $project 'tools\prepare_player_client.ps1');parameters=$parameters} | ConvertTo-Json -Compress
+    $encodedPayload=[Convert]::ToBase64String($utf8.GetBytes($payload))
+    $command='$ErrorActionPreference="Stop"; $ProgressPreference="SilentlyContinue"; [Console]::OutputEncoding=New-Object Text.UTF8Encoding($false); $OutputEncoding=[Console]::OutputEncoding; $payload=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("'+$encodedPayload+'")) | ConvertFrom-Json; $parameters=@{}; foreach($property in $payload.parameters.PSObject.Properties) { $parameters[$property.Name]=$property.Value }; try { $global:LASTEXITCODE=0; & $payload.script @parameters; exit $LASTEXITCODE } catch { [Console]::Error.WriteLine(($_ | Out-String)); exit 1 }'
+    $info=New-Object Diagnostics.ProcessStartInfo
+    $info.FileName='powershell.exe'
+    $info.Arguments='-NoProfile -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand '+[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
+    $info.WorkingDirectory=$project
+    $info.UseShellExecute=$false; $info.CreateNoWindow=$true
+    $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
+    $info.StandardOutputEncoding=$utf8; $info.StandardErrorEncoding=$utf8
+    $process=[Diagnostics.Process]::Start($info)
+    try {
+        $stdout=$process.StandardOutput.ReadToEndAsync(); $stderr=$process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $text=$stdout.Result+"`n"+$stderr.Result
+        [IO.File]::WriteAllText($log,$text,$utf8)
+        return @{code=$process.ExitCode;text=$text}
+    } finally { $process.Dispose() }
 }
 
 $sharedPublic=Join-Path $project 'artifacts\client'
@@ -66,11 +107,22 @@ try {
     $common=@('-IndexPath',$gamesIndex,'-ConnectionDirectory',$publicDir)
 
     # Controlled output range.
-    $outside=Join-Path ([IO.Path]::GetTempPath()) ('RoomKit-outside-'+$runId)
+    AssertExternalFixture
+    if(Test-Path -LiteralPath $externalRoot) { throw 'Unique external fixture already exists; refusing to reuse it.' }
+    New-Item -ItemType Directory -Path $externalRoot | Out-Null
+    $externalOwned=$true
+    $outside=Join-Path $externalRoot 'refused-output'
     $r=Prepare ($common+@('-OutputRoot',$outside))
-    Check ($r.code -ne 0 -and -not (Test-Path $outside) -and $r.text -match '受控范围') 'output outside artifacts/logs is refused and nothing is created'
+    $refused=$r.code -ne 0
+    $nothingCreated=-not (Test-Path -LiteralPath $outside)
+    $rangeDiagnostic=$r.text -match '受控范围'
+    Check $refused 'output outside artifacts/logs returns a refusal exit code'
+    Check $nothingCreated 'output outside artifacts/logs creates nothing'
+    Check $rangeDiagnostic 'output refusal preserves the Chinese controlled-range diagnostic'
     $r=Prepare ($common+@('-OutputRoot',$out,'-RepositoryCopy','-RepositoryDestination',(Join-Path $project 'docs\evil')))
-    Check ($r.code -ne 0 -and -not (Test-Path (Join-Path $project 'docs\evil'))) 'repository copy outside its fixed location is refused'
+    $repositoryRefused=$r.code -ne 0
+    $repositoryNothingCreated=-not (Test-Path -LiteralPath (Join-Path $project 'docs\evil'))
+    Check ($repositoryRefused -and $repositoryNothingCreated) 'repository copy outside its fixed location is refused'
 
     # First generation: local + repository copy from one export.
     $r=Prepare ($common+@('-OutputRoot',$out,'-RepositoryCopy','-RepositoryDestination',$repoCopy))
@@ -105,12 +157,18 @@ try {
     [IO.File]::WriteAllText((Join-Path $local 'my-notes.txt'),'keep me',$utf8)
     $before=Tree $local
     $r=Prepare ($common+@('-OutputRoot',$out))
-    Check ($r.code -ne 0 -and $r.text -match 'my-notes.txt' -and (Tree $local) -eq $before) 'user-added file blocks replacement and directory is untouched'
+    $addedRefused=$r.code -ne 0
+    $addedDiagnostic=$r.text -match 'my-notes.txt'
+    $addedTreeUnchanged=(Tree $local) -eq $before
+    Check ($addedRefused -and $addedDiagnostic -and $addedTreeUnchanged) 'user-added file blocks replacement and directory is untouched'
     Remove-Item (Join-Path $local 'my-notes.txt')
     Add-Content -LiteralPath (Join-Path $local 'README.md') -Value 'edited'
     $before=Tree $local
     $r=Prepare ($common+@('-OutputRoot',$out))
-    Check ($r.code -ne 0 -and $r.text -match 'README.md' -and (Tree $local) -eq $before) 'user-modified file blocks replacement and directory is untouched'
+    $modifiedRefused=$r.code -ne 0
+    $modifiedDiagnostic=$r.text -match 'README.md'
+    $modifiedTreeUnchanged=(Tree $local) -eq $before
+    Check ($modifiedRefused -and $modifiedDiagnostic -and $modifiedTreeUnchanged) 'user-modified file blocks replacement and directory is untouched'
     # Restore the generated README by regenerating into a clean state via previous copy.
     Remove-Item -LiteralPath $local -Recurse -Force
     $r=Prepare ($common+@('-OutputRoot',$out))
@@ -120,9 +178,19 @@ try {
     $before=Tree $local
     $previousCount=@(Get-ChildItem (Join-Path $out 'previous') -Directory).Count
     $r=Prepare ($common+@('-OutputRoot',$out,'-TestFailAt','swap'))
-    Check ($r.code -ne 0 -and $r.text -match '已恢复旧目录' -and (Tree $local) -eq $before -and @(Get-ChildItem (Join-Path $out 'previous') -Directory).Count -eq $previousCount -and -not (Get-ChildItem $out -Force -Filter '.staging-*')) 'swap failure restores the old directory and leaves no staging'
+    $swapRefused=$r.code -ne 0
+    $rollbackDiagnostic=$r.text -match '已恢复旧目录'
+    $oldTreeRestored=(Tree $local) -eq $before
+    $previousCountUnchanged=@(Get-ChildItem (Join-Path $out 'previous') -Directory).Count -eq $previousCount
+    $noStaging=-not (Get-ChildItem $out -Force -Filter '.staging-*')
+    Check $swapRefused 'injected swap failure returns a refusal exit code'
+    Check $rollbackDiagnostic 'swap failure preserves the Chinese restored-directory diagnostic'
+    Check $oldTreeRestored 'swap failure restores the complete old directory tree'
+    Check $previousCountUnchanged 'swap failure leaves the previous directory count unchanged'
+    Check $noStaging 'swap failure leaves no staging'
 
     # Real login/join from a fresh copy outside the repository.
+    AssertExternalFixture
     Copy-Item -LiteralPath $local -Destination $fresh -Recurse
     $check=& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fresh 'CheckClient.ps1')
     Check ($LASTEXITCODE -eq 0 -and ($check -match 'server_configured=True')) 'CheckClient in fresh directory'
@@ -221,7 +289,10 @@ try {
     if(-not $operatorTest.WaitForExit(240000)) { Check $false 'isolated operator test finished' } else { Check ($operatorTest.ExitCode -eq 0) 'isolated operator shut down cleanly' }
     $sharedAfter=(Tree $sharedPublic)+'|'+$(if(Test-Path $sharedIndex){(Get-FileHash $sharedIndex).Hash})
     Check ($sharedAfter -eq $sharedBefore) 'shared artifacts/client and game index were never modified'
-    if(Test-Path -LiteralPath $fresh) { Remove-Item -LiteralPath $fresh -Recurse -Force }
+    if($externalOwned) {
+        AssertExternalFixture
+        if(Test-Path -LiteralPath $externalRoot) { Remove-Item -LiteralPath $externalRoot -Recurse -Force }
+    }
     Write-Output ('PLAYER_CLIENT_RESULT passed='+$script:passed+' failed='+$script:failed+' evidence='+$evidence)
 }
 if($script:failed) { exit 1 }
