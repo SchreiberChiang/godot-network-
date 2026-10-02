@@ -21,6 +21,11 @@ function ssh.exe {
     $command=[string]$args[-1]
     [IO.File]::AppendAllText((Join-Path $PSScriptRoot 'ssh-commands.txt'),$command+"`n")
     $global:LASTEXITCODE=0
+    if($command -match ' && bash roomkit/releases/linux-[0-9]{14}-[a-f0-9]{8}/UpdateRoomKit.sh status --new-package /home/zhao/roomkit/releases/linux-[0-9]{14}-[a-f0-9]{8} --instance export-[a-f0-9]{8}$'){
+        $statusPath=Join-Path $PSScriptRoot 'remote-update-status.json'
+        if(-not [IO.File]::Exists($statusPath)){$global:LASTEXITCODE=99;return 'Missing substitute update journal.'}
+        return ('ROOMKIT_UPDATE '+([IO.File]::ReadAllText($statusPath)|ConvertFrom-Json|ConvertTo-Json -Compress -Depth 12))
+    }
     if($command -match ' && cat roomkit/releases/linux-[0-9-]+[a-f0-9]*/data/instance-export-[a-f0-9]+/data/config.json$'){
         return [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'remote-network.json'))
     }
@@ -85,7 +90,9 @@ if($actualPaths.Count -ne 9 -or ($actualPaths -join '|') -cne ($expectedPaths -j
 $count++;Write-Output 'PASS exact nine remote link guard paths'
 Json $pointer $valid;Run 'prepared local identity accepted without SSH' $true ''
 foreach($case in @(
-    @{name='wrong instance';field='instance';value='export-ffffffff';reason='unprepared Linux package identity'},
+    @{name='different instance without update evidence';field='instance';value='export-ffffffff';reason='Prepared Linux package operation failed'},
+    @{name='instance traversal';field='instance';value='export-../ffffffff';reason='unprepared Linux package identity'},
+    @{name='instance newline';field='instance';value="export-ffffffff`n";reason='unprepared Linux package identity'},
     @{name='different server';field='server';value='192.168.10.1';reason='unprepared Linux package identity'},
     @{name='different panel';field='panel';value=28491;reason='unprepared Linux package identity'},
     @{name='client traversal';field='client';value='artifacts/../PlayerClient';reason='client or private notes path'},
@@ -178,5 +185,46 @@ Json $pointer $valid;SetConnection '192.168.10.105' 28700
 foreach($binding in @('0.0.0.0','192.168.10.105')){
     Json 'tools/remote-network.json' @{lobby_bind=$binding;game_bind=$binding;advertised_host='192.168.10.105';lobby_port=28700}
     Run ('old pointer Start remains compatible with '+$binding) $true '' 'Start'
+}
+
+# The updater keeps the original instance name in a newer immutable package.
+# Exercise its validated, non-secret status output rather than a pointer flag.
+$migrated=@{};foreach($key in $valid.Keys){$migrated[$key]=$valid[$key]}
+$migrated.instance='export-ffffffff'
+$absoluteRemote='/home/zhao/'+$remote
+$oldPackage='/home/zhao/roomkit/releases/linux-20190101000000-ffffffff'
+$sealed=@{ok=$true;state='SEALED';instance=$migrated.instance;new_package=$absoluteRemote;
+    new_instance=($absoluteRemote+'/data/instance-'+$migrated.instance);
+    journal=($absoluteRemote+'/data/update-'+$migrated.instance+'/journal.json');
+    old_package=$oldPackage;old_instance=($oldPackage+'/data/instance-'+$migrated.instance);rollback_allowed=$false;code=''}
+Json $pointer $migrated;Json 'tools/remote-update-status.json' $sealed
+foreach($action in @('Check','Start','Stop')){
+    [IO.File]::WriteAllText((Join-Path $fake 'tools/ssh-commands.txt'),'',$utf8)
+    Run ('sealed migration preserves old instance for '+$action) $true '' $action
+    $commands=[IO.File]::ReadAllText((Join-Path $fake 'tools/ssh-commands.txt'))
+    $expected='bash '+$remote+'/UpdateRoomKit.sh status --new-package '+$absoluteRemote+' --instance '+$migrated.instance
+    if(-not $commands.Contains($expected) -or -not $commands.Contains('sha256sum -c SHA256SUMS.txt >/dev/null) && '+$expected)){
+        throw 'Migrated identity was accepted without the checksummed official status command.'
+    }
+}
+foreach($case in @(
+    @{name='unsealed migration';field='state';value='VERIFIED'},
+    @{name='failed migration status';field='ok';value=$false},
+    @{name='string success flag';field='ok';value='true'},
+    @{name='different migration instance';field='instance';value='export-12345678'},
+    @{name='forged new package';field='new_package';value='/home/zhao/roomkit/releases/linux-20200101000000-12345678'},
+    @{name='forged instance data path';field='new_instance';value=($absoluteRemote+'/data/../instance-export-ffffffff')},
+    @{name='forged journal outside update directory';field='journal';value=($absoluteRemote+'/journal.json')},
+    @{name='arbitrary old package';field='old_package';value='/tmp/other-package'},
+    @{name='old package traversal';field='old_package';value='/home/zhao/roomkit/releases/../linux-20190101000000-ffffffff'},
+    @{name='mismatched old instance path';field='old_instance';value=($oldPackage+'/data/instance-export-12345678')}
+)){
+    $copy=@{};foreach($key in $sealed.Keys){$copy[$key]=$sealed[$key]};$copy[$case.field]=$case.value
+    Json 'tools/remote-update-status.json' $copy
+    [IO.File]::WriteAllText((Join-Path $fake 'tools/ssh-commands.txt'),'',$utf8)
+    Run $case.name $false 'update status does not match the sealed prepared instance' 'Start'
+    if([IO.File]::ReadAllText((Join-Path $fake 'tools/ssh-commands.txt')) -match '/RoomKit.sh (start|stop)'){
+        throw 'Rejected migration still issued a service operation.'
+    }
 }
 Write-Output ('LINUX_PACKAGE_ENTRY_TEST passed='+$count+' failed=0 evidence='+$root)

@@ -24,7 +24,7 @@ function SafePath([string]$Relative) {
 $pointer=SafePath 'artifacts/linux-package-playtest.json'
 if(-not (Test-Path -LiteralPath $pointer -PathType Leaf)){throw 'Linux package playtest is not prepared on this computer. See docs/17 (linux-package-playtest).'}
 $meta=Get-Content -Encoding UTF8 -Raw -LiteralPath $pointer | ConvertFrom-Json
-if($meta.build -notmatch '\A[0-9]{14}-[0-9a-f]{8}\z' -or $meta.instance -cne ('export-'+$meta.build.Substring(15)) -or
+if($meta.build -notmatch '\A[0-9]{14}-[0-9a-f]{8}\z' -or $meta.instance -isnot [string] -or $meta.instance -cnotmatch '\Aexport-[0-9a-f]{8}\z' -or
    $meta.server -cne '192.168.10.105' -or $meta.user -cne 'zhao' -or $meta.panel -ne 28691){throw 'Refused unprepared Linux package identity.'}
 $packageRelative='artifacts/RoomKit-0.5.0-linux-x86_64-'+$meta.build
 if($meta.PSObject.Properties.Name -contains 'package'){
@@ -65,6 +65,25 @@ $safeRemotePaths=@('roomkit','roomkit/releases',$remote,($remote+'/SHA256SUMS.tx
 $guards=foreach($path in $safeRemotePaths){'test ! -L '+$path}
 $verify=($guards -join ' && ')+' && test "$(sha256sum '+$remote+'/SHA256SUMS.txt | cut -d '' '' -f1)" = '+$manifestHash+
     ' && (cd '+$remote+' && sha256sum -c SHA256SUMS.txt >/dev/null)'
+# The offline updater preserves the old instance name. A different build suffix
+# is accepted only after the checksummed official updater validates its journal.
+# SEALED remains valid after normal starts change instance data; do not compare
+# the original candidate fingerprints against a running instance.
+if($meta.instance -cne ('export-'+$meta.build.Substring(15))){
+    $absoluteRemote='/home/zhao/'+$remote
+    $updateOutput=Remote ($verify+' && bash '+$remote+'/UpdateRoomKit.sh status --new-package '+$absoluteRemote+' --instance '+$meta.instance)
+    if(-not($updateOutput -cmatch '\AROOMKIT_UPDATE (\{[^\r\n]*\})\z')){throw 'Migrated Linux package has no verified sealed update status.'}
+    try{$update=$matches[1]|ConvertFrom-Json}catch{throw 'Migrated Linux package has invalid update status.'}
+    if($update.ok -isnot [bool] -or $update.ok -ne $true -or $update.state -cne 'SEALED' -or
+       $update.instance -cne $meta.instance -or $update.new_package -cne $absoluteRemote -or
+       $update.new_instance -cne ($absoluteRemote+'/data/instance-'+$meta.instance) -or
+       $update.journal -cne ($absoluteRemote+'/data/update-'+$meta.instance+'/journal.json') -or
+       $update.old_package -isnot [string] -or $update.old_package -cnotmatch '\A/home/zhao/roomkit/releases/linux-[0-9]{14}-[0-9a-f]{8}\z' -or
+       $update.old_package -ceq $absoluteRemote -or
+       $update.old_instance -cne ($update.old_package+'/data/instance-'+$meta.instance)){
+        throw 'Migrated Linux package update status does not match the sealed prepared instance.'
+    }
+}
 if($Action -eq 'Stop'){
     $result=Remote ($verify+' && bash '+$remote+'/RoomKit.sh stop --instance '+$meta.instance)
     if($result -notmatch ('(?m)^ROOMKIT_(STOPPED|NOT_RUNNING) instance='+[regex]::Escape($meta.instance)+'$')){throw 'Unexpected package stop response.'}
