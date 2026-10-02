@@ -14,6 +14,8 @@ class PendingResults extends RefCounted:
 		return pending
 	func prepare_launch(_row: Dictionary) -> Dictionary:
 		return {"ok": true, "config": {}}
+	func confirm_exit(_row: Dictionary) -> bool:
+		return true
 
 class PendingRecovery extends RefCounted:
 	var healthy := true
@@ -26,6 +28,8 @@ class PendingRecovery extends RefCounted:
 		return true
 	func release(_launch: String) -> void:
 		pass
+	func mark_exited(_launch: String, _observed_at: int) -> bool:
+		return true
 
 func run() -> Dictionary:
 	var fake = Fake.new()

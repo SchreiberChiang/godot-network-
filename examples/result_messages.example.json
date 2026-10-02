@@ -39,5 +39,21 @@
       "ok": true,
       "code": "DUPLICATE"
     }
+  },
+  {
+    "version": 1,
+    "kind": "event",
+    "event_id": "example_result_expired",
+    "type": "result.ack",
+    "room_id": "r_example",
+    "launch_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "game_id": "turns",
+    "build_id": "turns-dev-003",
+    "payload": {
+      "result_id": "cccccccccccccccccccccccccccccccc",
+      "record_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "ok": false,
+      "code": "RESULT_EXPIRED"
+    }
   }
 ]

@@ -225,7 +225,7 @@ func _start_host() -> Dictionary:
 	if FileAccess.file_exists(root_path.path_join("host-running.json")):
 		return Wire.failure("RECOVERY_REQUIRED")
 	starting = true
-	var safe_rooms: Dictionary = await _work(_inspect_old_rooms.bind(root_path.path_join("processes.json")))
+	var safe_rooms: Dictionary = await _work(_inspect_old_rooms.bind(root_path.path_join("processes.json"), {"root": results.repository.root, "database": results.repository.database}))
 	if not safe_rooms.ok:
 		starting = false
 		return safe_rooms
@@ -374,7 +374,7 @@ func _host_exited() -> void:
 	var end := Time.get_ticks_msec() + 60000
 	var clean := false
 	while not clean and Time.get_ticks_msec() < end:
-		var inspected: Dictionary = await _work(_inspect_old_rooms.bind(root_path.path_join("processes.json")))
+		var inspected: Dictionary = await _work(_inspect_old_rooms.bind(root_path.path_join("processes.json"), {"root": results.repository.root, "database": results.repository.database}))
 		clean = inspected.ok
 		if not clean:
 			await create_timer(1.0).timeout
@@ -587,7 +587,7 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 			return
 		account_requests[context_key] = context
 	var admission := {"ok": true}
-	if storage_maintenance or quitting:
+	if storage_maintenance or (quitting and action not in ["result.end", "result.submit"]):
 		# Only account operations wait through a backup; restore/config never do.
 		admission = await _wait_for_backup(context, peer_id) if account_op else Wire.failure("STORAGE_UNAVAILABLE")
 	elif account_op and _account_request_cancelled(context, peer_id):
@@ -627,12 +627,17 @@ func _rpc_request(peer_id: String, request_id: String, action: String, payload: 
 		"result.grant":
 			var grant: Dictionary = payload.get("grant", {})
 			if grant.get("game_id", "") in games and grant.get("build_id", "") == games[grant.game_id].manifest.build_id:
-				result = await _work(results.repository.execute.bind({"op": "grant", "grant": grant}))
+				result = await _work(results.store_grant.bind(grant))
 				if result.ok:
-					results.grants[grant.launch_id] = grant
+					results.apply_grant(grant, result)
+		"result.end":
+			# Authenticated loopback host's first verified process exit. This action
+			# is unavailable to player clients, and public record times are ignored.
+			if payload.size() == 2 and str(payload.get("launch_id", "")).length() == 32 and str(payload.launch_id).is_valid_hex_number(false) and (payload.get("observed_exit_at") is float or payload.get("observed_exit_at") is int) and payload.observed_exit_at >= 0 and payload.observed_exit_at == floor(payload.observed_exit_at) and payload.observed_exit_at <= Time.get_unix_time_from_system():
+				result = await _work(results.end_launch.bind(str(payload.launch_id), int(payload.observed_exit_at)))
 		"result.submit":
 			var checked: Dictionary = results.validate_submission(payload)
-			result = await _work(results.repository.execute.bind(checked.request)) if checked.ok else checked
+			result = await _work(results.commit.bind(checked.request)) if checked.ok else checked
 	_note_storage_failure(action + ":" + str(payload.get("op", "")), result)
 	if account_op:
 		account_requests.erase(context_key)
@@ -1107,7 +1112,7 @@ static func _terminate_owned(owned: Dictionary) -> Dictionary:
 		return Wire.failure("PROCESS_IDENTITY_UNVERIFIED")
 	return Launcher.new()._inspect("terminate", owned)
 
-static func _inspect_old_rooms(path: String) -> Dictionary:
+static func _inspect_old_rooms(path: String, result_store: Dictionary = {}) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {"ok": true}
 	var journal := Wire.decode(FileAccess.get_file_as_bytes(path), "res://schemas/process_journal.schema.json", 65536)
@@ -1123,6 +1128,21 @@ static func _inspect_old_rooms(path: String) -> Dictionary:
 		if probe.create_server(int(entry.port), 1) != OK:
 			return Wire.failure("RECOVERY_REQUIRED")
 		probe.close()
+	if not result_store.is_empty() and not journal.entries.is_empty():
+		# Persist the first verified exit before touching storage. If close fails
+		# or this controller crashes, a later run retries with this exact time.
+		for entry in journal.entries.values():
+			if not entry.has("exit_confirmed_at"):
+				entry.exit_confirmed_at = int(Time.get_unix_time_from_system())
+		if not _write_json(path, journal):
+			return Wire.failure("RECOVERY_REQUIRED")
+		var store = preload("res://host/storage/sqlite_repository.gd").new()
+		store.root = result_store.root
+		store.database = result_store.database
+		for launch in journal.entries:
+			var closed: Dictionary = store.execute({"op": "grant.end", "launch_id": launch, "ended_at": int(journal.entries[launch].exit_confirmed_at)})
+			if not closed.ok:
+				return Wire.failure("RECOVERY_REQUIRED")
 	# This controller starts no replacement until every old entry was verified above.
 	# Persist that completed recovery before a replacement can publish RUNNING.
 	return {"ok": true} if _write_json(path, {"version": 1, "entries": {}}) else Wire.failure("RECOVERY_REQUIRED")
@@ -1137,7 +1157,7 @@ func _recover_previous() -> void:
 	elif owned.get("verified", false) and owned.has_all(["pid", "parent_pid", "launch_id", "created_filetime", "executable"]):
 		inspected = await _work(Launcher.new()._inspect.bind("inspect", owned))
 	if inspected.get("state", "unknown") == "exited":
-		var rooms: Dictionary = await _work(_inspect_old_rooms.bind(root_path.path_join("processes.json")))
+		var rooms: Dictionary = await _work(_inspect_old_rooms.bind(root_path.path_join("processes.json"), {"root": results.repository.root, "database": results.repository.database}))
 		if rooms.ok:
 			DirAccess.remove_absolute(path)
 			snapshot.host.state = "STOPPED"

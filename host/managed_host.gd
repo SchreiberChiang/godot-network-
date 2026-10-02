@@ -88,6 +88,14 @@ func _process(_delta: float) -> bool:
 				bus.close()
 				quit(0)
 				return false
+			elif not bus.ready() and manager.close_after_control_loss():
+				# Room exits are verified and journaled, but result.end was not
+				# acknowledged. Preserve that recovery input without claiming a
+				# completed cleanup; the next Operator will close the grants.
+				lobby.close()
+				bus.close()
+				quit(0)
+				return false
 	if initialized and Time.get_ticks_msec() - last_status > 1000:
 		_publish()
 	return false

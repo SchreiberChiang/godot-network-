@@ -90,7 +90,17 @@ v0.1 建议采用高熵随机一次性票据：宿主保存票据摘要、user_i
 
 唯一契约为schemas/result_record.schema.json、result_submission.schema.json和result_ack.schema.json，由control.schema.json引用；回合示例使用summary_result.schema.json。结构例子见examples/result_messages.example.json，全零signature/record_hash仅演示格式，不能认证或清除真实记录。运行时验证JSON有限数、深度与Schema，正文最大16KiB；按递归字典排序、整数规范化后的完整精度UTF-8 JSON计算SHA-256和每launch独立HMAC-SHA256。match_id以m_<launch_id>_开头，SDK局内key限1—64个字母/数字/下划线/连字符。
 
-result.submit身份必须与已认证控制连接及持久启动授权一致；result.ack同时绑定result_id和record_hash。DUPLICATE是成功确认；RESULT_CONFLICT、MATCH_RESULT_CONFLICT、AUTH_FAILED、INVALID_RESULT是不可自动覆盖的失败，outbox保留为.rejected.json。STORAGE_UNAVAILABLE与STORAGE_CAPACITY_EXCEEDED保留文件重试。SDK本地未启用服务返回RESULTS_DISABLED；初始化可返回UNSUPPORTED_STORAGE或PRIVATE_DATA_FAILED，这些本地错误不作为线上ACK。
+result.submit身份必须与已认证控制连接及持久启动授权一致；result.ack同时绑定result_id和record_hash。DUPLICATE是成功确认；RESULT_CONFLICT、MATCH_RESULT_CONFLICT、AUTH_FAILED、INVALID_RESULT、RESULT_EXPIRED是不可自动覆盖的失败，outbox保留为.rejected.json。STORAGE_UNAVAILABLE与STORAGE_CAPACITY_EXCEEDED保留文件重试。SDK本地未启用服务返回RESULTS_DISABLED；初始化可返回UNSUPPORTED_STORAGE或PRIVATE_DATA_FAILED，这些本地错误不作为线上ACK。
+
+结果授权的补交窗口由服务器核实房间进程退出的第一时刻起算 7 天（604800 秒），不读取比赛记录或玩家提交的时间。仍在运行或身份未核实的房间不因年代久远而回收；旧库缺少结束证据的授权保持未结束。结束时间先写进进程日志，数据库结束标记用首次值，重试不延长窗口；记录结束失败时保留房间/日志并重试，关停等结果任务完成。跨运行恢复仅在只读核实原进程退出和端口可重新绑定后补记。
+
+管理服务控制连接丢失时，宿主先等所有房间真实退出、首次退出时间写入磁盘日志及在途结果 RPC 结束，再退出；此路径只关闭传输，不声称数据库收尾成功、不删除日志或释放未确认的租约。新管理服务按原日志核实退出后补做授权结束。无法核实的进程、未知旧日志和失败的持久化继续阻止安全恢复。
+
+新授权的事务先回收已确认结束且窗口已到期的授权，再检查 256 条容量；没有可回收项时继续拒绝，不提高上限。回收清掉授权密钥，仅留下轻量过期标记，已接受成绩和奖励回执不删除。正式带签名的 accept 在同一 SQLite 写事务里复核密钥、身份和截止时间；排队期间过期的新成绩返回 RESULT_EXPIRED，不发奖励。已接受成绩在授权回收后仅允许原 record_hash 与原签名完全一致的 DUPLICATE，不会再发奖励。旧内部存储夹具的无签名 accept 仍为受信测试接口，玩家不能调用；极旧成绩缺少签名回执且正文已被账号删除匿名化时，不合成新的签名，回收后重放保守拒绝。成绩 10000 条和资产回执 100000 条上限保留，这不是无限历史保存承诺。
+
+旧已接受成绩缺少签名回执时，授权密钥尚存期间可用原提交正文验签、比较保存的原 record_hash 后补回执并返回 DUPLICATE，即使补交窗口已结束也不再发奖；不对匿名化后的存储正文重算哈希。密钥已回收后不能用此兼容路径绕过签名回执。
+
+兼容说明：result.ack 新增 RESULT_EXPIRED 枚举；进程日志 v1 新增可选 exit_confirmed_at 字段；数据库 user_version=2 下做添加列/表升级，旧 launches.ended_at 为 NULL。配套服务和房间需一同更新，旧 Schema 不认识该新 ACK；版本/签名/加密门禁不放宽。
 
 正常停止最多额外等待1.5秒发送/确认；超时留存outbox，后续恢复。尚未生成、未成功写入outbox的内存结果不保证恢复。未实现奖励或外部业务副作用。
 

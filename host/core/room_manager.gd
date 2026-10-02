@@ -19,6 +19,7 @@ const Ports = preload("res://host/core/port_allocator.gd")
 const Launcher = preload("res://host/platform/process_launcher.gd")
 const Transport = preload("res://sdk/roomkit/shared/control_transport.gd")
 const Protocol = preload("res://sdk/roomkit/shared/protocol.gd")
+const Wire = preload("res://sdk/roomkit/shared/json_wire.gd")
 const PrivatePath = preload("res://host/platform/posix_private_path.gd")
 
 var registry = Registry.new()
@@ -154,6 +155,7 @@ func poll() -> void:
 	_poll_workers()
 	_poll_resources()
 	if recovery_guard != null:
+		recovery_guard.exit_handler = result_service.confirm_exit if result_service != null else Callable()
 		recovery_guard.poll()
 	while server.is_connection_available():
 		var peer := server.take_connection()
@@ -270,6 +272,38 @@ func snapshot(room_id: String) -> Dictionary:
 func close() -> bool:
 	if active_count() != 0:
 		return false
+	return _close_listener()
+
+func close_after_control_loss() -> bool:
+	# The Operator is permanently gone. This ends the host transport, not the
+	# database close job: keep every unacknowledged journal entry and UDP lease.
+	# A new Operator must verify these processes again before completing end.
+	if result_service == null or not result_service.has_method("control_disconnected") or not result_service.control_disconnected() or result_service.busy():
+		return false
+	if not starts.is_empty() or not terminations.is_empty() or resource_worker != null:
+		return false
+	if recovery_guard == null or not recovery_guard.healthy or recovery_guard.worker != null:
+		return false
+	var journal := Wire.decode(FileAccess.get_file_as_bytes(recovery_guard.path), "res://schemas/process_journal.schema.json", 65536)
+	if journal.is_empty():
+		return false
+	for row in rooms.values():
+		if row.cleaned:
+			continue
+		if row.pid != 0 and launcher.probe(row.launch_id) != "exited":
+			return false
+		var recorded: Dictionary = journal.entries.get(row.launch_id, {})
+		if not row.get("exit_confirmed", false) or not row.has("exit_observed_at") or recorded.get("exit_confirmed_at", -1) != row.exit_observed_at:
+			return false
+	for launch in recovery_guard.orphans:
+		if not recovery_guard.confirmed_exits.has(launch):
+			return false
+		var recorded: Dictionary = journal.entries.get(launch, {})
+		if not recorded.has("exit_confirmed_at"):
+			return false
+	return _close_listener()
+
+func _close_listener() -> bool:
 	for connection in connections.duplicate():
 		_drop(connection, "HOST_CLOSED")
 	server.stop()
@@ -361,6 +395,16 @@ func _cleanup(row: Dictionary) -> void:
 	if row.pid != 0 and launcher.probe(row.launch_id) != "exited":
 		return
 	row.exit_confirmed = true
+	if not row.has("exit_observed_at"):
+		row.exit_observed_at = int(Time.get_unix_time_from_system())
+	if recovery_guard != null and not recovery_guard.mark_exited(row.launch_id, row.exit_observed_at):
+		row["cleanup_code"] = "RESULT_EXIT_PENDING"
+		return
+	# Do not discard the live row/journal until the durable seven-day clock was
+	# recorded. The result service queues this; no per-frame storage subprocess.
+	if result_service != null and not result_service.confirm_exit(row):
+		row["cleanup_code"] = "RESULT_EXIT_PENDING"
+		return
 	if row.port != 0 and not ports.release(row.launch_id, true):
 		row["cleanup_code"] = "PORT_QUARANTINED"
 		return
@@ -471,6 +515,7 @@ static func _seal_private_file(path: String) -> bool:
 	return false
 
 static func _start_worker(descriptor: Dictionary, bootstrap: Dictionary, path: String, grant: Dictionary, store: Dictionary) -> Dictionary:
+	var pruned: Array = []
 	if not grant.is_empty():
 		var written: Dictionary
 		if store.has("rpc"):
@@ -485,19 +530,20 @@ static func _start_worker(descriptor: Dictionary, bootstrap: Dictionary, path: S
 			written = repository.execute({"op": "grant", "grant": grant})
 		if not written.ok:
 			return {"started": written, "owned": {}, "grant": {}}
+		pruned = written.get("pruned", [])
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
-		return {"started": {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}, "owned": {}, "grant": grant}
+		return {"started": {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}, "owned": {}, "grant": grant, "pruned": pruned}
 	file.store_string(JSON.stringify(bootstrap))
 	file.close()
 	if not _seal_private_file(path):
-		return {"started": {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}, "owned": {}, "grant": grant}
+		return {"started": {"ok": false, "code": "PRIVATE_CONFIG_FAILED"}, "owned": {}, "grant": grant, "pruned": pruned}
 	var isolated = Launcher.new()
 	var started: Dictionary = isolated.launch(descriptor, bootstrap.launch_id, ["--launch-id=" + bootstrap.launch_id, "--launch-config=" + path])
 	# owned: an observation (journal, diagnostics). handoff: what moves the child
 	# to the main launcher (Windows: the same record; Linux: a single-use token that
 	# exists only in memory).
-	return {"started": started, "owned": isolated.journal_record(bootstrap.launch_id), "handoff": isolated.handoff(bootstrap.launch_id), "grant": grant}
+	return {"started": started, "owned": isolated.journal_record(bootstrap.launch_id), "handoff": isolated.handoff(bootstrap.launch_id), "grant": grant, "pruned": pruned}
 
 static func _terminate_worker(owned: Dictionary) -> bool:
 	if owned.is_empty():
@@ -515,7 +561,7 @@ func _poll_workers() -> void:
 		starts.erase(id)
 		var row: Dictionary = rooms[id]
 		if not completed.grant.is_empty():
-			result_service.grants[row.launch_id] = completed.grant
+			result_service.apply_grant(completed.grant, {"ok": true, "pruned": completed.get("pruned", [])})
 		row.pid = maxi(0, int(completed.started.get("pid", 0)))
 		var handed: Dictionary = completed.get("handoff", {})
 		var taken: bool = not handed.is_empty() and launcher.import_owned(handed)

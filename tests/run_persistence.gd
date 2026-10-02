@@ -47,6 +47,8 @@ func _run() -> void:
 	check(stored.ok and stored.count == 1, "retried result has one SQLite row")
 	manager.stop_all()
 	check(await until(func(): return manager.active_count() == 0, 8000), "result room safely stops and reclaims")
+	var closed_grants: Dictionary = service.repository.execute({"op": "grants"})
+	check(closed_grants.ok and closed_grants.grants.filter(func(grant): return grant.launch_id == row.launch_id and str(grant.ended_at) != "").size() == 1, "normal real room stop durably starts seven-day grant window")
 	if not stored.ok or stored.get("rows", []).is_empty():
 		await finish()
 		return
@@ -114,6 +116,7 @@ func crash_recovery() -> void:
 	check(await until(func(): return manager.launcher.probe(recovery.launch_id) == "exited", 20000), "fresh recovery host exits normally")
 	var report := read_json(recovery_path)
 	check(report.get("recovered", {}).get("accepted", 0) == 1 and report.get("stored", {}).get("count", 0) == 1, "fresh host recovers exactly one persisted result")
+	check(report.get("closed_grants", []).filter(func(grant): return grant.launch_id == row.launch_id and str(grant.ended_at) != "").size() == 1, "cross-run read-only exit recovery durably closes real orphan grant")
 	check(pending_files(directory).is_empty(), "recovered outbox removed only after commit")
 	var again_path := root_path.path_join("recovery-again.json")
 	var again := launch_host(crash_store, again_path, "recover")

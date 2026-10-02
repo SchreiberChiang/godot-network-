@@ -23,13 +23,26 @@ func _run() -> void:
 		quit(2)
 		return
 	if args.get("--mode", "") == "recover":
+		var config := _settings()
+		if not manager.initialize(config).ok:
+			quit(2)
+			return
+		manager.result_service = service
+		service.manager = manager
+		initialized = true
+		var until := Time.get_ticks_msec() + 12000
+		while (not manager.recovery_guard.orphans.is_empty() or service.busy()) and Time.get_ticks_msec() < until:
+			await process_frame
+		if not manager.recovery_guard.orphans.is_empty() or service.busy():
+			quit(2)
+			return
 		var recovered: Dictionary = service.recover()
-		write_report({"recovered": recovered, "stored": service.repository.execute({"op": "inspect"})})
+		write_report({"recovered": recovered, "stored": service.repository.execute({"op": "inspect"}), "closed_grants": service.repository.execute({"op": "grants"}).get("grants", [])})
+		manager.close()
+		initialized = false
 		quit(0)
 		return
-	var config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/development.json"))
-	config.godot_executable = OS.get_executable_path()
-	config.heartbeat_timeout_ms = 8000
+	var config := _settings()
 	if not manager.initialize(config).ok:
 		quit(2)
 		return
@@ -47,6 +60,17 @@ func _run() -> void:
 		quit(2)
 		return
 	room_id = result.room_id
+
+func _settings() -> Dictionary:
+	var config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/development.json"))
+	config.godot_executable = OS.get_executable_path()
+	config.heartbeat_timeout_ms = 8000
+	var probe := TCPServer.new()
+	probe.listen(0, "127.0.0.1")
+	config.control_port = probe.get_local_port()
+	probe.stop()
+	config.process_journal = str(args["--store"]).path_join("processes.json")
+	return config
 
 func _process(_delta: float) -> bool:
 	if not initialized:

@@ -88,6 +88,43 @@ $transaction=$false
 $jsonKeepsText=(Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')
 function ParseJson([string]$Text) { if ($jsonKeepsText) { return ConvertFrom-Json -InputObject $Text -DateKind String }; return ConvertFrom-Json -InputObject $Text }
 function Query([string]$Sql,[string[]]$Values=@()) { return ,($db.Query($Sql,$Values)) }
+# Internal host time, never copied from the public record or its timestamps.
+# Tests inject it through ResultService.clock; production uses the system clock.
+function ServerNow {
+    if ($null -ne $requestObject.PSObject.Properties['server_now']) {
+        if (-not (RewardInteger $requestObject.server_now 9007199254740991)) { throw 'INVALID_STORAGE_REQUEST' }
+        return [long]$requestObject.server_now
+    }
+    return [long][Math]::Floor(([DateTime]::UtcNow-[DateTime]'1970-01-01').TotalSeconds)
+}
+function SignBody([string]$Body,[string]$Secret) {
+    if ($Secret -cnotmatch '^[a-f0-9]{64}$') { return '' }
+    $key=New-Object byte[] 32
+    for($i=0;$i -lt 32;$i++) { $key[$i]=[Convert]::ToByte($Secret.Substring($i*2,2),16) }
+    $hmac=New-Object Security.Cryptography.HMACSHA256(,$key)
+    try { return [BitConverter]::ToString($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($Body))).Replace('-','').ToLowerInvariant() }
+    finally { $hmac.Dispose() }
+}
+function PruneGrants([long]$Now) {
+    # Called only within BEGIN IMMEDIATE, the same lock used by acceptance.
+    $old=Query 'SELECT launch_id,room_id,game_id,build_id,secret,ended_at FROM launches WHERE ended_at IS NOT NULL AND CAST(ended_at AS INTEGER)+604800<=CAST(? AS INTEGER)' @([string]$Now)
+    foreach($grant in $old) {
+        # Upgrade old accepted records conservatively. Only the unchanged signed
+        # canonical body can reconstruct a missing receipt signature. Deleted
+        # accounts may have anonymized bodies; do not synthesize a new identity.
+        $legacy=Query 'SELECT r.result_id,r.record_hash,r.body FROM results r LEFT JOIN result_signatures s ON s.result_id=r.result_id WHERE s.result_id IS NULL AND r.match_id LIKE ?' @('m_'+$grant['launch_id']+'_%')
+        foreach($entry in $legacy) {
+            $record=ParseJson $entry['body']
+            if ($record.launch_id -cne $grant['launch_id']) { continue }
+            $sha=[Security.Cryptography.SHA256]::Create()
+            try { $hash=[BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($entry['body']))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() }
+            if ($hash -ceq $entry['record_hash']) { [void](Query 'INSERT OR IGNORE INTO result_signatures(result_id,signature) VALUES (?,?)' @($entry['result_id'],(SignBody $entry['body'] $grant['secret']))) }
+        }
+        [void](Query 'INSERT OR IGNORE INTO expired_launches(launch_id,room_id,game_id,build_id,ended_at) VALUES (?,?,?,?,?)' @($grant['launch_id'],$grant['room_id'],$grant['game_id'],$grant['build_id'],$grant['ended_at']))
+        [void](Query 'DELETE FROM launches WHERE launch_id=? AND ended_at IS NOT NULL AND CAST(ended_at AS INTEGER)+604800<=CAST(? AS INTEGER)' @($grant['launch_id'],[string]$Now))
+    }
+    return @($old | ForEach-Object { $_['launch_id'] })
+}
 # Deleted test accounts (docs/17 section 7) leave only this pseudonym, the same one
 # account_store.ps1 derives. Additive table under the same user_version.
 $tombstoneTable='CREATE TABLE IF NOT EXISTS deleted_subjects (subject TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)'
@@ -128,6 +165,9 @@ try {
         [void](Query 'PRAGMA journal_mode=WAL')
         [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
         [void](Query 'CREATE TABLE IF NOT EXISTS launches (launch_id TEXT PRIMARY KEY, room_id TEXT NOT NULL, game_id TEXT NOT NULL, build_id TEXT NOT NULL, secret TEXT NOT NULL)')
+        if (@((Query 'PRAGMA table_info(launches)') | Where-Object { $_['name'] -eq 'ended_at' }).Count -eq 0) { [void](Query 'ALTER TABLE launches ADD COLUMN ended_at INTEGER') }
+        [void](Query 'CREATE TABLE IF NOT EXISTS expired_launches (launch_id TEXT PRIMARY KEY,room_id TEXT NOT NULL,game_id TEXT NOT NULL,build_id TEXT NOT NULL,ended_at INTEGER NOT NULL,rejected_count INTEGER NOT NULL DEFAULT 0,last_rejected_hash TEXT NOT NULL DEFAULT '''')')
+        [void](Query 'CREATE TABLE IF NOT EXISTS result_signatures (result_id TEXT PRIMARY KEY,signature TEXT NOT NULL)')
         [void](Query 'CREATE TABLE IF NOT EXISTS results (result_id TEXT PRIMARY KEY, game_id TEXT NOT NULL, match_id TEXT NOT NULL, result_kind TEXT NOT NULL, record_hash TEXT NOT NULL, body TEXT NOT NULL, UNIQUE(game_id, match_id, result_kind))')
         [void](Query 'CREATE TABLE IF NOT EXISTS asset_states (user_id TEXT NOT NULL, space_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>=0), body TEXT NOT NULL, PRIMARY KEY(user_id,space_id))')
         [void](Query 'CREATE TABLE IF NOT EXISTS asset_receipts (user_id TEXT NOT NULL, request_id TEXT NOT NULL, fingerprint TEXT NOT NULL, space_id TEXT NOT NULL, actor_id TEXT NOT NULL, command TEXT NOT NULL, previous_body TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,request_id))')
@@ -191,8 +231,16 @@ try {
     elseif ($requestObject.op -eq 'grant') {
         $g=$requestObject.grant
         [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
+        $result.pruned=@(PruneGrants (ServerNow))
         if ([int](Query 'SELECT count(*) AS count FROM launches')[0]['count'] -ge 256) { $result=@{ok=$false;code='STORAGE_CAPACITY_EXCEEDED'} }
+        elseif ((Query 'SELECT launch_id FROM expired_launches WHERE launch_id=?' @($g.launch_id)).Count) { throw 'EXPIRED_LAUNCH_REUSE' }
         else { [void](Query 'INSERT INTO launches (launch_id,room_id,game_id,build_id,secret) VALUES (?,?,?,?,?)' @($g.launch_id,$g.room_id,$g.game_id,$g.build_id,$g.secret)) }
+        [void](Query 'COMMIT'); $transaction=$false
+    } elseif ($requestObject.op -eq 'grant.end') {
+        [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
+        $ended=if($null -ne $requestObject.PSObject.Properties['ended_at']) { $requestObject.ended_at } else { ServerNow }
+        if (-not (RewardInteger $ended (ServerNow))) { throw 'INVALID_STORAGE_REQUEST' }
+        [void](Query 'UPDATE launches SET ended_at=COALESCE(ended_at,CAST(? AS INTEGER)) WHERE launch_id=?' @([string]$ended,$requestObject.launch_id))
         [void](Query 'COMMIT'); $transaction=$false
     } elseif ($requestObject.op -eq 'grants') {
         $result.grants=@((Query 'SELECT * FROM launches').ToArray())
@@ -201,9 +249,35 @@ try {
         [void](Query 'BEGIN IMMEDIATE'); $transaction=$true
         $existing=Query 'SELECT record_hash FROM results WHERE result_id=?' @($r.result_id)
         $match=Query 'SELECT result_id FROM results WHERE game_id=? AND match_id=? AND result_kind=?' @($r.game_id,$r.match_id,$r.result_kind)
-        if ($existing.Count -gt 0) {
+        $signed=$null -ne $requestObject.PSObject.Properties['signature']
+        $authorization=''
+        if ($signed) {
+            $launch=Query 'SELECT room_id,game_id,build_id,secret,ended_at FROM launches WHERE launch_id=?' @($r.launch_id)
+            $expired=Query 'SELECT launch_id FROM expired_launches WHERE launch_id=?' @($r.launch_id)
+            $receipt=Query 'SELECT signature FROM result_signatures WHERE result_id=?' @($r.result_id)
+            $exact=$existing.Count -gt 0 -and $receipt.Count -gt 0 -and $existing[0]['record_hash'] -ceq $requestObject.record_hash -and $receipt[0]['signature'] -ceq $requestObject.signature
+            if ($launch.Count -eq 0) { $authorization=if($exact){'DUPLICATE'}elseif($expired.Count){'RESULT_EXPIRED'}else{'AUTH_FAILED'} }
+            elseif ($launch[0]['room_id'] -cne $r.room_id -or $launch[0]['game_id'] -cne $r.game_id -or $launch[0]['build_id'] -cne $r.build_id -or (SignBody $requestObject.body $launch[0]['secret']) -cne $requestObject.signature) { $authorization='AUTH_FAILED' }
+            # A legacy accepted row may predate signature receipts. While its
+            # grant key still exists, metadata + HMAC above authenticates the
+            # original submitted body even if deletion anonymized the stored body.
+            elseif ($existing.Count -gt 0 -and $existing[0]['record_hash'] -ceq $requestObject.record_hash) {
+                [void](Query 'INSERT OR IGNORE INTO result_signatures(result_id,signature) VALUES (?,?)' @($r.result_id,$requestObject.signature))
+                $authorization='DUPLICATE'
+            }
+            elseif ($launch[0]['ended_at'] -ne '' -and [long]$launch[0]['ended_at']+604800 -le (ServerNow)) { $authorization='RESULT_EXPIRED' }
+        }
+        if ($authorization -eq 'DUPLICATE') { $result=@{ok=$true;code='DUPLICATE'} }
+        elseif ($authorization) {
+            $result=@{ok=$false;code=$authorization}
+            if ($authorization -eq 'RESULT_EXPIRED') {
+                [void](Query 'INSERT OR IGNORE INTO expired_launches(launch_id,room_id,game_id,build_id,ended_at) SELECT launch_id,room_id,game_id,build_id,ended_at FROM launches WHERE launch_id=? AND ended_at IS NOT NULL' @($r.launch_id))
+                [void](Query 'UPDATE expired_launches SET rejected_count=rejected_count+1,last_rejected_hash=? WHERE launch_id=?' @($requestObject.record_hash,$r.launch_id))
+            }
+        } elseif ($existing.Count -gt 0) {
             $result.ok=$existing[0]['record_hash'] -eq $requestObject.record_hash
             $result.code=if ($result.ok) {'DUPLICATE'} else {'RESULT_CONFLICT'}
+            if ($result.ok -and $signed) { [void](Query 'INSERT OR IGNORE INTO result_signatures(result_id,signature) VALUES (?,?)' @($r.result_id,$requestObject.signature)) }
         } elseif ($match.Count -gt 0) { $result=@{ok=$false;code='MATCH_RESULT_CONFLICT'} }
         elseif ([int](Query 'SELECT count(*) AS count FROM results')[0]['count'] -ge 10000) { $result=@{ok=$false;code='STORAGE_CAPACITY_EXCEEDED'} }
         else {
@@ -237,6 +311,7 @@ try {
                 $result=@{ok=$false;code='STORAGE_CAPACITY_EXCEEDED'}
             } else {
                 [void](Query 'INSERT INTO results (result_id,game_id,match_id,result_kind,record_hash,body) VALUES (?,?,?,?,?,?)' @($r.result_id,$r.game_id,$r.match_id,$r.result_kind,$requestObject.record_hash,$storedBody))
+                if ($signed) { [void](Query 'INSERT INTO result_signatures(result_id,signature) VALUES (?,?)' @($r.result_id,$requestObject.signature)) }
                 foreach($reward in $rewards) {
                     $rows=Query 'SELECT revision,body FROM asset_states WHERE user_id=? AND space_id=?' @($reward.user_id,$reward.space_id)
                     $previous=if($rows.Count){$rows[0]['body']}else{''}
