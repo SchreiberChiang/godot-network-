@@ -8,6 +8,7 @@ param(
 # service, reads shared connection files, downloads dependencies or migrates data.
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
+. (Join-Path $PSScriptRoot 'artifact_retention.ps1')
 $utf8=New-Object Text.UTF8Encoding($false)
 $id=[DateTime]::UtcNow.ToString('yyyyMMddHHmmss')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8)
 function WriteUtf8([string]$Path,[string]$Text){[void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path));[IO.File]::WriteAllText($Path,$Text,$utf8)}
@@ -43,6 +44,7 @@ foreach($folder in @('host','sdk','schemas','config','examples')){
 foreach($relative in @('project.godot','tools/prepare_deployment.ps1','tools/check_deployment.ps1','tools/build_framework.ps1','tools/build_linux_server.ps1','tools/build_framework_release.ps1','tools/prepare_player_client.ps1','tools/content_digest.ps1')){$sourceFiles+=@{path=$relative;sha256=(Hash (Join-Path $project $relative))}}
 $server=Join-Path $delivery 'Server'
 [void][IO.Directory]::CreateDirectory($delivery)
+$retentionOutcome='failure'
 try {
     if($ServerPlatform -eq 'Linux'){
         $buildOutput=RunScript 'build_linux_server.ps1' @('-Godot',$Godot,'-OutputDirectory',$server)
@@ -52,7 +54,7 @@ try {
         $sourceIndex=[string]$build.source_index
         $serverIndex=Get-Content -LiteralPath (Join-Path $server 'games.json') -Encoding UTF8 -Raw|ConvertFrom-Json
         $identity='linux-package.json';$checksums='SHA256SUMS.txt'
-        $dependencies=@('Linux x86_64, ordinary user, writable real directory (no symlinks)','pwsh 7.6.6 already installed; set ROOMKIT_PWSH to its absolute path','system libsqlite3.so.0 and runtime libraries checked by CheckPackage.sh')
+        $dependencies=@('Linux x86_64, ordinary user, writable real directory (no symlinks)','run bash PrepareEnvironment.sh check; if pwsh 7.6.6 is missing, run bash PrepareEnvironment.sh prepare explicitly','system libsqlite3.so.0 and runtime libraries must already exist; no system package installation is performed')
         $entries=@{check='bash CheckPackage.sh';start='bash RoomKit.sh start --instance demo';status='bash RoomKit.sh status --instance demo';stop='bash RoomKit.sh stop --instance demo';public_config='data/instance-demo/public'}
     }else{
         $null=RunScript 'build_framework_release.ps1' @('-Godot',$Godot,'-OutputDirectory',$server,'-SkipArchive')
@@ -100,6 +102,9 @@ Windows server does not run on Linux. Nothing installs software or opens ports.
 
 1. Copy the WHOLE Server folder to a writable ordinary folder on the target
    __PLATFORM__ machine. Check dependencies and package hashes using __CHECK__.
+   On Linux, bash PrepareEnvironment.sh check diagnoses dependencies; the
+   prepare subcommand explicitly prepares supported user-local tools. It does not
+   install system libraries or start a service. Repeat the package check after it.
    __DEPENDENCIES__
 2. In Server, run __START__. Open the printed local admin URL on that machine;
    SSH forwarding is optional for viewing a Linux panel from another computer.
@@ -134,10 +139,19 @@ On Windows, CheckDeployment.cmd verifies the fresh delivery without services.
     Move-Item -LiteralPath ($pointer+'.tmp') -Destination $pointer -Force
     Write-Output ('DEPLOYMENT_READY '+$delivery)
     Write-Output ('DEPLOYMENT_BUILD '+$id+' server='+$ServerPlatform+' shooter='+$clientVersion.build_id+' player_configured=false')
+    $retentionOutcome='success'
     if(-not $NoOpen){Invoke-Item -LiteralPath $delivery}
 }catch{
     # Preserve failed output for inspection; never recursively delete a directory
     # that might now contain user changes. It has no successful deployment marker.
     Write-Error ('Deployment preparation failed; evidence remains at '+$delivery+': '+$_.Exception.Message)
     exit 1
+}finally{
+    # Only completed output is snapshotted. Retention failures never turn a
+    # successful build into a failed build or adopt unregistered old history.
+    try{
+        $references=@();if($retentionOutcome -eq 'success'){$references=@($sourceIndex)}
+        Register-RoomKitArtifact -ProjectRoot $project -Category ('deployment-'+$ServerPlatform.ToLowerInvariant()) -Paths @($delivery) -Outcome $retentionOutcome -References $references -Summary @{build=$id;platform=$ServerPlatform;stage='prepare';result=$retentionOutcome}|Out-Null
+        Invoke-RoomKitArtifactRetention -ProjectRoot $project -Category ('deployment-'+$ServerPlatform.ToLowerInvariant()) -ProtectedPaths @($delivery)|Out-Null
+    }catch{Write-Warning 'ARTIFACT_RETENTION_SKIPPED deployment_registration_or_cleanup_failed'}
 }

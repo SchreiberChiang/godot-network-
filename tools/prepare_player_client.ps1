@@ -12,9 +12,10 @@
 # 从 StartManagement.cmd 当前服务器所用的射击工程导出独立客户端，并附上该服务器的
 # 公开 connection.json/server.crt。版本校验保持原样：客户端清单就是服务器自己的清单。
 # 同一次导出同时供本地分发（含连接配置）和 GitHub 仓库副本（-RepositoryCopy，不含连接配置）。
-# 输出只写入受控目录；替换前核对清单，发现用户新增或改动的文件就拒绝；旧目录移入 previous\ 保留，失败时自动回退。
+# 输出只写入受控目录；替换前核对清单，发现用户新增或改动的文件就拒绝；旧目录移入 previous\，登记后的历史默认保留最近两份，失败时自动回退。
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
+. (Join-Path $PSScriptRoot 'artifact_retention.ps1')
 $utf8=New-Object Text.UTF8Encoding($false)
 $helpers=Join-Path $PSScriptRoot 'shooter_client'
 if($IndexPath -eq '') { $IndexPath=Join-Path $project 'artifacts\framework-games.json' }
@@ -93,6 +94,12 @@ function SafeReplace([string]$Target,[string]$Stage,[string]$BackupRoot) {
     }
     return $backup
 }
+function RetainGenerated([string]$Category,[string[]]$Paths,[string]$Outcome='success',[string[]]$References=@()) {
+    try {
+        Register-RoomKitArtifact -ProjectRoot $project -Category $Category -Paths $Paths -Outcome $Outcome -References $References -Summary @{generator='prepare_player_client';result=$Outcome}|Out-Null
+        Invoke-RoomKitArtifactRetention -ProjectRoot $project -Category $Category -ProtectedPaths $References|Out-Null
+    } catch { Write-Warning ('ARTIFACT_RETENTION_SKIPPED '+$Category+' registration_or_cleanup_failed') }
+}
 
 $OutputRoot=Controlled $OutputRoot 'output'
 $target=Join-Path $OutputRoot 'shooter-windows'
@@ -120,6 +127,7 @@ $work=Join-Path $staging 'project'
 $stage=Join-Path $staging 'shooter-windows'
 $repoStage=Join-Path $staging 'repository'
 New-Item -ItemType Directory -Force -Path $work,$stage,(Join-Path $project 'logs') | Out-Null
+$retentionOutcome='failure'
 try {
     foreach($item in Get-ChildItem -LiteralPath $source -Force) {
         if($item.Name -eq '.godot') { continue }
@@ -212,10 +220,10 @@ server databases, private certificates, administrator credentials or backups.
     if($RepositoryCopy -and ((Test-Path -LiteralPath (Join-Path $repoStage 'connection.json')) -or (Test-Path -LiteralPath (Join-Path $repoStage 'server.crt')))) { throw '仓库副本不应包含服务器连接文件。' }
 
     $previous=SafeReplace $target $stage (Join-Path $OutputRoot 'previous')
-    if($previous) { Write-Output ('PLAYER_CLIENT_PREVIOUS '+$previous) }
+    if($previous) { Write-Output ('PLAYER_CLIENT_PREVIOUS '+$previous);RetainGenerated 'player-client-previous' @($previous) }
     if($RepositoryCopy) {
         $repoPrevious=SafeReplace $RepositoryDestination $repoStage (Join-Path $OutputRoot 'previous-repository')
-        if($repoPrevious) { Write-Output ('REPOSITORY_CLIENT_PREVIOUS '+$repoPrevious) }
+        if($repoPrevious) { Write-Output ('REPOSITORY_CLIENT_PREVIOUS '+$repoPrevious);RetainGenerated 'player-client-repository-previous' @($repoPrevious) }
         Write-Output ('REPOSITORY_CLIENT_READY '+$RepositoryDestination+' tag='+$tag)
         # GitHub Release attachments: exactly the repository copy's files, Client.exe
         # included, uploaded one by one (no archive). The list and hashes sit beside
@@ -224,16 +232,21 @@ server databases, private certificates, administrator credentials or backups.
         $releaseStage=Join-Path $staging 'release'
         Copy-Item -LiteralPath $RepositoryDestination -Destination $releaseStage -Recurse
         $releasePrevious=SafeReplace $releaseDir $releaseStage (Join-Path $OutputRoot 'previous-release')
-        if($releasePrevious) { Write-Output ('RELEASE_ASSETS_PREVIOUS '+$releasePrevious) }
+        if($releasePrevious) { Write-Output ('RELEASE_ASSETS_PREVIOUS '+$releasePrevious);RetainGenerated 'player-client-release-previous' @($releasePrevious) }
         $assets=@(Get-ChildItem -LiteralPath $releaseDir -File | Sort-Object Name | ForEach-Object { [ordered]@{name=$_.Name;size=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} })
         if(@(Get-ChildItem -LiteralPath $releaseDir -Directory).Count) { throw 'Release attachments must be a flat folder.' }
         if(-not ($assets | Where-Object { $_.name -eq 'Client.exe' })) { throw 'Release attachments are missing Client.exe.' }
         [IO.File]::WriteAllText(($releaseDir+'.json'),([ordered]@{tag=$tag;build_id=$manifest.build_id;repository=$Repository;target_path='clients/shooter-windows';assets=$assets}|ConvertTo-Json -Depth 4),$utf8)
         [IO.File]::WriteAllText(($releaseDir+'-SHA256SUMS.txt'),((($assets | ForEach-Object { $_.sha256+'  '+$_.name }) -join "`n")+"`n"),$utf8)
         Write-Output ('RELEASE_ASSETS_READY '+$releaseDir+' files='+$assets.Count+' bytes='+(Get-ChildItem -LiteralPath $releaseDir -File | Measure-Object Length -Sum).Sum)
+        RetainGenerated 'player-client-release' @($releaseDir,($releaseDir+'.json'),($releaseDir+'-SHA256SUMS.txt')) 'success' @($releaseDir)
     }
+    $retentionOutcome='success'
 } finally {
     if(Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
+    if($null -ne $process){$process.Dispose()}
+    $exportLogs=@($stdout,$stderr)|Where-Object {$_ -and (Test-Path -LiteralPath $_ -PathType Leaf)}
+    if($exportLogs.Count){RetainGenerated 'player-client-export' $exportLogs $retentionOutcome}
 }
 $connection=if($Unconfigured){[pscustomobject]@{url='UNCONFIGURED'}}else{Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $target 'connection.json') | ConvertFrom-Json}
 $size=(Get-ChildItem -LiteralPath $target -Recurse -File | Measure-Object Length -Sum).Sum
