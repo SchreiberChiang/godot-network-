@@ -2,6 +2,13 @@
 
 **阶段 7 公网试玩已获人工通过反馈，移动卡顿待定位**：用户转述朋友移动像掉帧，本人单人入房也发现人物移动与枪口旋转略卡，观察 FPS 约 120、感觉没有下降。更偏向显示同步问题；没有连续帧时间或网络时序数据，不将基本可玩扩大为性能达标。先补诊断与显示平滑，再安排赛车；合作种田和云端后置。详见 [阶段 7](docs/17_framework_shooter_plan.md#friends-public-preparation) 与 [指标定义](docs/25_shooter_room_rules.md#client-diagnostics)。
 
+## dot 双端协调小试验已核对（10-02）
+
+已从笔记本桌面取回报告及 20 KB 证据包，传输 SHA256 一致。ZIP 内 23 项校验和匹配；云端原始输出与退出记录支持两项通过。另经 SSH 只读读取笔记本原始 `report.json`，确认两项各 1 次、退出 0、stderr 空；源码 HEAD 为固定 `735a419`，当前工作区干净。两端均为 Godot 4.7.2，瞄准 **94/0**、射击 **83/0**。报告记载通过连接的笔记本本地 Codex 任务执行，不是用云端结果冒充本机。
+
+此结果只验逻辑与脚本加载，不是画面、联网或部署验收；云端 Git/完整调用历史及本地工具通道由报告声明，不宣称独立取证了全部过程。我本轮未重跑测试、安装或启动服务。轻量证据在 `logs/dot-control-pilot-20261002/`，详见 [小试验记录](docs/17_framework_shooter_plan.md#dot-linux-control-pilot)。
+
+台式机 10x dot 的附件传输另被 `DesktopTaskWorkspaceUnavailableError / desktop_task_workspace_unavailable` 阻挡：设备据其报告 connected/attached，但创建任务工作区失败，未返回 threadId，三个附件未保存，补丁未应用。不要记成 F 盘写入失败或候选已复核。
 ## 人物移动测量工具（10-02）
 
 **当前下一步**：本地 Codex 补移动生命周期与重复/旧快照的独立验收；10x dot 负责呈现候选，5x 在控制小试验后复用基线独立复验。候选通过后定向整合、相关短回归、生成配套客户端/服务器再试玩。用户已反馈离线 stable 效果较好；不等于公网或 jitter 已通过。详见 [本地推进顺序](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)。
@@ -16,7 +23,7 @@
 
 日常入口仍是 `F:\文档\GodotGame\Net\RoomKit` 的 `main`。10-02 工作树核查已记录到 `778a0f8`；**主线现已接收本地枪口方案，身体移动尚未修改，配套试玩包尚未更新**。两份候选目录继续保留供对照；七个旧本地分支的实施内容均已在 main，不是七项待合并功能。
 
-人物移动两份任务单已更新到统一基准 `f368df0`，暂未派发：10x dot 的呈现任务可与 Linux 小试验并行，5x 先完成小试验再接独立验收。Linux 小试验任务已放在 `/home/zhao/Desktop/RoomKit-dot任务单.txt`，继续固定 `735a419`，未收到执行结果。台式机负责范围、验收标准和最终整合。当前分工见 [主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)，历史候选文档不作为当前分配指令。
+人物移动两份任务单已更新到统一基准 `f368df0`，10x dot 已通过用户截图报告候选完成，补丁文件尚未接收，Godot 4.6.3 的结果待本机 4.7.2 复验。5x 的 Linux/云端小试验已交报告并经本地复核，固定 `735a419`，两端各瞄准 **94/0**、射击 **83/0**，四次退出均 0；可转入独立候选复验。台式机负责范围、验收标准和最终整合。当前分工见 [主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)，历史候选文档不作为当前分配指令。
 
 ## 本轮：接收枪口方案，停止笔记本服务
 

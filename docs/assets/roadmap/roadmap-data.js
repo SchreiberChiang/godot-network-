@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-02",
-  baseline: "阶段7已获公网试玩人工反馈；main现已接收本地枪口呈现与诊断，用户反馈转枪验证无问题，身体移动未修改，配套试玩包未更新。笔记本游戏服务已按用户要求停止；dot协调小试验任务已放在笔记本桌面，未执行。当前提交用git log -1核实，目录和分工以docs/17顶部为准",
+  baseline: "阶段7已获公网试玩人工反馈；main现已接收本地枪口呈现与诊断，用户反馈转枪验证无问题，身体移动未修改，配套试玩包未更新。笔记本游戏服务已按用户要求停止；dot双端协调小试验已交报告并核对：两端各瞄准94/0、射击83/0；只验逻辑，不等于联网。当前提交用git log -1核实，目录和分工以docs/17顶部为准",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -247,7 +247,7 @@ window.ROADMAP_DATA = {
     { id: "game-movement-presentation", area: "game", phase: 7, status: "pending",
       title: "移动与瞄准显示平滑",
       summary: "主线枪口已获用户验证；移动基线与离线预览已完成，身体移动修复待候选。",
-      details: "自己的枪逐帧跟随可操作时的鼠标方向，其他枪走50ms最短角度插值；失焦、弹窗、离房、死亡复活和换局复位，服务器射击判定不变。根目录PreviewAim提供离线旧/新预览。PreviewMovement已提供稳定、抖动、250ms断流的实际显示算法对照，TAB输入分发已修复并用真实窗口按键消息验证；合成120Hz下停顿为0/16.7/250ms，不等于公网根因。用户反馈stable效果较好；本地Codex先补停走、反向、跳跃、死亡复活、传送与重复旧快照验收，5x复用已有基线独立复验，不重复造同类工具。候选通过后定向整合并更新配套交付，不把更大显示延迟当成成功。10x移动任务可与Linux控制小试验并行；5x收尾后接独立验收，Windows统一整合。两份移动任务均固定f368df0，尚未派发。",
+      details: "自己的枪逐帧跟随可操作时的鼠标方向，其他枪走50ms最短角度插值；失焦、弹窗、离房、死亡复活和换局复位，服务器射击判定不变。根目录PreviewAim提供离线旧/新预览。PreviewMovement已提供稳定、抖动、250ms断流的实际显示算法对照，TAB输入分发已修复并用真实窗口按键消息验证；合成120Hz下停顿为0/16.7/250ms，不等于公网根因。用户反馈stable效果较好；本地Codex先补停走、反向、跳跃、死亡复活、传送与重复旧快照验收，5x复用已有基线独立复验，不重复造同类工具。候选通过后定向整合并更新配套交付，不把更大显示延迟当成成功。10x移动任务可与Linux控制小试验并行；5x收尾后接独立验收，Windows统一整合。两份移动任务均固定f368df0；10x候选已给完成截图，实际补丁待接收，5x双端小试验已核对，可接独立复验。",
       files: ["examples/shooter/game.gd", "examples/framework/client.gd", "tests/run_aim_presentation.gd", "PreviewAim.cmd", "PreviewMovement.cmd", "tests/support/movement_probe.gd", "tests/run_movement_baseline.gd"],
       docs: ["docs/17_framework_shooter_plan.md#worktree-mainline-20261002", "docs/25_shooter_room_rules.md#aim-presentation-mainline"],
       evidence: "主线隔离枪口94/0、射击83/0、诊断30/0、反馈8/0，退出0且stderr空，四脚本解析通过；用户反馈转枪验证无问题，联网包未重建，身体移动未修复" },
