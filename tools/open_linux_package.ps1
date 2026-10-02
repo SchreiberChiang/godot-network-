@@ -26,12 +26,30 @@ if(-not (Test-Path -LiteralPath $pointer -PathType Leaf)){throw 'Linux package p
 $meta=Get-Content -Encoding UTF8 -Raw -LiteralPath $pointer | ConvertFrom-Json
 if($meta.build -notmatch '\A[0-9]{14}-[0-9a-f]{8}\z' -or $meta.instance -cne ('export-'+$meta.build.Substring(15)) -or
    $meta.server -cne '192.168.10.105' -or $meta.user -cne 'zhao' -or $meta.panel -ne 28691){throw 'Refused unprepared Linux package identity.'}
-$package=SafePath ('artifacts/RoomKit-0.5.0-linux-x86_64-'+$meta.build)
-$packageInfo=SafePath ('artifacts/RoomKit-0.5.0-linux-x86_64-'+$meta.build+'/linux-package.json')
-$manifest=SafePath ('artifacts/RoomKit-0.5.0-linux-x86_64-'+$meta.build+'/SHA256SUMS.txt')
+$packageRelative='artifacts/RoomKit-0.5.0-linux-x86_64-'+$meta.build
+if($meta.PSObject.Properties.Name -contains 'package'){
+    if($meta.package -isnot [string] -or $meta.package -cnotmatch '\Aartifacts/deployments/[a-z0-9][a-z0-9-]{0,63}/Server\z'){throw 'Refused deployment package path.'}
+    $packageRelative=$meta.package
+}
+$publicHost='192.168.10.105'
+$hasPublicHost=$meta.PSObject.Properties.Name -contains 'public_host'
+if($hasPublicHost){
+    if($meta.public_host -isnot [string] -or $meta.public_host -cnotmatch '\A(?:0|[1-9][0-9]{0,2})(?:\.(?:0|[1-9][0-9]{0,2})){3}\z'){throw 'Refused public IPv4 address.'}
+    $address=$null
+    if(-not [Net.IPAddress]::TryParse($meta.public_host,[ref]$address) -or $address.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or $address.ToString() -cne $meta.public_host -or $meta.public_host -ceq '0.0.0.0'){throw 'Refused public IPv4 address.'}
+    $publicHost=$meta.public_host
+}
+$lobbyPort=28700
+if($meta.PSObject.Properties.Name -contains 'lobby_port'){
+    if(($meta.lobby_port -isnot [int] -and $meta.lobby_port -isnot [long]) -or $meta.lobby_port -lt 1024 -or $meta.lobby_port -gt 65535){throw 'Refused lobby port.'}
+    $lobbyPort=[int]$meta.lobby_port
+}
+$package=SafePath $packageRelative
+$packageInfo=SafePath ($packageRelative+'/linux-package.json')
+$manifest=SafePath ($packageRelative+'/SHA256SUMS.txt')
 $packageMeta=Get-Content -Encoding UTF8 -Raw -LiteralPath $packageInfo | ConvertFrom-Json
 if($packageMeta.build -cne $meta.build -or $packageMeta.engine -cne '4.7.2.stable.official.ed1daf0bf'){throw 'Local package differs from its prepared identity.'}
-$gamesPath=SafePath ('artifacts/RoomKit-0.5.0-linux-x86_64-'+$meta.build+'/games.json')
+$gamesPath=SafePath ($packageRelative+'/games.json')
 $game=(Get-Content -Encoding UTF8 -Raw -LiteralPath $gamesPath | ConvertFrom-Json).shooter.manifest
 $remote='roomkit/releases/linux-'+$meta.build
 $target='zhao@192.168.10.105'
@@ -65,7 +83,7 @@ $connection=Get-Content -Encoding UTF8 -Raw -LiteralPath $connectionPath | Conve
 foreach($field in @('game_id','build_id','compatibility_id','game_protocol')){
     if($null -eq $game.$field -or $version.$field -cne $game.$field){throw 'Player client does not match the prepared package game.'}
 }
-if($version.build_id -cne $packageMeta.games.shooter -or $connection.url -cne 'wss://192.168.10.105:28700' -or
+if($version.build_id -cne $packageMeta.games.shooter -or $connection.url -cne ('wss://'+$publicHost+':'+$lobbyPort) -or
    $connection.managed -ne $true -or $connection.secure_enet -ne $true -or $connection.server_hostname -cne 'localhost' -or
    $connection.ca_certificate -cne 'server.crt'){throw 'Player client does not match the prepared encrypted package connection.'}
 foreach($name in @('Client.exe','Client.pck','RunGame.ps1','StartGame.cmd','connection.json','server.crt')){
@@ -79,6 +97,17 @@ if($Action -eq 'Check'){Write-Output 'LINUX_PACKAGE_PLAYTEST_READY';exit 0}
 # close another SSH tunnel. The tunnel helper checks ownership again afterwards.
 $reservation=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,28691)
 try{$reservation.Start()}catch{throw 'Local panel port 28691 is occupied. Use the existing playtest window; nothing was stopped.'}finally{$reservation.Stop()}
+# A public player URL is insufficient if the saved room or lobby bind is still
+# loopback. Read only this exact prepared instance before any start request.
+# Stop remains available even after the operator changes its network settings.
+$remoteConfig=$remoteInstance+'/data/config.json'
+$savedConfig=Remote ($verify+' && test ! -L '+$remoteConfig+' && cat '+$remoteConfig)
+try{$network=$savedConfig|ConvertFrom-Json}catch{throw 'Prepared Linux network configuration is invalid; nothing was started.'}
+$allowedBinds=if($hasPublicHost){@('0.0.0.0')}else{@('0.0.0.0','192.168.10.105')}
+if($network.lobby_bind -isnot [string] -or $network.game_bind -isnot [string] -or
+   $allowedBinds -cnotcontains $network.lobby_bind -or $network.game_bind -cne $network.lobby_bind -or
+   $network.advertised_host -cne $publicHost -or
+   ($network.lobby_port -isnot [int] -and $network.lobby_port -isnot [long]) -or $network.lobby_port -ne $lobbyPort){throw 'Prepared Linux network configuration differs from the player connection; nothing was started.'}
 # Values below are restricted above to digits, lowercase hexadecimal and fixed
 # path segments. Verify the remote manifest before executing package scripts.
 $command=$verify+' && bash '+$remote+'/CheckPackage.sh && bash '+$remote+'/RoomKit.sh start --instance '+$meta.instance

@@ -1,6 +1,6 @@
 param()
 # Pure launcher guards in a new fake project. No engine or remote service is
-# started: every case uses Check, except a Start rejected by a held local port.
+# started: Start/Stop use a substitute SSH function and management entry.
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $root=Join-Path $project ('data/linux-package-entry-'+[Guid]::NewGuid().ToString('N'))
@@ -13,6 +13,33 @@ $notes='data/codex-linux-package-'+$build+'-12345678/PLAYTEST.md'
 foreach($folder in @('tools',$client,$package,[IO.Path]::GetDirectoryName($notes))){[void][IO.Directory]::CreateDirectory((Join-Path $fake $folder))}
 Copy-Item -LiteralPath (Join-Path $project 'tools/open_linux_package.ps1') -Destination (Join-Path $fake 'tools/open_linux_package.ps1')
 $utf8=New-Object Text.UTF8Encoding($false)
+# Inject a substitute only into the disposable launcher copy. Production code
+# still calls ssh.exe directly; the substitute records every command and reads
+# small JSON fixtures instead of contacting a host.
+$sshFixture=@'
+function ssh.exe {
+    $command=[string]$args[-1]
+    [IO.File]::AppendAllText((Join-Path $PSScriptRoot 'ssh-commands.txt'),$command+"`n")
+    $global:LASTEXITCODE=0
+    if($command -match ' && cat roomkit/releases/linux-[0-9-]+[a-f0-9]*/data/instance-export-[a-f0-9]+/data/config.json$'){
+        return [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'remote-network.json'))
+    }
+    if($command -match '/RoomKit.sh start --instance '){return ('ROOMKIT_PANEL http://127.0.0.1:28691/ instance='+$meta.instance+' pid=12345')}
+    if($command -match '/RoomKit.sh stop --instance '){return ('ROOMKIT_STOPPED instance='+$meta.instance)}
+    if($command -match '^test ! -L (roomkit/releases/linux-[^ ]+/data/instance-export-[^ ]+/public/server.crt) && sha256sum '){
+        $hash=(Get-FileHash -LiteralPath (Join-Path $project ($meta.client+'/server.crt')) -Algorithm SHA256).Hash.ToLowerInvariant()
+        return ($hash+'  '+$matches[1])
+    }
+    $global:LASTEXITCODE=99
+    return 'Unexpected substitute SSH command.'
+}
+'@
+$launcherPath=Join-Path $fake 'tools/open_linux_package.ps1'
+$launcherText=[IO.File]::ReadAllText($launcherPath)
+$fixtureMarker="# Local convenience entry"
+if(-not $launcherText.Contains($fixtureMarker)){throw 'Launcher fixture insertion point missing.'}
+[IO.File]::WriteAllText($launcherPath,$launcherText.Replace($fixtureMarker,$sshFixture+"`n"+$fixtureMarker),$utf8)
+[IO.File]::WriteAllText((Join-Path $fake 'tools/open_linux_management.ps1'),"param(`$Server,`$User,`$PanelPort,[switch]`$NoBrowser,`$HoldSeconds)`nWrite-Output 'SUBSTITUTE_MANAGEMENT_READY'`nexit 0`n",$utf8)
 function Json([string]$Relative,$Value){[IO.File]::WriteAllText((Join-Path $fake $Relative),($Value|ConvertTo-Json -Depth 12),$utf8)}
 function ReadJson([string]$Relative){return (Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $fake $Relative)|ConvertFrom-Json)}
 [IO.File]::WriteAllText((Join-Path $fake $notes),'fake private instructions',$utf8)
@@ -35,7 +62,8 @@ function Run([string]$Label,[bool]$Accept,[string]$Reason,[string]$Action='Check
     try{
         if(-not $process.WaitForExit(10000)){$process.Kill();throw 'Pure entry check did not return in ten seconds.'}
         $text=(Get-Content -Encoding UTF8 -Raw -LiteralPath $out)+(Get-Content -Encoding UTF8 -Raw -LiteralPath $err)
-        if(($Accept -and ($process.ExitCode -ne 0 -or $text -notmatch 'LINUX_PACKAGE_PLAYTEST_READY')) -or
+        $acceptedOutput=switch($Action){'Start'{'LINUX_PACKAGE_PLAYTEST_STARTED'};'Stop'{'ROOMKIT_STOPPED'};default{'LINUX_PACKAGE_PLAYTEST_READY'}}
+        if(($Accept -and ($process.ExitCode -ne 0 -or $text -notmatch $acceptedOutput)) -or
            (-not $Accept -and ($process.ExitCode -eq 0 -or $text -notmatch $Reason))){throw ('Unexpected check result: '+$Label)}
         Write-Output ('PASS '+$Label)
     }finally{$process.Dispose()}
@@ -89,4 +117,66 @@ Move-Item -LiteralPath ($realClient+'-saved') -Destination $realClient
 [IO.Directory]::Delete($junction)
 $listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,28691)
 try{$listener.Start();Run 'occupied port refused before remote operation' $false 'port 28691 is occupied' 'Start'}finally{$listener.Stop()}
+
+function SetConnection([string]$HostName,[int]$Port){
+    Json ($client+'/connection.json') @{url=('wss://'+$HostName+':'+$Port);managed=$true;secure_enet=$true;server_hostname='localhost';ca_certificate='server.crt'}
+    $current=ReadJson ($client+'/client-version.json')
+    foreach($entry in $current.generated_files){if($entry.path -ceq 'connection.json'){$entry.sha256=(Get-FileHash -LiteralPath (Join-Path $fake ($client+'/connection.json')) -Algorithm SHA256).Hash.ToLowerInvariant()}}
+    Json ($client+'/client-version.json') $current
+}
+$deployment='artifacts/deployments/friends-20261002-test/Server'
+[void][IO.Directory]::CreateDirectory((Join-Path $fake $deployment))
+foreach($name in @('linux-package.json','games.json','SHA256SUMS.txt')){Copy-Item -LiteralPath (Join-Path $fake ($package+'/'+$name)) -Destination (Join-Path $fake ($deployment+'/'+$name))}
+$public=@{};foreach($key in $valid.Keys){$public[$key]=$valid[$key]}
+$public.package=$deployment;$public.public_host='60.163.23.141';$public.lobby_port=28700
+SetConnection $public.public_host $public.lobby_port
+Json $pointer $public;Run 'public deployment identity accepted without SSH' $true ''
+foreach($case in @(
+    @{name='package traversal';field='package';value='artifacts/deployments/../Server';reason='deployment package path'},
+    @{name='package nested directory';field='package';value='artifacts/deployments/valid/extra/Server';reason='deployment package path'},
+    @{name='package newline';field='package';value="artifacts/deployments/friends/Server`n";reason='deployment package path'},
+    @{name='package injection';field='package';value='artifacts/deployments/friends;echo/Server';reason='deployment package path'},
+    @{name='package arbitrary old location';field='package';value='artifacts/elsewhere';reason='deployment package path'},
+    @{name='wildcard public address';field='public_host';value='0.0.0.0';reason='public IPv4 address'},
+    @{name='IPv4 octet overflow';field='public_host';value='60.163.23.256';reason='public IPv4 address'},
+    @{name='IPv4 abbreviated';field='public_host';value='127.1';reason='public IPv4 address'},
+    @{name='IPv4 leading zero';field='public_host';value='060.163.23.141';reason='public IPv4 address'},
+    @{name='public hostname';field='public_host';value='server.example.test';reason='public IPv4 address'},
+    @{name='public injection';field='public_host';value='60.163.23.141;echo';reason='public IPv4 address'},
+    @{name='string lobby port';field='lobby_port';value='28700';reason='lobby port'},
+    @{name='floating lobby port';field='lobby_port';value=28700.5;reason='lobby port'},
+    @{name='low lobby port';field='lobby_port';value=1023;reason='lobby port'},
+    @{name='high lobby port';field='lobby_port';value=65536;reason='lobby port'}
+)){
+    $copy=@{};foreach($key in $public.Keys){$copy[$key]=$public[$key]};$copy[$case.field]=$case.value;Json $pointer $copy
+    Run $case.name $false $case.reason
+}
+Json $pointer $public
+SetConnection '192.168.10.105' 28700;Run 'public pointer rejects old LAN player URL' $false 'encrypted package connection'
+SetConnection $public.public_host 28701;Run 'public pointer rejects wrong lobby URL port' $false 'encrypted package connection'
+SetConnection $public.public_host $public.lobby_port
+
+$network=@{lobby_bind='0.0.0.0';game_bind='0.0.0.0';advertised_host=$public.public_host;lobby_port=$public.lobby_port}
+Json 'tools/remote-network.json' $network
+Run 'public Start checks saved network then uses exact instance' $true '' 'Start'
+foreach($case in @(
+    @{name='loopback lobby bind';field='lobby_bind';value='127.0.0.1'},
+    @{name='loopback room bind';field='game_bind';value='127.0.0.1'},
+    @{name='different advertised address';field='advertised_host';value='192.168.10.105'},
+    @{name='different saved lobby port';field='lobby_port';value=28701},
+    @{name='string saved lobby port';field='lobby_port';value='28700'}
+)){
+    $copy=@{};foreach($key in $network.Keys){$copy[$key]=$network[$key]};$copy[$case.field]=$case.value
+    Json 'tools/remote-network.json' $copy
+    [IO.File]::WriteAllText((Join-Path $fake 'tools/ssh-commands.txt'),'',$utf8)
+    Run $case.name $false 'network configuration differs' 'Start'
+    if([IO.File]::ReadAllText((Join-Path $fake 'tools/ssh-commands.txt')) -match '/RoomKit.sh start'){throw 'Rejected network still started a package.'}
+}
+Run 'Stop remains available with mismatched network' $true '' 'Stop'
+
+Json $pointer $valid;SetConnection '192.168.10.105' 28700
+foreach($binding in @('0.0.0.0','192.168.10.105')){
+    Json 'tools/remote-network.json' @{lobby_bind=$binding;game_bind=$binding;advertised_host='192.168.10.105';lobby_port=28700}
+    Run ('old pointer Start remains compatible with '+$binding) $true '' 'Start'
+}
 Write-Output ('LINUX_PACKAGE_ENTRY_TEST passed='+$count+' failed=0 evidence='+$root)
