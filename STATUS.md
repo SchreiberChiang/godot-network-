@@ -1,5 +1,9 @@
 # 当前状态：RoomKit（2026-10-03）
 
+**并行制作已启动，尚未合并候选**：赛车驾驶、检查点、街车/越野车、技术美术、港区/山路地图、自然/城镇/工业/港口道具分独立 F 盘工作树；另有新机部署审查。街车 `5a60db1`、技术美术 `a9e7d8d`、港区 `0963332`、检查点 `1ecae47` 已交候选，结果为各会话报告，主线整合未验。两份赛车研究已核读。清理盘点 2094 项约 9.70 GiB，未删除；旧基线拒绝有效。任务范围与候选表见 [并行交付](docs/17_framework_shooter_plan.md#parallel-assets-20261003)。
+
+**快照修复仍未过关**：独立集成候选 `292ff36` 已通过 codec 33/0、生命周期 17/0及射击/瞄准/移动/诊断/音效/反馈回归；真实 ENet 无 MTU 警告，但 87 片大合法快照连续六次均不能完整到达。诊断 31/8，缺片先于 TTL；恢复小帧后 8 端恢复完整状态。保留失败，未合并或换包，下一步处理发送突发容量，见 [候选结果](docs/17_framework_shooter_plan.md#snapshot-candidate-20261003)。
+
 **D1 离线网络报告已接入。** 双击根目录 [NETWORK_REPORT.html](NETWORK_REPORT.html)，选择玩家 `client-data/reports/` 中的 JSONL，即可比较 RTT、可靠发送丢包估计、画面慢帧和卡顿前后时间线。主线补完 Edge 真实 file://：最终核心与浏览器 **10/10、退出 0、无跳过**，2 份 N2 实际报告共 42 采样全部读入；截图已查看，零远程请求/控制台错误。未知值不当成零，不自动判断网络根因。详见 [D1 验收](docs/17_framework_shooter_plan.md#d1-mainline-acceptance)。
 
 **N2 最终诊断包已换上 Linux，跨机 65/0。** 真实 Windows 成品直接连接 Linux，双人互见、各自网络报告、购买幂等、备份恢复、重启保留通过；正式实例经 PREPARED → VERIFIED → SEALED 保留账号/资产/配置/证书，旧包保留。仍双击 **PlayLinuxPackage.cmd**；版本 `56f4b235deea`。朋友干净目录 `artifacts/friend-clients/network-20261002/shooter-windows/`（12 文件，约104.63 MiB，不含本地运行数据）已配置公网，直接发整个目录。新包朋友实测与公网日志仍待反馈。详见 [N2 交付](docs/17_framework_shooter_plan.md#n2-final-delivery)。
