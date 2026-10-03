@@ -17,6 +17,7 @@ func run() -> Dictionary:
 	_test_drift_resources()
 	_test_requests_and_duration()
 	_test_boost_brake_reverse()
+	_test_backward_inertia_nitro()
 	_test_rates_and_invalid_inputs()
 	return {"passed": _passed, "failed": _failed, "checks": _checks.duplicate(true)}
 
@@ -133,6 +134,32 @@ func _test_boost_brake_reverse() -> void:
 	control.reset()
 	state = _peek(control)
 	_check("reset clears fuel, queued spray and drift", state.mode == "forward" and state.fuel == 0.0 and state.boost_remaining == 0.0 and not state.boost_active and not state.drifting)
+
+func _test_backward_inertia_nitro() -> void:
+	var control := Control.new()
+	_charge(control, 2.0)
+	control.step(0.1, true, true, Vector2.ZERO, FORWARD)
+	control.step(0.1, true, true, Vector2(0.0, 3.0), FORWARD)
+	var state := control.step(0.1, false, true, Vector2(0.0, 3.0), FORWARD)
+	var denied: bool = not control.request_nitro(false, true)
+	state = control.step(0.0, false, true, Vector2(0.0, 3.0), FORWARD)
+	_check("forward intent with actual backward inertia refuses nitro without spending", denied and state.mode == "forward" and _close(state.fuel, 2.0) and state.boost_remaining == 0.0)
+	state = control.step(1.0, false, false, Vector2(NAN, 0.0), FORWARD)
+	_check("invalid displacement preserves backward nitro restriction and cannot charge", not control.request_nitro(false, false) and _close(state.fuel, 2.0) and not state.drifting)
+	state = control.step(1.0, false, false, DRIFT_VELOCITY, Vector2.ZERO)
+	_check("invalid heading preserves backward nitro restriction and cannot charge", not control.request_nitro(false, false) and _close(state.fuel, 2.0) and not state.drifting)
+	control.step(0.1, false, false, Vector2(0.0, -2.0), FORWARD)
+	var accepted: bool = control.request_nitro(false, false)
+	state = control.step(0.0, false, false, Vector2(0.0, -2.0), FORWARD)
+	_check("actual forward recovery permits nitro again", accepted and _close(state.fuel, 1.0) and _close(state.boost_remaining, 1.5))
+	state = control.step(0.2, false, false, Vector2(0.0, 1.0), FORWARD)
+	denied = not control.request_nitro(false, false)
+	state = control.step(0.0, false, false, Vector2(0.0, 1.0), FORWARD)
+	_check("active nitro cannot append duration during actual backward motion", denied and state.mode == "forward" and _close(state.fuel, 1.0) and _close(state.boost_remaining, 1.3))
+	control.step(0.0, false, false, Vector2.ZERO, FORWARD)
+	accepted = control.request_nitro(false, false)
+	state = _peek(control)
+	_check("actual zero-speed recovery permits queued nitro", accepted and _close(state.fuel, 0.0) and _close(state.boost_remaining, 2.8))
 
 func _test_rates_and_invalid_inputs() -> void:
 	var results: Array[Dictionary] = []

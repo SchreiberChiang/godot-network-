@@ -16,6 +16,7 @@ const ANGLE_EPSILON := 0.00001
 var _fuel := 0.0
 var _boost_remaining := 0.0
 var _mode := "forward"
+var _last_actual_forward_speed := 0.0
 var _drifting := false
 var _request_busy := false
 
@@ -23,6 +24,7 @@ func reset() -> void:
 	_fuel = 0.0
 	_boost_remaining = 0.0
 	_mode = "forward"
+	_last_actual_forward_speed = 0.0
 	_drifting = false
 	_request_busy = false
 
@@ -30,6 +32,10 @@ func request_nitro(left: bool, right: bool) -> bool:
 	# One invocation is one edge. Holding/debouncing keys belongs to the caller.
 	# No callbacks occur within this transaction; queued requests only add time.
 	if _request_busy or (left and right) or _mode == "reverse":
+		return false
+	# Releasing reverse changes intent immediately; backward inertia still bars
+	# starting/extending nitro until measured motion is nonnegative (1e-6 noise).
+	if _last_actual_forward_speed < -SPEED_EPSILON:
 		return false
 	if _fuel + TIME_EPSILON < NITRO_COST:
 		return false
@@ -43,6 +49,14 @@ func step(dt: float, left: bool, right: bool, actual_velocity: Vector2, forward:
 	var steer := int(right) - int(left)
 	var has_boost := _boost_remaining > 0.0
 	var valid_velocity := actual_velocity.is_finite() and is_finite(actual_velocity.length())
+	if valid_velocity and forward.is_finite():
+		var forward_length := forward.length()
+		if is_finite(forward_length) and forward_length > TIME_EPSILON:
+			var measured_speed := actual_velocity.dot(forward / forward_length)
+			if is_finite(measured_speed):
+				_last_actual_forward_speed = measured_speed
+	# Invalid observations keep the last valid motion; they cannot clear a
+	# backward-motion restriction by masquerading as a stop.
 	if not (left and right):
 		_mode = "forward"
 	elif has_boost:
