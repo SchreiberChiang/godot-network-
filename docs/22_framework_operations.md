@@ -22,6 +22,14 @@ Windows 老的 Operator 标记没有足够的创建身份信息，进程仍在�
 
 独立验收：Windows 源码与真实导出包各一次管理服务启停/HTTP 检查，均 11/0；Linux 笔记本新导出包完整性、只读状态、启动、HTTP、停止通过。此处未重复游戏对局或公网测试；旧包需重新生成才含新入口。[原始失败、修复及命令](17_framework_shooter_plan.md#u1-mainline-acceptance)。
 
+## 玩家自行发送网络报告
+
+新源码的“网络详情 / 报告”提供本地邮件草稿和复制诊断功能。玩家点击后只在本机整理近期白名单指标，不上传到游戏服务器。打开草稿调用系统默认邮件软件；收件地址、主题和简短诊断正文预填，玩家仍需检查并按“发送”。没有邮件软件时，可以复制报告，在自己的 QQ 网页邮箱粘贴发送。完整脱敏 JSONL 仍保存在 `client-data/reports/`，需要详细分析时由玩家自行添加附件，不发送整个 `client-data`。
+
+服主为新的玩家目录配置一个公开联系邮箱：在该目录运行 `SetServer.cmd -Source <公共连接文件目录> -ReportEmail <收件邮箱>`。脚本把 `report_email` 写入该玩家目录的 `connection.json`，只允许单个邮箱地址。它不是发信账号配置，不需要 SMTP 密码或授权码。不要把收件人写进通用源码；旧连接文件没有这个字段仍可玩游戏，客户端会提示收件邮箱未配置，并保留复制报告能力。
+
+此功能不能确认玩家是否发送，更不能确认收件箱送达。`mailto:` 无法可靠自动添加本地附件，草稿携带的是有长度上限的摘要。游戏服务器断开不妨碍本地整理/复制，但玩家的邮件软件或网页邮箱仍需要自己的网络连接。当前已安装旧包是否包含入口，以 STATUS 的配套交付记录为准。
+
 ## 配套交付与离线更新
 
 构建机的 `PrepareDeployment.cmd` 默认生成 Linux 服务端与匹配的 Windows 玩家目录；`-ServerPlatform Windows` 改为 Windows 服务端。`OpenDeployment.cmd` 打开最近的干净目录。目标机启动、玩家 `SetServer.cmd` 配置和 Linux `UpdateRoomKit.sh` 更新流程见 [首版交付](17_framework_shooter_plan.md#deployment-stage-result)；准备依赖需显式使用下面的入口，构建和更新不会操作运行服务。目录用途见 [根目录说明](01_scope_architecture.md#root-folders)。

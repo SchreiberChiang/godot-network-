@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "单主线推进，本轮使用两名6.1 Sol子代理，未新增聊天。快照分批发送已入源码，Windows真实8端138/0；大帧需有界延长寿命，固定250ms对照90/9。未换现用包，Linux/DTLS/导出仍待验。两棵临时树已保全回收，登记仍11；下一步发布门槛、跨平台交付、赛车整圈。",
+  baseline: "本轮玩家报告改为本机邮件草稿/复制，由玩家确认发送，不经游戏服务器。Windows本地50/0、地址13/0、生成器只解析2/0；真实邮箱、Linux、新包待验。快照v3源码已入主线但现用v2包未换，后续仍需发布门槛和跨平台交付。临时树已收回，登记11。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -48,7 +48,14 @@ window.ROADMAP_DATA = {
       files: ["examples/shooter/game.gd", "examples/shooter/snapshot_sender.gd", "examples/shooter/snapshot_codec.gd", "tests/test_shooter_snapshot_network.ps1"],
       docs: ["docs/17_framework_shooter_plan.md#snapshot-capacity-20261003", "docs/25_shooter_room_rules.md#snapshot-v3", "docs/17_framework_shooter_plan.md#f1-mainline-result"],
       evidence: "真实回环138/0；codec33/0、调度40/0、生命周期21/0。旧失败和固定寿命失败保留；Linux/DTLS/导出包/公网仍未验，现用v2包不变" },
-    { id: "network-report-viewer", area: "ops", phase: 7, status: "verified",
+    { id: "player-local-email-report", area: "ops", phase: 7, status: "pending",
+        title: "玩家本地邮件反馈",
+        summary: "本机准备邮件草稿或复制摘要，由玩家自己的邮箱发送。",
+        details: "按用户要求不经游戏服务器，不添加SMTP服务、端口或授权码。仅整理近期白名单指标，草稿由玩家确认发送；没有邮件软件时可复制摘要及地址。未知值不当零，可靠发送丢包估计不代表全部UDP。旧试玩包未更新。",
+        files: ["examples/framework/client.gd", "examples/framework/client_data.gd", "sdk/roomkit/shared/player_report.gd", "tools/shooter_client/SetServer.ps1"],
+        docs: ["docs/17_framework_shooter_plan.md#local-player-report-20261003", "docs/22_framework_operations.md"],
+        evidence: "Windows本地50/0（邮件/剪贴板替身，截图已看），地址13/0，生成器只解析2/0；真实邮件软件/QQ收信、Linux及配套新包待验" },
+      { id: "network-report-viewer", area: "ops", phase: 7, status: "verified",
       title: "离线网络报告查看器 D1",
       summary: "选取客户端JSONL，查看延迟、停顿和卡顿标记。",
       details: "双击NETWORK_REPORT.html选JSONL，比较摘要、会话时间线及卡顿前后15秒。未知不当0，可靠发送丢包估计不代表所有UDP，跨机不对时。10x dot候选经主线修计数字段并验Windows Edge。朋友公网/真人及其它浏览器待验。",

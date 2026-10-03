@@ -1,4 +1,4 @@
-﻿param([string]$Source = '')
+﻿param([string]$Source = '', [string]$ReportEmail = '')
 # 把服务器主机提供的公开连接文件（connection.json + server.crt）放进本客户端目录。
 # 用法：把包含这两个文件的文件夹拖到 SetServer.cmd 上；或把两个文件放进本目录的
 # server-config 文件夹后双击 SetServer.cmd。只接受公开证书，拒绝私钥和凭据。
@@ -16,9 +16,15 @@ if(-not (Test-Path -LiteralPath $configuration -PathType Leaf) -or -not (Test-Pa
 $text=[IO.File]::ReadAllText($configuration)
 try { $connection=$text | ConvertFrom-Json } catch { throw 'connection.json 不是有效的 JSON。' }
 if($connection -isnot [PSCustomObject]) { throw 'connection.json 格式错误。' }
-$allowed=@('url','ca_certificate','server_hostname','managed','secure_enet')
+$allowed=@('url','ca_certificate','server_hostname','managed','secure_enet','report_email')
 foreach($property in $connection.PSObject.Properties) {
     if($property.Name -notin $allowed) { throw ('connection.json 含有客户端不应接收的字段：'+$property.Name) }
+}
+# Optional PUBLIC contact address; used only for an explicitly opened local draft.
+if($ReportEmail -ne '') { $connection | Add-Member -NotePropertyName report_email -NotePropertyValue $ReportEmail -Force }
+if($connection.PSObject.Properties['report_email']) {
+    $address=$connection.report_email
+    if($address -isnot [string] -or $address.Length -gt 254 -or $address -cnotmatch '\A[A-Za-z0-9][A-Za-z0-9._+-]{0,63}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+\z') { throw 'report_email must be one mailbox address, without spaces, newlines or mail parameters.' }
 }
 if([string]$connection.url -notmatch '^wss://[A-Za-z0-9.-]+:[0-9]{1,5}/?$') { throw 'connection.json 的 url 必须是 wss://主机:端口。' }
 $pem=[IO.File]::ReadAllText($certificate)
