@@ -494,7 +494,7 @@ window.ROADMAP_DATA = {
     { id: "clean-implementation-worktrees", area: "cleanup", phase: 4, status: "candidate",
       title: "实施工作树的实际空间与归档",
       summary: "17个F盘工作树已归档移除；登记目录28→11，C盘六树仍占1.17GiB。",
-      details: "23份完整ZIP逐文件校验，全部Git引用另存bundle；两处未提交修改保全，候选分支未硬合主线。C盘两个转枪树受置顶保护，四个归档请求仅返回queued；F盘四树因历史清理拒绝原位保留。另清除C盘3.10GiB旧安装下载/关闭应用缓存/自动日志。日常统一根目录main和当前会话，需继续候选时再恢复对应F盘目录。",
+      details: "23份完整ZIP逐文件校验，全部Git引用另存bundle；两处未提交修改保全，候选分支未硬合主线。C盘两个转枪树受置顶保护，四个归档请求仅返回queued；F盘四树因历史清理拒绝原位保留。另清除C盘3.10GiB旧安装下载/关闭应用缓存/自动日志。日常统一根目录main和当前会话；后续允许按需隔离，创建即登记恢复/回收办法，交付后复核空间。迁盘仅记录意向，须先验Git、忽略数据、Codex关联及入口，再回收旧目录。",
       files: [],
       docs: ["docs/17_framework_shooter_plan.md#consolidation-20261003", "docs/17_framework_shooter_plan.md#project-space-check"],
       evidence: "归档哈希/ZIP内容与bundle验证通过；C盘删除3,330,177,594字节，11:22可用28.94GiB；六项真实数据及配置哈希和修改时间不变" }
