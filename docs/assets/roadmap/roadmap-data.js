@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "只保留主线会话，14会话已归档；17工作树已保全移除，登记目录28→11，候选分支保留未合并。C盘清理3.10GiB，六个C盘项目树仍在。下一步先修快照容量和发布门槛，再做赛车整圈；本轮未启动新实施。",
+  baseline: "单主线推进，本轮使用两名6.1 Sol子代理，未新增聊天。快照分批发送已入源码，Windows真实8端138/0；大帧需有界延长寿命，固定250ms对照90/9。未换现用包，Linux/DTLS/导出仍待验。两棵临时树已保全回收，登记仍11；下一步发布门槛、跨平台交付、赛车整圈。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -43,11 +43,11 @@ window.ROADMAP_DATA = {
       evidence: "N2跨机65/0、正式迁移SEALED；D1核心+Edge真实file验收10/10；F1 89/1与149/1：多人流程通过，MTU警告未解决" },
     { id: "shooter-snapshot-budget", area: "game", phase: 7, status: "pending",
       title: "射击快照 MTU 负载修复",
-      summary: "独立有界分片候选已写；大状态突发仍缺片，未合并或换包。",
-      details: "codec33/0、生命周期17/0及显示回归通过。真实8端无MTU警告，但87片大合法状态连续6次均无法完整到达；缺片先于TTL，恢复小状态后全员恢复。下一步控制发送突发并复验，不把无警告称为通过；协议3需服务端客户端同源重建。",
-      files: ["examples/shooter/game.gd", "tests/test_linux_concurrent_login.ps1", "tests/support/linux_concurrent_login.sh"],
-      docs: ["docs/17_framework_shooter_plan.md#snapshot-candidate-20261003", "docs/17_framework_shooter_plan.md#f1-mainline-result"],
-      evidence: "候选292ff36；真实回环诊断31/8，未通过。新协议Linux/DTLS/导出包未验" },
+      summary: "源码已合入，Windows真实8端持续更新/恢复通过；新版尚未换包。",
+      details: "全局128片/端16片、至少8ms、一个active和一个最新pending。87片大状态持续5秒全端有完整帧，终态589ms收敛；该极限状态未达实际20Hz。小帧250ms，大帧寿命按大小有界增长；固定250对照90/9，不能说节奏调整单独足够。协议3须同源配套交付。",
+      files: ["examples/shooter/game.gd", "examples/shooter/snapshot_sender.gd", "examples/shooter/snapshot_codec.gd", "tests/test_shooter_snapshot_network.ps1"],
+      docs: ["docs/17_framework_shooter_plan.md#snapshot-capacity-20261003", "docs/25_shooter_room_rules.md#snapshot-v3", "docs/17_framework_shooter_plan.md#f1-mainline-result"],
+      evidence: "真实回环138/0；codec33/0、调度40/0、生命周期21/0。旧失败和固定寿命失败保留；Linux/DTLS/导出包/公网仍未验，现用v2包不变" },
     { id: "network-report-viewer", area: "ops", phase: 7, status: "verified",
       title: "离线网络报告查看器 D1",
       summary: "选取客户端JSONL，查看延迟、停顿和卡顿标记。",

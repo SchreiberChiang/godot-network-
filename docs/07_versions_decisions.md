@@ -75,3 +75,5 @@ ADR-008：Windows SQLite适配通过系统winsqlite3.dll及宿主PowerShell助�
 2026-09-20 M3：新增 blocks / turns 两个 game_id，分别使用 blocks-dev-001 / turns-dev-001 构建以及 blocks-v1 / turns-v1 兼容标识。每个开发工程携带同一份未修改的 SDK 0.2.0，独立目录启动。玩法输入/状态 Schema 独立放在 schemas/，无 CharacterBody/武器依赖。没有改动宿主核心或 SDK 协议；Godot ENet RPC 仅属于对应游戏。独立开发工程验证与专用可执行文件导出验证明确分开。
 
 2026-09-26：可信清单声明通用整数 room_rules，宿主规范化并传递给游戏适配器。射击状态新增获胜击杀目标，升级 shooter-dev-002 / shooter-v2 / game_protocol=2，旧客户端需重新构建。每局时长和复活等待属于游戏，永久奖励资格保持不变。详见 docs/25。
+
+2026-10-03 源码射击协议升为 `game_protocol=3 / shooter-v3`：完整状态改为游戏自有有界分片 RPC，带 stream/serial 及公平分批发送。没有变更 SDK、控制协议或服务器命中规则。旧已发布 v2 包保持原状，新版需同源成对重建；实现契约及大状态延迟边界见 [docs/25](25_shooter_room_rules.md#snapshot-v3)，各平台和交付门槛以 STATUS 为准。
