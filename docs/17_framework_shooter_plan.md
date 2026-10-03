@@ -39,7 +39,7 @@
 1. **发布检查补修（已通过此范围门槛）**：三类缺口的复现、修复、定向回归与真实配套导出已完成，见[本轮结果](#release-guards-20261003)。原审计失败保留；不把这个检查点扩展为新版 Linux 联机、TLS 或真人试玩通过。
 2. **射击新版配套交付（此门槛已完成）**：独立 Linux 源码严格 4/8 人与两平台 DTLS 通过，真实 Windows Client.exe → Linux 成品 69/0、退出 0；正式离线更新 SEALED，试玩指针及入口 Start 通过，公开 QQ 收件地址已配置。源码多人、成品双人、真人公网分别记录，见[交付结果](#snapshot-v3-delivery-20261003)。
 3. **用户简单试玩已通过，专项反馈另验**：用户反馈“简单试玩，没啥问题”；高延迟玩家当时不在，不作为高延迟优化或多人公网验收。QQ 实际收信尚未确认。后续在这些玩家可参与时查看网络详情并由玩家自行发报告，不为补齐记录重复大量测试。
-4. **单人练习圈/HUD/可调相机源码通过，下一步独立导出**：采用[最新八值与HUD相机](#racing-hud-camera-20261003)，单人practice、3秒倒计时、顺序检查点、起终线间计时与R整场重开已接线。[本轮自动实车整圈](#racing-practice-20261003)及实际窗口通过；用户完整圈另验。按[三个实施门槛](#racing-offline-plan-20261003)接下来做干净Windows导出，再双人权威竞速和框架；山路失败及未接素材保留。
+4. **单人练习圈/HUD/可调相机源码通过，下一步胎痕与声音**：采用[最新八值与HUD相机](#racing-hud-camera-20261003)，单人practice、3秒倒计时、顺序检查点、起终线间计时与R整场重开已接线。[本轮自动实车整圈](#racing-practice-20261003)及实际窗口通过；用户完整圈另验。按[三个实施门槛](#racing-offline-plan-20261003)先按本次用户需求接漂移胎痕和基础音效，再做干净Windows导出、双人权威竞速和框架；山路失败及未接素材保留。
 
 **正式部署目标（用户 10-03 确认）**：部署到独立游戏服务器；当前 Linux 笔记本、本地公网和路由器转发只承担开发/试玩。正式机器尚未选定，不能记为生产部署完成。后续根据实际服务器的系统、资源、地址、端口与数据迁移要求执行；不因此新增云服务费用、改防火墙或停当前试玩实例。
 
@@ -75,6 +75,17 @@ README 已改为当前身份 `e1bbf7b65cc9` / 协议 3 和同一 PlayLinuxPackag
 
 离线圈验收后另设 **真实双人竞速 → GameAdapter/通用框架闭环**：房间服务器权威计圈和成绩；账号共用、各游戏资产隔离，赛车规则留在游戏模块。车辆解锁与八人性能后置，不用离线圈声称框架接入已完成。正式独立游戏服务器部署是另一条待实际机器明确的门槛；高延迟玩家与 QQ 收信等外部参与不阻塞离线阶段。每个完成且验收过的检查点提交推送、同步本节/STATUS/ROADMAP，保全轻量失败证据后回收临时目录，默认每用途最多两份重型产物。
 
+
+<a id="racing-feedback-20261004"></a>
+## 用户镜头定值与下一切片：漂移胎痕、基础音效（2026-10-04）
+
+用户选择俯视角56°、视野44.5m，已设为默认；F2仍可改，R保留，退出后重新启动恢复该默认。驾驶八值未改，旧65°/22m验收是历史。主线main由同一负责人写入，Sol子代理只读检查接入边界，没有创建新会话或工作树。镜头复验为camera-default-r1：首次冷导入、24脚本只解析、HUD68/0、规则360/0、检测607/0、驾驶181/0及窗口103/0、练习377/0及窗口385/0均退出0、stderr0。实际整圈33.933s；本轮已查看新默认的倒计时/进行中两张真实Godot截图，其他交互边界仍沿用此前事件注入验收，不称真人、手机或导出通过。命令为`powershell -NoProfile -ExecutionPolicy Bypass -File examples/racing/integration/launch.ps1 -Mode Verify -RunName camera-default-r1`。原始输出/退出码和哈希见[轻量记录](../logs/racing-camera-20261004/)，当前运行证据另保全为artifacts/racing-camera-candidate/camera-default-r1-evidence.zip。
+
+下一实施检查点先补反馈，再独立Windows导出，再双人权威竞速/GameAdapter；这是用户需求引起的顺序调整。胎痕由主线实现，仅订阅move_and_slide后的movement_completed和实际forward_speed/slip_degrees，不因按转向键直接画痕迹；漂移条件与现有充能口径一致，两条后轮带按位移采样，断漂移/异常段断开，暂停不新增、冻结寿命，R清空旧段与采样点。用固定总量缓冲和有限网格，8秒淡出复用，禁止每帧新建无限节点；容量及实际画面验收后再记通过。
+
+音效接入也由主线负责，只读速度、侧滑、氮气/碰撞和练习阶段，避免改驾驶/成绩逻辑；默认音量、循环淡入淡出和暂停/重开停止由一个表现控制器管理。dot专做engine_idle_loop、engine_drive_loop、tire_skid_loop、nitro_loop、impact_soft、countdown_beep六种原创48kHz单声道WAV。任务单在artifacts/dot-racing-audio-candidate/TASK.md，接收ZIP/中文报告到同一Windows绝对目录；任务单已准备，尚未声称dot已接单、音频已收到或本轮已实现反馈。用户下一轮重点验收胎痕自然程度和轮胎/氮气/发动机音量，不重复改认可的八值。
+
+用户已手删F:/文档/GodotGame/Net/RoomKit/artifacts/worktrees/racing-hud/prototypes/racing_hud的4个旧预览文件（1987字节）。主线确认其不存在、旧树无改动/忽略文件/链接/活动进程引用、2aa4642已在main并且9份恢复材料哈希一致后，以`git worktree remove`正常收回其余12,142,342字节；物理路径与Git登记均已不存在，当前11棵，codex/racing-hud分支和恢复包保留。回收见[结果](../logs/racing-camera-20261004/reclaim-result.json)。原blocked by policy记录不改写为成功，也没有绕过删除被拒的文件；未测磁盘可用空间增量。生成运行当前保留hud-r7和camera-default-r1两份，旧hud-r6已有ZIP保全后按现有规则移除。
 
 <a id="racing-hud-camera-20261003"></a>
 ## 练习HUD、最新氮气参数与可调相机（2026-10-04收尾）

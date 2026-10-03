@@ -5,8 +5,8 @@ const TuningPanel = preload("res://arcade_tuning_panel.gd")
 const Practice = preload("res://practice_session.gd")
 const PracticeHUD = preload("res://practice_hud.gd")
 const VIEW_LIMITS := {"view_pitch_degrees": Vector2(35, 85), "view_size_m": Vector2(12, 50)}
-var view_pitch_degrees := 65.0
-var view_size_m := 22.0
+var view_pitch_degrees := 56.0
+var view_size_m := 44.5
 var car
 var track
 var camera: Camera3D

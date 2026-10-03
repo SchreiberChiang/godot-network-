@@ -91,7 +91,7 @@ func run() -> void:
 	check("approved values remain in vehicle", lab.car.tuning.values == lab.car.tuning.get_script().new().values)
 	check("real renderer when requested", lab.test_mode != "practice-render" or DisplayServer.get_name() != "headless", DisplayServer.get_name())
 	var driving_values: Dictionary = lab.car.tuning.values.duplicate()
-	check("camera controls are separate from eight driving values", lab.tuning_panel.view_sliders.size() == 2 and lab.tuning_panel.sliders.size() == 8 and lab.view_pitch_degrees == 65.0 and lab.view_size_m == 22.0)
+	check("camera controls are separate from eight driving values", lab.tuning_panel.view_sliders.size() == 2 and lab.tuning_panel.sliders.size() == 8 and lab.view_pitch_degrees == 56.0 and lab.view_size_m == 44.5)
 	check("invalid camera settings rejected", not lab.set_view_value("view_pitch_degrees", NAN) and not lab.set_view_value("view_pitch_degrees", 90) and not lab.set_view_value("view_size_m", 0) and not lab.set_view_value("other", 10))
 	lab.tuning_panel.view_sliders.view_pitch_degrees.value = 82.0
 	lab.tuning_panel.view_sliders.view_size_m.value = 18.0
@@ -103,8 +103,8 @@ func run() -> void:
 	lab.tuning_panel.visible = true
 	await image_file("practice-camera-tuning")
 	lab.tuning_panel.visible = false
-	lab.tuning_panel.view_sliders.view_pitch_degrees.value = 65.0
-	lab.tuning_panel.view_sliders.view_size_m.value = 22.0
+	lab.tuning_panel.view_sliders.view_pitch_degrees.value = 56.0
+	lab.tuning_panel.view_sliders.view_size_m.value = 44.5
 	_r()
 	var spawn: Vector3 = lab.car.global_position
 	check("R begins a new countdown with no results", lab.practice.phase == "countdown" and lab.practice.snapshot().results.is_empty() and lab.practice.events.is_empty())

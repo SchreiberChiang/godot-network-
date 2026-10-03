@@ -10,8 +10,8 @@
 
 运行 OpenRacing.cmd 后按 F2：
 
-- **俯视角**：35–85°，越大越垂直；默认65°，可先试80°。
-- **视野**：12–50m，越小车在画面里越大；默认22m，可先试18m。正交相机用视野调整画面大小。
+- **俯视角**：35–85°，越大越垂直；默认56°，按用户本次反馈固化。
+- **视野**：12–50m，越小车在画面里越大；默认44.5m，按用户本次反馈固化。正交相机用视野调整画面大小。
 
 两项相机参数与八项驾驶参数分开；R重开和驾驶预设保留当前视角，退出重开恢复默认。复制按钮仅复制驾驶JSON。窄于900px的窗口打开F2会暂停驾驶并隐藏HUD，收起后恢复自己创建的暂停；失焦暂停仍需点“继续驾驶”。
 
@@ -37,10 +37,10 @@ CharacterBody3D 每物理帧执行一次实际滑动碰撞，一个连续横向�
 
 本机引擎为 4.7.2.stable.steam.ed1daf0bf。默认路径 D:\SteamLibrary\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe；安装位置不同可运行 OpenRacing.cmd -Godot "<实际路径>"。没有自动下载、安装或修改全局配置。
 
-OpenRacing.cmd -Mode Verify 会短暂打开窗口：新工程首次冷导入、二十四脚本 --check-only、HUD、规则、过线检测、驾驶物理/实际窗口、练习整圈/实际窗口分别记退出码。首次冷导入失败不会以热导入掩盖。证据保存在主检出的 artifacts/racing-offline/，本轮轻量记录在 logs/racing-hud-20261003/；练习圈历史在 logs/racing-practice-20261003/；最终参数记录在 logs/racing-approved-handling-20261003/；旧记录在 logs/racing-nitro-contact-20261003/、logs/racing-tuning-20261003/ 与 logs/racing-arcade-20261003/。真实数量、失败及未验范围见 [练习圈验收](../../../docs/17_framework_shooter_plan.md#racing-practice-20261003) 与 [最终参数验收](../../../docs/17_framework_shooter_plan.md#racing-approved-handling-20261003)。
+OpenRacing.cmd -Mode Verify 会短暂打开窗口：新工程首次冷导入、二十四脚本 --check-only、HUD、规则、过线检测、驾驶物理/实际窗口、练习整圈/实际窗口分别记退出码。首次冷导入失败不会以热导入掩盖。证据保存在主检出的 artifacts/racing-offline/，用户默认镜头复验在 logs/racing-camera-20261004/；此前HUD验收轻量记录在 logs/racing-hud-20261003/；练习圈历史在 logs/racing-practice-20261003/；最终参数记录在 logs/racing-approved-handling-20261003/；旧记录在 logs/racing-nitro-contact-20261003/、logs/racing-tuning-20261003/ 与 logs/racing-arcade-20261003/。真实数量、失败及未验范围见 [练习圈验收](../../../docs/17_framework_shooter_plan.md#racing-practice-20261003) 与 [最终参数验收](../../../docs/17_framework_shooter_plan.md#racing-approved-handling-20261003)。
 
 源码路径相对项目根；临时工作树也把运行输出放到主检出 F 盘。引擎采用 ._sc_，共享编辑器缓存留在 runtime/editor_data，每次项目 .godot、HOME/XDG/TEMP 都新建；不能称所有缓存全独立。入口一次只允许一个实例，收尾只处理自己创建的进程。街机 Play / Verify 分用途各最多两份，不挤掉旧力式专项的历史记录；清理失败如实保留。
 
 ## 后续
 
-单人 practice 已接入并完成Windows源码自动实车一圈；不是联机成绩或永久资产。本地计时只供练习，没有排行榜或最佳圈持久化。下一检查点为干净Windows独立导出，随后双人服务器权威竞速和GameAdapter接入。Linux、真实手机触控、实际鼠标点击重开/操作系统切窗、用户完整练习圈仍待验。dot的HUD交付已收取、按当前快照适配并接入；其云端Pillow示意图不作为本机Godot截图。
+单人 practice 已接入并完成Windows源码自动实车一圈；不是联机成绩或永久资产。本地计时只供练习，没有排行榜或最佳圈持久化。下一检查点为漂移胎痕与基础音效反馈，随后干净Windows独立导出，再双人服务器权威竞速和GameAdapter接入。Linux、真实手机触控、实际鼠标点击重开/操作系统切窗、用户完整练习圈仍待验。dot的HUD交付已收取、按当前快照适配并接入；其云端Pillow示意图不作为本机Godot截图。
