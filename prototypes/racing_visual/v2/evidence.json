@@ -1,0 +1,418 @@
+{
+  "base_commit": "0da5395ba0e0858385c9c9a8c432807756771a6c",
+  "candidate_branch": "codex/racing-models",
+  "date": "2026-10-03",
+  "final_models": [
+    {
+      "file": "street_car_v2.glb",
+      "bytes": 235960,
+      "sha256": "6ef93e4a898948d0b71524ac5a4c1d19277af4e11f15e178d1ad446f2dca8bc9",
+      "triangles": 2846,
+      "materials": 6,
+      "nodes": 12
+    },
+    {
+      "file": "traffic_cone_v2.glb",
+      "bytes": 16388,
+      "sha256": "6ac1b1c643c6703725e4886afcf531c407848503bc44260562901540bef04c98",
+      "triangles": 176,
+      "materials": 3,
+      "nodes": 2
+    },
+    {
+      "file": "tire_barrier_v2.glb",
+      "bytes": 155276,
+      "sha256": "b41eece9a6ba2618e752a69805b051bf5998c7d5f25b107198aa1b5a14f55885",
+      "triangles": 1956,
+      "materials": 3,
+      "nodes": 2
+    },
+    {
+      "file": "road_barrier_v2.glb",
+      "bytes": 14272,
+      "sha256": "0b38b3c9ef2cced7d45738812713e3b0e2ee629d2980561cf0af8caa25e5d297",
+      "triangles": 140,
+      "materials": 4,
+      "nodes": 2
+    }
+  ],
+  "runs": {
+    "review-01": {
+      "cold-import.command.json": {
+        "command": [
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+          "--path",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\project",
+          "--headless",
+          "--editor",
+          "--import",
+          "--log-file",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\evidence\\import.engine.log"
+        ],
+        "exit_code": 0,
+        "stdout": "cold-import.stdout.log",
+        "stderr": "cold-import.stderr.log"
+      },
+      "godot_result.json": {
+        "adapter": "NVIDIA GeForce RTX 3080",
+        "animated_frames": 60,
+        "engine": "4.7.2-stable (steam)",
+        "failures": [],
+        "renderer": "gl_compatibility",
+        "resource_root": "F:/文档/GodotGame/Net/RoomKit/artifacts/worktrees/racing-models/artifacts/racing-models/review-01/project/",
+        "status": "PASS",
+        "user_data": "F:/文档/GodotGame/Net/RoomKit/artifacts/worktrees/racing-models/artifacts/racing-models/review-01/profile/roaming/Godot/app_userdata/Racing Models V2 Isolated Preview",
+        "wheel_transforms": [
+          {
+            "center": [
+              -0.819999992847443,
+              0.340000003576279,
+              -1.23000001907349
+            ],
+            "roll_x": -4.00395727157593,
+            "steer_y": 0.43979150056839,
+            "wheel": "Front_Left"
+          },
+          {
+            "center": [
+              0.819999992847443,
+              0.340000003576279,
+              -1.23000001907349
+            ],
+            "roll_x": -4.00395727157593,
+            "steer_y": 0.43979150056839,
+            "wheel": "Front_Right"
+          },
+          {
+            "center": [
+              -0.819999992847443,
+              0.340000003576279,
+              1.22000002861023
+            ],
+            "roll_x": -4.00395727157593,
+            "steer_y": 0.0,
+            "wheel": "Rear_Left"
+          },
+          {
+            "center": [
+              0.819999992847443,
+              0.340000003576279,
+              1.22000002861023
+            ],
+            "roll_x": -4.00395727157593,
+            "steer_y": 0.0,
+            "wheel": "Rear_Right"
+          }
+        ]
+      },
+      "provenance.json": {
+        "engine_source": "D:\\SteamLibrary\\steamapps\\common\\Godot Engine\\godot.windows.opt.tools.64.exe",
+        "engine_sha256": "12310c74bdda7dcd43f28e971f33047dcecadd436b68169d61ce41009006df38",
+        "isolated_engine": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+        "cold_import": true,
+        "models": {
+          "road_barrier_v2.glb": {
+            "bytes": 14272,
+            "sha256": "0b38b3c9ef2cced7d45738812713e3b0e2ee629d2980561cf0af8caa25e5d297"
+          },
+          "street_car_v2.glb": {
+            "bytes": 235320,
+            "sha256": "85e7f50907fef4d3577dc0cde89b86554db1656bfeb6a4dd664a52c6e7b2b1f9"
+          },
+          "tire_barrier_v2.glb": {
+            "bytes": 155276,
+            "sha256": "b41eece9a6ba2618e752a69805b051bf5998c7d5f25b107198aa1b5a14f55885"
+          },
+          "traffic_cone_v2.glb": {
+            "bytes": 16388,
+            "sha256": "6ac1b1c643c6703725e4886afcf531c407848503bc44260562901540bef04c98"
+          }
+        },
+        "preview_sha256": "7cbfffcacd2f46c5f7c9c122b5ec6db3c91571163d910e514b105216631668fa",
+        "environment_overrides": {
+          "APPDATA": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\profile\\roaming",
+          "LOCALAPPDATA": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\profile\\local",
+          "USERPROFILE": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\profile",
+          "HOME": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\profile",
+          "TEMP": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\temp",
+          "TMP": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\temp",
+          "XDG_DATA_HOME": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\profile\\data",
+          "XDG_CONFIG_HOME": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\profile\\config",
+          "XDG_CACHE_HOME": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\profile\\cache"
+        }
+      },
+      "render.command.json": {
+        "command": [
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+          "--path",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\project",
+          "--rendering-method",
+          "gl_compatibility",
+          "--rendering-driver",
+          "opengl3",
+          "--max-fps",
+          "60",
+          "--log-file",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-01\\evidence\\render.engine.log"
+        ],
+        "exit_code": 0,
+        "stdout": "render.stdout.log",
+        "stderr": "render.stderr.log"
+      },
+      "version.command.json": {
+        "command": [
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+          "--version"
+        ],
+        "exit_code": 0,
+        "stdout": "version.stdout.log",
+        "stderr": "version.stderr.log"
+      }
+    },
+    "review-02": {
+      "cold-import.command.json": {
+        "command": [
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+          "--path",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\project",
+          "--headless",
+          "--editor",
+          "--import",
+          "--log-file",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\evidence\\import.engine.log"
+        ],
+        "exit_code": 0,
+        "stdout": "cold-import.stdout.log",
+        "stderr": "cold-import.stderr.log"
+      },
+      "godot_result.json": {
+        "adapter": "NVIDIA GeForce RTX 3080",
+        "animated_frames": 60,
+        "engine": "4.7.2-stable (steam)",
+        "failures": [],
+        "renderer": "gl_compatibility",
+        "resource_root": "F:/文档/GodotGame/Net/RoomKit/artifacts/worktrees/racing-models/artifacts/racing-models/review-02/project/",
+        "status": "PASS",
+        "user_data": "F:/文档/GodotGame/Net/RoomKit/artifacts/worktrees/racing-models/artifacts/racing-models/review-02/profile/roaming/Godot/app_userdata/Racing Models V2 Isolated Preview",
+        "wheel_transforms": [
+          {
+            "center": [
+              -0.819999992847443,
+              0.340000003576279,
+              -1.23000001907349
+            ],
+            "roll_x": -4.03088283538818,
+            "steer_y": 0.439620137214661,
+            "wheel": "Front_Left"
+          },
+          {
+            "center": [
+              0.819999992847443,
+              0.340000003576279,
+              -1.23000001907349
+            ],
+            "roll_x": -4.03088283538818,
+            "steer_y": 0.439620137214661,
+            "wheel": "Front_Right"
+          },
+          {
+            "center": [
+              -0.819999992847443,
+              0.340000003576279,
+              1.22000002861023
+            ],
+            "roll_x": -4.03088283538818,
+            "steer_y": 0.0,
+            "wheel": "Rear_Left"
+          },
+          {
+            "center": [
+              0.819999992847443,
+              0.340000003576279,
+              1.22000002861023
+            ],
+            "roll_x": -4.03088283538818,
+            "steer_y": 0.0,
+            "wheel": "Rear_Right"
+          }
+        ]
+      },
+      "provenance.json": {
+        "engine_source": "D:\\SteamLibrary\\steamapps\\common\\Godot Engine\\godot.windows.opt.tools.64.exe",
+        "engine_sha256": "12310c74bdda7dcd43f28e971f33047dcecadd436b68169d61ce41009006df38",
+        "isolated_engine": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+        "cold_import": true,
+        "models": {
+          "road_barrier_v2.glb": {
+            "bytes": 14272,
+            "sha256": "0b38b3c9ef2cced7d45738812713e3b0e2ee629d2980561cf0af8caa25e5d297"
+          },
+          "street_car_v2.glb": {
+            "bytes": 235320,
+            "sha256": "85e7f50907fef4d3577dc0cde89b86554db1656bfeb6a4dd664a52c6e7b2b1f9"
+          },
+          "tire_barrier_v2.glb": {
+            "bytes": 155276,
+            "sha256": "b41eece9a6ba2618e752a69805b051bf5998c7d5f25b107198aa1b5a14f55885"
+          },
+          "traffic_cone_v2.glb": {
+            "bytes": 16388,
+            "sha256": "6ac1b1c643c6703725e4886afcf531c407848503bc44260562901540bef04c98"
+          }
+        },
+        "preview_sha256": "7751f69bd0a8fbbf5cdc7f3dbf29873ce7409de09e5734b5a8e11c49cee81ae3",
+        "environment_overrides": {
+          "APPDATA": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\profile\\roaming",
+          "LOCALAPPDATA": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\profile\\local",
+          "USERPROFILE": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\profile",
+          "HOME": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\profile",
+          "TEMP": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\temp",
+          "TMP": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\temp",
+          "XDG_DATA_HOME": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\profile\\data",
+          "XDG_CONFIG_HOME": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\profile\\config",
+          "XDG_CACHE_HOME": "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\profile\\cache"
+        }
+      },
+      "render.command.json": {
+        "command": [
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+          "--path",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\project",
+          "--rendering-method",
+          "gl_compatibility",
+          "--rendering-driver",
+          "opengl3",
+          "--max-fps",
+          "60",
+          "--log-file",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\evidence\\render.engine.log"
+        ],
+        "exit_code": 0,
+        "stdout": "render.stdout.log",
+        "stderr": "render.stderr.log"
+      },
+      "version.command.json": {
+        "command": [
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+          "--version"
+        ],
+        "exit_code": 0,
+        "stdout": "version.stdout.log",
+        "stderr": "version.stderr.log"
+      }
+    },
+    "final-import": {
+      "cold-import.command.json": {
+        "command": [
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+          "--headless",
+          "--path",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\final-import\\project",
+          "--editor",
+          "--import"
+        ],
+        "exit_code": 0,
+        "stdout": "cold-import.stdout.log",
+        "stderr": "cold-import.stderr.log"
+      },
+      "final-mesh-check.command.json": {
+        "command": [
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\runtime\\godot.windows.opt.tools.64.exe",
+          "--headless",
+          "--path",
+          "F:\\文档\\GodotGame\\Net\\RoomKit\\artifacts\\worktrees\\racing-models\\artifacts\\racing-models\\review-02\\final-import\\project",
+          "--script",
+          "res://verify_final.gd"
+        ],
+        "exit_code": 0,
+        "stdout": "final-mesh-check.stdout.log",
+        "stderr": "final-mesh-check.stderr.log"
+      },
+      "final_import_result.json": {
+        "chassis_half_width_m": 0.490000009536743,
+        "engine": "4.7.2-stable (steam)",
+        "failures": [],
+        "minimum_vertex_lateral_gap_m": 0.0719897747039795,
+        "physics_tested": false,
+        "rendered": false,
+        "samples": 60,
+        "scope": "Chassis_Visual clearance only",
+        "status": "PASS",
+        "test": "final GLB imported meshes; 5 steering x 6 rolling angles x 2 front wheels"
+      },
+      "generate_models.py.command.json": {
+        "command": [
+          "py",
+          "-B",
+          "prototypes/racing_visual/v2/generate_models.py"
+        ],
+        "exit_code": 0
+      },
+      "provenance.json": {
+        "models": {
+          "road_barrier_v2.glb": {
+            "bytes": 14272,
+            "sha256": "0b38b3c9ef2cced7d45738812713e3b0e2ee629d2980561cf0af8caa25e5d297"
+          },
+          "street_car_v2.glb": {
+            "bytes": 235960,
+            "sha256": "6ef93e4a898948d0b71524ac5a4c1d19277af4e11f15e178d1ad446f2dca8bc9"
+          },
+          "tire_barrier_v2.glb": {
+            "bytes": 155276,
+            "sha256": "b41eece9a6ba2618e752a69805b051bf5998c7d5f25b107198aa1b5a14f55885"
+          },
+          "traffic_cone_v2.glb": {
+            "bytes": 16388,
+            "sha256": "6ac1b1c643c6703725e4886afcf531c407848503bc44260562901540bef04c98"
+          }
+        },
+        "engine_sha256": "12310c74bdda7dcd43f28e971f33047dcecadd436b68169d61ce41009006df38",
+        "cold_import": true,
+        "rendered": false
+      },
+      "validate_models.py.command.json": {
+        "command": [
+          "py",
+          "-B",
+          "prototypes/racing_visual/v2/validate_models.py"
+        ],
+        "exit_code": 0
+      }
+    }
+  },
+  "deterministic_regeneration": "PASS exact SHA256 equality",
+  "visual_review": {
+    "viewed": [
+      "review-01 three_quarter/top/kit/wheel_check",
+      "review-02 three_quarter/top/kit/wheel_check"
+    ],
+    "review_01": "Not accepted visually: overexposure",
+    "review_02": "Accepted visual candidate before internal chassis correction",
+    "final_model_render": "NOT RUN: obeyed two rendering rounds; final hidden chassis change checked by cold import and mesh geometry only"
+  },
+  "review_findings": [
+    {
+      "issue": "front wheel intersects original 1.22 m chassis at steering",
+      "status": "fixed by 0.98 m Chassis_Visual; independent read-only review confirms >4 cm swept clearance"
+    }
+  ],
+  "not_run": [
+    "Blender/.blend",
+    "final-hash pixel review",
+    "interactive key operation",
+    "full Khronos validator",
+    "physics/driving/network",
+    "Linux/Web/mobile",
+    "EXE/PCK export"
+  ],
+  "cleanup": {
+    "status": "BLOCKED",
+    "action": "remove only artifacts/racing-models/review-01/project",
+    "tool_error": "automatic approval review: blocked by policy",
+    "executed": false,
+    "retried_with_other_tool": false,
+    "retained_first_project_bytes": 561895,
+    "retained_generation_projects": 3
+  }
+}

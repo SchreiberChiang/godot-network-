@@ -1,0 +1,302 @@
+{
+  "status": "PASS",
+  "checks": "GLB bytes/accessors/indices/finite positions/unit normals/winding/bounds/budgets/degenerates/wheel pivots/self-contained",
+  "not_checked": [
+    "Full Khronos validator",
+    "Blender",
+    "Godot import/render (separate evidence)",
+    "Physics/driving"
+  ],
+  "assets": [
+    {
+      "file": "street_car_v2.glb",
+      "bytes": 235960,
+      "sha256": "6ef93e4a898948d0b71524ac5a4c1d19277af4e11f15e178d1ad446f2dca8bc9",
+      "status": "PASS",
+      "materials": [
+        "Lagoon_Paint",
+        "Ink_Glass",
+        "Graphite_Rubber",
+        "Warm_Porcelain",
+        "Signal_Orange",
+        "Satin_Aluminium"
+      ],
+      "triangles": 2846,
+      "dimensions_xyz": [
+        2.0250000953674316,
+        1.3654999768733977,
+        4.101500034332275
+      ],
+      "world_bounds": [
+        [
+          -1.0125000476837158,
+          -3.576278662098531e-09,
+          -2.069999933242798
+        ],
+        [
+          1.0125000476837158,
+          1.3654999732971191,
+          2.0315001010894775
+        ]
+      ],
+      "meshes": [
+        {
+          "name": "Chassis_Visual",
+          "triangles": 12,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 0.12446785473678652
+        },
+        {
+          "name": "Body",
+          "triangles": 594,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 2.8561100570811512e-08
+        },
+        {
+          "name": "Wheel_Front_Left",
+          "triangles": 560,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 3.3346866994301223e-07
+        },
+        {
+          "name": "Wheel_Front_Right",
+          "triangles": 560,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 3.3346866994301223e-07
+        },
+        {
+          "name": "Wheel_Rear_Left",
+          "triangles": 560,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 3.3346866994301223e-07
+        },
+        {
+          "name": "Wheel_Rear_Right",
+          "triangles": 560,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 3.3346866994301223e-07
+        }
+      ],
+      "wheels": [
+        {
+          "name": "Wheel_Front_Left",
+          "mesh_index": 2,
+          "center": [
+            -0.82,
+            0.34,
+            -1.23
+          ],
+          "local_bounds": [
+            [
+              -0.15399999916553497,
+              -0.3400000035762787,
+              -0.3400000035762787
+            ],
+            [
+              0.15399999916553497,
+              0.3400000035762787,
+              0.3400000035762787
+            ]
+          ]
+        },
+        {
+          "name": "Wheel_Front_Right",
+          "mesh_index": 3,
+          "center": [
+            0.82,
+            0.34,
+            -1.23
+          ],
+          "local_bounds": [
+            [
+              -0.15399999916553497,
+              -0.3400000035762787,
+              -0.3400000035762787
+            ],
+            [
+              0.15399999916553497,
+              0.3400000035762787,
+              0.3400000035762787
+            ]
+          ]
+        },
+        {
+          "name": "Wheel_Rear_Left",
+          "mesh_index": 4,
+          "center": [
+            -0.82,
+            0.34,
+            1.22
+          ],
+          "local_bounds": [
+            [
+              -0.15399999916553497,
+              -0.3400000035762787,
+              -0.3400000035762787
+            ],
+            [
+              0.15399999916553497,
+              0.3400000035762787,
+              0.3400000035762787
+            ]
+          ]
+        },
+        {
+          "name": "Wheel_Rear_Right",
+          "mesh_index": 5,
+          "center": [
+            0.82,
+            0.34,
+            1.22
+          ],
+          "local_bounds": [
+            [
+              -0.15399999916553497,
+              -0.3400000035762787,
+              -0.3400000035762787
+            ],
+            [
+              0.15399999916553497,
+              0.3400000035762787,
+              0.3400000035762787
+            ]
+          ]
+        }
+      ],
+      "external_resources": false,
+      "degenerate_triangles": 0,
+      "wheel_chassis_clearance": {
+        "method": "conservative_cylinder_swept_about_Y_any_roll",
+        "max_steer_radians": 0.44,
+        "chassis_half_width": 0.49000000953674316,
+        "wheel_max_radial_distance_m": 0.3400000035762787,
+        "minimum_lateral_gap_m": 0.04584881543664798,
+        "scope": "internal_Chassis_Visual_only_not_full_body_or_physics"
+      }
+    },
+    {
+      "file": "traffic_cone_v2.glb",
+      "bytes": 16388,
+      "sha256": "6ac1b1c643c6703725e4886afcf531c407848503bc44260562901540bef04c98",
+      "status": "PASS",
+      "materials": [
+        "Graphite_Rubber",
+        "Warm_Porcelain",
+        "Signal_Orange"
+      ],
+      "triangles": 176,
+      "dimensions_xyz": [
+        0.4699999988079071,
+        0.6890000104904175,
+        0.4699999988079071
+      ],
+      "world_bounds": [
+        [
+          -0.23499999940395355,
+          0.0,
+          -0.23499999940395355
+        ],
+        [
+          0.23499999940395355,
+          0.6890000104904175,
+          0.23499999940395355
+        ]
+      ],
+      "meshes": [
+        {
+          "name": "Cone",
+          "triangles": 176,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 3.4907752425449623e-09
+        }
+      ],
+      "wheels": [],
+      "external_resources": false,
+      "degenerate_triangles": 0,
+      "wheel_chassis_clearance": null
+    },
+    {
+      "file": "tire_barrier_v2.glb",
+      "bytes": 155276,
+      "sha256": "b41eece9a6ba2618e752a69805b051bf5998c7d5f25b107198aa1b5a14f55885",
+      "status": "PASS",
+      "materials": [
+        "Graphite_Rubber",
+        "Signal_Orange",
+        "Satin_Aluminium"
+      ],
+      "triangles": 1956,
+      "dimensions_xyz": [
+        2.119999885559082,
+        0.5299999713897705,
+        0.6899999976158142
+      ],
+      "world_bounds": [
+        [
+          -1.059999942779541,
+          0.0,
+          -0.3499999940395355
+        ],
+        [
+          1.059999942779541,
+          0.5299999713897705,
+          0.3400000035762787
+        ]
+      ],
+      "meshes": [
+        {
+          "name": "Tire_Barrier",
+          "triangles": 1956,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 1.5839202142260798e-07
+        }
+      ],
+      "wheels": [],
+      "external_resources": false,
+      "degenerate_triangles": 0,
+      "wheel_chassis_clearance": null
+    },
+    {
+      "file": "road_barrier_v2.glb",
+      "bytes": 14272,
+      "sha256": "0b38b3c9ef2cced7d45738812713e3b0e2ee629d2980561cf0af8caa25e5d297",
+      "status": "PASS",
+      "materials": [
+        "Graphite_Rubber",
+        "Warm_Porcelain",
+        "Signal_Orange",
+        "Satin_Aluminium"
+      ],
+      "triangles": 140,
+      "dimensions_xyz": [
+        2.130000114440918,
+        1.027500033378601,
+        0.7900000214576721
+      ],
+      "world_bounds": [
+        [
+          -1.065000057220459,
+          0.0,
+          -0.39500001072883606
+        ],
+        [
+          1.065000057220459,
+          1.027500033378601,
+          0.39500001072883606
+        ]
+      ],
+      "meshes": [
+        {
+          "name": "Road_Barrier",
+          "triangles": 140,
+          "degenerate_triangles": 0,
+          "min_cross_squared": 3.136004559518459e-05
+        }
+      ],
+      "wheels": [],
+      "external_resources": false,
+      "degenerate_triangles": 0,
+      "wheel_chassis_clearance": null
+    }
+  ]
+}

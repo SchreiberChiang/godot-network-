@@ -1,0 +1,34 @@
+[
+  {
+    "file": "street_car_v2.glb",
+    "bytes": 235960,
+    "sha256": "6ef93e4a898948d0b71524ac5a4c1d19277af4e11f15e178d1ad446f2dca8bc9",
+    "triangles": 2846,
+    "materials": 6,
+    "nodes": 12
+  },
+  {
+    "file": "traffic_cone_v2.glb",
+    "bytes": 16388,
+    "sha256": "6ac1b1c643c6703725e4886afcf531c407848503bc44260562901540bef04c98",
+    "triangles": 176,
+    "materials": 3,
+    "nodes": 2
+  },
+  {
+    "file": "tire_barrier_v2.glb",
+    "bytes": 155276,
+    "sha256": "b41eece9a6ba2618e752a69805b051bf5998c7d5f25b107198aa1b5a14f55885",
+    "triangles": 1956,
+    "materials": 3,
+    "nodes": 2
+  },
+  {
+    "file": "road_barrier_v2.glb",
+    "bytes": 14272,
+    "sha256": "0b38b3c9ef2cced7d45738812713e3b0e2ee629d2980561cf0af8caa25e5d297",
+    "triangles": 140,
+    "materials": 4,
+    "nodes": 2
+  }
+]

@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。接下来赛车一车一图完整一圈。",
+  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车阶段1冷导入/车图物理/真实窗口已通过，下一步练习圈计时和独立导出。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -333,13 +333,13 @@ window.ROADMAP_DATA = {
       files: ["prototypes/racing_visual/v1/ACCEPTANCE.md", "prototypes/racing_visual/v1/street_car_v1.glb", "prototypes/racing_visual/v1/three_quarter.png"],
       docs: ["docs/17_framework_shooter_plan.md#car-v1-acceptance"],
       evidence: "本机独立结构检查退出0、9文件哈希与两端ZIP一致；两图已看。仅能力样本范围，存在已记录拓扑缺项，非游戏接入通过" },
-    { id: "game-racing", area: "game", phase: 8, status: "planned",
+    { id: "game-racing", area: "game", phase: 8, status: "pending",
       title: "赛车最小接入",
-      summary: "接驾驶、V2街车、Port Loop和检查点，先交离线单车练习圈。",
-      details: "main尚无examples/racing，候选均未接入。优先按文件范围复用驾驶591c09c、V2街车5a60db1、港区0963332和检查点1ecae47；规则a4498a0默认至少两人，单人须新增practice模式，不能伪造第二玩家。先对齐车轮尺寸/悬挂与检测门映射，再验证真实一圈和干净Windows导出入口。归档前racing-playable停在523ffa8，没有整圈实现。山路三项碰撞失败及V1车模16个退化面仍保留；不为首个试玩批量合并素材。",
-      files: ["tools/new_game.ps1", "templates/managed_game/"],
-      docs: ["docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/17_framework_shooter_plan.md#parallel-assets-20261003","docs/24_managed_game_template.md"],
-      evidence: "候选历史：驾驶物理39/0、窗口42/0；V2车2846面、0退化面；港区19/0；检查点607/0。只是复用依据，离线整圈、实车赛道碰撞、独立导出与框架接入未实现/未验" },
+      summary: "街车V2与港区离线驾驶已过，练习圈计时、独立导出和接网下一步。",
+      details: "阶段1已按文件范围接驾驶591c09c、V2街车5a60db1、港区0963332。600Hz独立单车的真实悬挂/坡道/七种护栏碰撞、有限段测量反证、实际窗口和两视角已验。主线examples/racing已有，OpenRacing可离线驾驶；尚不计圈、不计时、不联网。下一步接检查点1ecae47及单人practice，不能伪造第二玩家；正确首尾映射、复位防刷、真实一圈和干净Windows导出另验。山路/V1失败保留；未接GameAdapter/通用房间和账号资产。",
+      files: ["OpenRacing.cmd", "examples/racing/integration/README.md", "examples/racing/integration/vehicle.gd", "prototypes/racing_level/harbor.gd", "prototypes/racing_visual/v2/models/street_car_v2.glb"],
+      docs: ["docs/17_framework_shooter_plan.md#racing-offline-stage1","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
+      evidence: "Windows新工程冷导入/六解析退出0、物理46/0、真实窗口7/0，stderr0；看过驾驶/全景截图。本机RTX3080三秒约120FPS，只算短样本。失败r1/r2及诊断保留；r1删除被拒绝，暂存三份。整圈、独立EXE、Linux、真人手感和框架接入未验" },
     { id: "sdk-reuse-from-racing", area: "sdk", phase: 9, status: "planned",
       title: "从真实游戏提炼接入积木",
       summary: "赛车接通以后，减少下一款游戏的重复工作。",
