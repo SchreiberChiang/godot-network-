@@ -1,7 +1,36 @@
 # 通用框架与横版射击分支实施计划
 
+<a id="consolidation-20261003"></a>
+## 单会话管理、工作树归档与空间清理（2026-10-03）
+
+用户要求只保留当前主线会话、清理不需要的占用并收拢工作目录。本轮没有派发任务、启动服务、部署或合并功能。应用已确认其他 14 个项目会话归档，项目活动列表只剩「完成 RoomKit M0 与 M1」；历史对话可以恢复。后续只在当前会话统筹、在项目根目录 `main` 日常开发，需要隔离时再按一项任务建立一个 F 盘工作树。
+
+**成果保全与目录收拢**：清理前共 28 个登记目录（主目录 + 27 个工作树）。所有 Git 引用保存为本地 `artifacts/worktree-archive-20261003/all-refs.bundle`，14,722,038 字节，SHA256 `81a4b918260633ffabac79b1449606c219897fb9b12c05970d75b48787381de4`，`git bundle verify` 成功；另有 23 个工作树完整 ZIP，逐项 SHA256 回读一致，包含忽略文件和测试证据，ZIP 中排除了 `.git` 指针。目录中 `manifest.json` 记录原绝对路径、分支、HEAD、归档哈希及逐文件清单。本地归档可能含隔离运行配置，继续忽略，不上传 Git 或分发给玩家。
+
+17 个 F 盘工作树已在再次核对文件、路径无链接、无进程引用后移除：`industrial-prop-kit`、`linux-concurrency-review`、`nature-kit`、`network-journal-review`、`network-viewer-review`、`racing-checkpoints`、`racing-level`、`racing-mountain-level`、`racing-offroad`、`racing-playable`、`racing-rules`、`racing-tech-art`、`release-guards`、`shooter-snapshot-codec`、`shooter-snapshot-integration`、`shooter-snapshot-nettest`、`unified-entry-review`。原目录合计 2,775,454,137 字节；包括 C 盘树额外保全在内的全部 ZIP 和 bundle 共 1,619,534,376 字节，F 盘净减少约 1.08 GiB（逻辑长度，未扣少量清单/日志）。最终登记目录为 11 个。
+
+未提交成果没有丢弃：`shooter-snapshot-nettest` 的三个修改文件及两个新增探针，`unified-entry-review/docs/unified_entry.md`，均保留于对应 ZIP；另外保存了 tracked binary diff。恢复时应保留原先未提交状态，不能把它们说成已验证产品提交。只有尚未开始实现、指向主线已有 `523ffa8` 的 `codex/racing-playable` 和 `codex/release-guards` 两个本地分支已用 `git branch -d` 删除，其余候选分支继续保留，远端分支未删除。分支引用本身不是大体积副本，无须为节省磁盘把有失败的实现合并进 main。
+
+**需要恢复已收起的 F 盘候选时**：由当前会话从 manifest 选定条目，核验 ZIP SHA256，在原 `artifacts/worktrees/<名称>` 路径以原分支/HEAD 运行 `git worktree add`，再将对应 ZIP 解压覆盖该新目录（包不含 `.git`，因此不替换 Git 指针），核对逐文件清单与 `git status`。被移除的两个空分支可从 `523ffa8` 重建。旧报告里的工作树路径属于验收时路径，恢复前不会存在；`artifacts/*-candidate/` 下交付包和预览图片仍原位保留。本轮只验证归档内容及 Git bundle，没有把归档验收说成重新运行游戏或完整恢复演练。
+
+| C 盘本次实际删除 | 文件逻辑大小 | 条件 |
+|---|---:|---|
+| 九份旧 `codex-runtime-install-*/node-runtime.tar.gz` | 1854.20 MiB | 超过七天且可独占打开；保留当前 runtime、previous 代、10-03 新下载及所有配置 |
+| WeGame 的 15 个 Cache / Code Cache / GPUCache 目录 | 619.71 MiB | 无对应应用进程、无链接、文件未占用；账号库/站点存储保留 |
+| 67 份 `RdClientAutoTrace-WppAutoTrace-*.etl` | 702.00 MiB | 一天前的自动诊断日志；保留最新两份及近一天记录，跳过被占用文件 |
+
+合计删除 16,295 个文件、3,330,177,594 字节（3.10 GiB）。11:22 读数 C 盘可用 31,073,021,952 字节（约 28.94 GiB）；磁盘同时有其他活动，瞬时空闲增量不等于删除逻辑长度。Claude `vm_bundles` 约 10.30 GiB、当前 Codex 运行时、会话/插件、WSL 和个人文件均未清理。
+
+**没有物理移除的边界**：两个 C 盘转枪工作树被应用返回 `This worktree is protected by a pinned task or workspace.`，没有改用 shell 绕过；四个此前已归档的 C 盘树再次请求返回 `queued`，核对目录仍在，因此全部六个 C 盘树约 1.17 GiB 未计作释放。F 盘 `racing-models`、`racing-harbor-props`、`town-building-kit`、`release-audit` 涉及此前清理拒绝，原路径继续保留，未换工具删除。不是所有工作树已清空。
+
+执行中的环境问题如实保留：首次 `git worktree remove` 受 Windows 路径长度限制，已经注销工业道具树却只删除部分文件；剩余文件再次与 ZIP 比对后用原生 PowerShell 完成清理，其后 Git 命令局部使用 `-c core.longpaths=true`，没有修改全局配置。该问题不是审批拒绝。证据在 `logs/consolidation-20261003/`：before、各归档/移除清单、`c-cleaned.json`、`final-verification.json`、`limitations.txt`。真实两个数据库、旧 operator.json、公开连接配置/证书和 Linux 试玩指针共六项 SHA256 与修改时间前后均不变。
+
+下一步集中推进：先修射击快照突发容量，再修发布门槛；通过相应验收后逐项接收候选。赛车从驾驶 + 街车 + 港区 + 检查点做一个完整离线圈，山路碰撞失败先留候选。此处是顺序记录，本轮没有自动启动这些工作。
+
 <a id="parallel-assets-20261003"></a>
 ## 并行原型与素材交付（2026-10-03）
+
+下文保留 11:04 审计时点。11:22 已归档会话并收起部分工作树，旧工作树路径的恢复方式见 [收拢记录](#consolidation-20261003)；测试结论不因归档改变。
 
 用户授权主线分派独立会话制作可用资源；均在 `artifacts/worktrees/` 下独立工作树，不在共享目录切分支。共同约定米制、Y 上、-Z 前、明亮低多边形；不安装依赖、不动真实服务/账号、不复制参考游戏资产。每件交可编辑来源、规格与 Godot 展示，不把美术或纯规则测试算驾驶/联机通过。验收过的候选由主线单独接收，各会话不得自行合并或替换当前客户端。
 

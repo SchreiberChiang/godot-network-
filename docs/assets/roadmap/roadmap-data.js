@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "14会话现已空闲；12候选交付完整性复核通过，均未合并。驾驶原型已交，整圈整合与发布修复中断未实施；山路碰撞、发布门槛及F1快照容量仍失败。U1/N1/D1已接入，N2跨机65/0；清理未执行，不再派发任务。",
+  baseline: "只保留主线会话，14会话已归档；17工作树已保全移除，登记目录28→11，候选分支保留未合并。C盘清理3.10GiB，六个C盘项目树仍在。下一步先修快照容量和发布门槛，再做赛车整圈；本轮未启动新实施。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -493,10 +493,10 @@ window.ROADMAP_DATA = {
       evidence: "旧包 EXE 的 ZIP 原字节对照、恢复抽测通过；其余仍为候选" },
     { id: "clean-implementation-worktrees", area: "cleanup", phase: 4, status: "candidate",
       title: "实施工作树的实际空间与归档",
-      summary: "当前C盘六树仍占1.17GiB，四个已归档标签没有释放实际目录。",
-      details: "此前另两份历史工作树已归档移除，独有交付保留；后来新增的六树以本次实测为准。四个归档树约1.15GiB，主要是movement-integration的测试程序副本；两个枪口比较入口仍保留。应用标签不等于物理删除。当前只读核对、不删除；后续新工作树和大输出放F盘项目忽略目录。",
+      summary: "17个F盘工作树已归档移除；登记目录28→11，C盘六树仍占1.17GiB。",
+      details: "23份完整ZIP逐文件校验，全部Git引用另存bundle；两处未提交修改保全，候选分支未硬合主线。C盘两个转枪树受置顶保护，四个归档请求仅返回queued；F盘四树因历史清理拒绝原位保留。另清除C盘3.10GiB旧安装下载/关闭应用缓存/自动日志。日常统一根目录main和当前会话，需继续候选时再恢复对应F盘目录。",
       files: [],
-      docs: ["docs/17_framework_shooter_plan.md#cleanup-review-20261002", "docs/17_framework_shooter_plan.md#project-space-check"],
-      evidence: "历史清理证据保留；本次磁盘与Git登记复核已纠正过时的三目录说法，没有新释放空间" }
+      docs: ["docs/17_framework_shooter_plan.md#consolidation-20261003", "docs/17_framework_shooter_plan.md#project-space-check"],
+      evidence: "归档哈希/ZIP内容与bundle验证通过；C盘删除3,330,177,594字节，11:22可用28.94GiB；六项真实数据及配置哈希和修改时间不变" }
   ]
 };

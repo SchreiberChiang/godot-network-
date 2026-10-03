@@ -3,6 +3,7 @@
 从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能与 Linux 源码服务已有验收；Linux 独立服务器普通目录也已构建和隔离运行。跨机完整对局用源码 SDK 客户端验证，真实 Client.exe 的双人入退房另列结果；用户已反馈本机与朋友公网试玩可用，但移动和枪口卡顿待定位。其它发行版、云端与导出包长期耐久仍未验收。
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
+**开发统一在本目录 `main` 和「完成 RoomKit M0 与 M1」会话。** 其他 14 个会话已归档；候选提交继续保留，17 个工作树已压缩归档，需要继续某项时先恢复对应目录。恢复位置与剩余保护项见 [收拢记录](docs/17_framework_shooter_plan.md#consolidation-20261003)，归档不代表候选已合并或通过验收。
 
 **看玩家卡顿报告：双击 [NETWORK_REPORT.html](NETWORK_REPORT.html)**，选择玩家客户端 `client-data/reports/` 中的一至八个 JSONL，比较延迟、快照停顿和慢帧，查看卡顿标记前后 15 秒。完全离线，不上传；只分享 reports，不要分享整个 client-data。Windows Edge 真实 file:// 和两份隔离联机报告已验，口径与限制见 [使用说明](docs/assets/network-report/README.md)。
 
