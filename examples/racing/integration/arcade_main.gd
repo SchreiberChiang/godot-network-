@@ -1,6 +1,7 @@
 extends Node3D
 const Vehicle = preload("res://arcade_vehicle.gd")
 const Harbor = preload("res://track/harbor.gd")
+const TuningPanel = preload("res://arcade_tuning_panel.gd")
 var car
 var track
 var camera: Camera3D
@@ -18,6 +19,7 @@ var resets := 0
 var touch_stamp := -1000
 var pause_panel: PanelContainer
 var flames: Array[MeshInstance3D] = []
+var tuning_panel
 
 func _ready() -> void:
 	process_physics_priority = -100
@@ -44,6 +46,7 @@ func _ready() -> void:
 	_planar_collision_layers(track)
 	car = Vehicle.new()
 	car.name = "StreetCar"
+	if not test_mode.is_empty(): car.tuning.use_preset("original")
 	add_child(car)
 	for x in [-0.55, 0.55]:
 		var flame := MeshInstance3D.new()
@@ -128,6 +131,9 @@ func _build_ui() -> void:
 	resume.pressed.connect(func(): car.paused = false; held.clear(); pointers.clear(); nitro_edge = false; nitro_requests = 0)
 	pause_panel.add_child(resume)
 	pause_panel.visible = false
+	tuning_panel = TuningPanel.new()
+	tuning_panel.vehicle = car
+	layer.add_child(tuning_panel)
 	_layout_controls()
 
 func _layout_controls() -> void:
@@ -143,6 +149,7 @@ func _layout_controls() -> void:
 		fuel_bars[i].size = Vector2(58, 14)
 	hud.custom_minimum_size = Vector2(minf(560, size.x - 32), 0)
 	pause_panel.position = (size - Vector2(260, 64)) * 0.5
+	tuning_panel.layout(size)
 	pointers.clear()
 	nitro_edge = false
 	nitro_requests = 0
@@ -157,11 +164,15 @@ func reset_car() -> void:
 	resets += 1
 
 func _pointer_kind(position: Vector2) -> String:
+	if tuning_panel.visible and tuning_panel.get_global_rect().has_point(position): return ""
 	for kind in controls:
 		if controls[kind].get_global_rect().has_point(position): return kind
 	return ""
 
 func _pointer_down(id, position: Vector2) -> void:
+	if tuning_panel.visible and tuning_panel.get_global_rect().has_point(position):
+		pointers[id] = "tuning" # Captured until release, including drags outside UI.
+		return
 	var kind := _pointer_kind(position)
 	pointers[id] = kind
 
@@ -177,6 +188,7 @@ func _input(event: InputEvent) -> void:
 		var key: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
 		held[key] = event.pressed
 		if event.pressed:
+			if key == KEY_F2: tuning_panel.visible = not tuning_panel.visible; tuning_panel.layout(get_viewport().get_visible_rect().size)
 			if key == KEY_R: reset_car()
 			if key == KEY_TAB: overview = not overview
 			if key == KEY_ESCAPE: get_tree().quit()
@@ -186,14 +198,14 @@ func _input(event: InputEvent) -> void:
 		else: pointers.erase(event.index)
 	elif event is InputEventScreenDrag:
 		touch_stamp = Time.get_ticks_msec()
-		if pointers.has(event.index):
+		if pointers.has(event.index) and pointers[event.index] != "tuning":
 			pointers[event.index] = _pointer_kind(event.position)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed:
 			pointers.erase("mouse")
 		elif Time.get_ticks_msec() - touch_stamp > 150:
 			_pointer_down("mouse", event.position)
-	elif event is InputEventMouseMotion and pointers.has("mouse"):
+	elif event is InputEventMouseMotion and pointers.has("mouse") and pointers.mouse != "tuning":
 		pointers.mouse = _pointer_kind(event.position)
 	# One logical action for both screen buttons and the keyboard. A release
 	# followed by another press remains another edge, even within one tick.
@@ -234,7 +246,7 @@ func _process(_dt: float) -> void:
 	var fuel := float(car.telemetry.get("fuel", 0))
 	var remaining := float(car.telemetry.get("boost_remaining", 0))
 	var mode: String = car.telemetry.get("mode", "forward")
-	hud.text = "港区 · 街机驾驶\n←/A  →/D 转向；双键制动/倒车；空格 氮气\n%.0f km/h  氮气 %.1f/3  喷射 %.1f 秒  %s\n漂移充能 · 本阶段不计圈  R复位  TAB全景  ESC退出" % [
+	hud.text = "港区 · 街机驾驶\n←/A  →/D 转向；双键制动/倒车；空格 氮气\n%.0f km/h  氮气 %.1f/3  喷射 %.1f 秒  %s\n漂移充能 · 本阶段不计圈  R复位  F2调参  TAB全景  ESC退出" % [
 		float(car.telemetry.get("speed", 0)) * 3.6, fuel, remaining,
 		"倒车" if mode == "reverse" else ("制动" if mode == "brake" else ("漂移" if car.telemetry.get("drifting", false) else "前进"))]
 	for i in range(3):

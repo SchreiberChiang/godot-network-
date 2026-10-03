@@ -128,6 +128,7 @@ func run() -> void:
 	print("ARCADE_PHASE pure_complete")
 	await tick()
 	print("ARCADE_PHASE first_tick")
+	await tuning_run()
 	if lab.test_mode == "render":
 		await render_run()
 	elif lab.test_mode == "physics":
@@ -142,6 +143,111 @@ func run() -> void:
 	else:
 		check("supported test mode", false, lab.test_mode)
 	finish()
+
+func tuning_run() -> void:
+	var tuning = lab.car.tuning
+	var saved: Dictionary = tuning.snapshot()
+	# Scalar normalization check: five source ticks and six target ticks must
+	# yield the same retention over 100 ms, including the user's 0.2 case.
+	for keep in [0.2, 0.95, 1.0, 0.0]:
+		tuning.set_value("lateral_keep_turn", keep)
+		check("retention time equivalence " + str(keep), absf(pow(tuning.lateral_multiplier(true, 0.02), 5) - pow(tuning.lateral_multiplier(true, 1.0 / 60.0), 6)) < 0.000001)
+	check("invalid tuning values rejected", not tuning.set_value("turn_degrees", NAN) and not tuning.set_value("lateral_keep_turn", -0.1) and not tuning.set_value("top_speed", 35) and not tuning.set_value("unknown", 10))
+	tuning.use_preset("original")
+	check("old grip/yaw model preserved", absf(tuning.lateral_multiplier(true, 1.0 / 60.0) - exp(-2.8 / 60.0)) < 0.000001 and absf(tuning.yaw_rate(25) - 1.22) < 0.000001)
+	# UI paths call the same live model; they must not reset velocity or fuel.
+	reset_at()
+	await seconds(1.0)
+	var before_velocity: Vector3 = lab.car.velocity
+	var before_fuel: float = lab.car.control._fuel
+	lab.tuning_panel._preset("reference")
+	check("preset is live without resetting motion/fuel", lab.car.velocity == before_velocity and lab.car.control._fuel == before_fuel and tuning.profile == "reference")
+	var ui_value: float = 0.2
+	lab.tuning_panel.sliders.lateral_keep_turn.value = ui_value
+	check("slider updates actual physics setting", absf(float(tuning.values.lateral_keep_turn) - ui_value) < 0.000001)
+	tuning.use_preset("reference")
+	lab.tuning_panel._sync()
+	reset_at()
+	await seconds(1.2)
+	check("reference acceleration and speed operate in real physics", float(lab.car.telemetry.speed) > 19.0 and float(lab.car.telemetry.speed) <= 20.05, _telemetry())
+	buttons(true, false)
+	await seconds(0.6)
+	var held_slip: float = absf(float(lab.car.telemetry.slip_degrees))
+	check("short reference turn gives measurable sideslip", held_slip > 15.0 and _valid_car(), _telemetry())
+	await seconds(4.2)
+	check("reference sustained slide actually charges nitro", lab.car.control._fuel >= 1.0 and absf(float(lab.car.telemetry.slip_degrees)) > 20.0, _telemetry())
+	buttons(false, false)
+	await seconds(0.3)
+	var released_slip: float = absf(float(lab.car.telemetry.slip_degrees))
+	check("reference keeps visible slip briefly after release", released_slip > 3.0 and released_slip < 75.0, _telemetry())
+	measurements.live_tuning = {"short_turn_slip_degrees": held_slip, "released_at_0_3s_slip_degrees": released_slip, "reference": tuning.snapshot()}
+	var fuel: float = lab.car.control._fuel
+	lab.tuning_panel.sliders.turn_degrees.value = 140
+	check("live turn adjustment preserves earned fuel", lab.car.control._fuel == fuel and float(tuning.values.turn_degrees) == 140)
+	lab.tuning_panel.visible = true
+	lab.tuning_panel.layout(get_viewport().get_visible_rect().size)
+	var panel_point: Vector2 = lab.tuning_panel.get_global_rect().get_center()
+	check("tuning panel cannot become a driving pointer", lab._pointer_kind(panel_point).is_empty())
+	var mouse := InputEventMouseButton.new()
+	mouse.button_index = MOUSE_BUTTON_LEFT
+	mouse.pressed = true
+	mouse.position = panel_point
+	lab._input(mouse)
+	var motion := InputEventMouseMotion.new()
+	motion.position = lab.controls.nitro_left.get_global_rect().get_center()
+	lab._input(motion)
+	check("mouse slider drag remains captured outside panel", lab.pointers.get("mouse") == "tuning" and lab.nitro_requests == 0)
+	mouse.pressed = false
+	lab._input(mouse)
+	var touch := InputEventScreenTouch.new()
+	touch.index = 99
+	touch.pressed = true
+	touch.position = panel_point
+	lab._input(touch)
+	var drag := InputEventScreenDrag.new()
+	drag.index = 99
+	drag.position = lab.controls.nitro_right.get_global_rect().get_center()
+	lab._input(drag)
+	check("touch slider drag remains captured outside panel", lab.pointers.get(99) == "tuning" and lab.nitro_requests == 0)
+	touch.pressed = false
+	lab._input(touch)
+	check("UI pointers release without leaving input held", not lab.pointers.has(99) and not lab.pointers.has("mouse"))
+	if lab.test_mode == "render":
+		await tick()
+		await RenderingServer.frame_post_draw
+		check("live tuning panel frame saved", get_viewport().get_texture().get_image().save_png(lab.evidence_dir.path_join("tuning.png")) == OK)
+	lab.tuning_panel.visible = false
+	var nitro_fuel: float = lab.car.control._fuel
+	check("reference nitro still consumes one unit", lab.car.request_nitro() and absf(lab.car.control._fuel - nitro_fuel + 1) < 0.000001)
+	buttons(true, true)
+	await seconds(0.4)
+	check("reference dual brake cannot reverse during active nitro", lab.car.telemetry.mode == "brake" and lab.car.telemetry.boost_active and float(lab.car.telemetry.forward_speed) >= 0)
+	await seconds(2.0)
+	check("tuning preserves capped straight reverse", lab.car.telemetry.mode == "reverse" and float(lab.car.telemetry.speed) <= 5.05 and float(lab.car.telemetry.forward_speed) < -4.5, _telemetry())
+	if lab.test_mode == "physics":
+		var wall := _box_body(Vector3(225, 0.8, 0), Vector3(0.45, 2.4, 50))
+		var collider := wall.get_child(0) as CollisionShape3D
+		reset_at(Vector3(225 - 0.225 - RADIUS - 0.03, PLANE_Y, 0))
+		await tick()
+		inject_velocity(Vector3.FORWARD * 10)
+		var rejections: int = lab.car.rejected_yaws
+		buttons(false, true)
+		var deepest := 0.0
+		for _i in range(Engine.physics_ticks_per_second):
+			await tick()
+			deepest = maxf(deepest, capsule_depth(lab.car, collider))
+		check("reference fast yaw still rejects wall penetration", deepest <= PENETRATION_GATE and lab.car.rejected_yaws > rejections and _valid_car(), {"depth_m": deepest, "rejected_yaws": lab.car.rejected_yaws - rejections})
+		reset_at(Vector3(225 - 0.225 - RADIUS - HALF_STRAIGHT - 0.04, PLANE_Y, 12), Vector3.RIGHT)
+		await seconds(0.8)
+		var blocked_x: float = lab.car.global_position.x
+		buttons(true, true)
+		await seconds(1.5)
+		check("reference can reverse away from real wall", lab.car.telemetry.mode == "reverse" and lab.car.global_position.x < blocked_x - 3 and float(lab.car.telemetry.speed) <= 5.05 and _valid_car(), _telemetry())
+		wall.queue_free()
+		await tick()
+	tuning.use_preset(str(saved.profile))
+	lab.tuning_panel._sync()
+	reset_at()
 
 func driving_run() -> void:
 	reset_at()

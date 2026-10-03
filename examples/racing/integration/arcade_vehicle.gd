@@ -1,6 +1,7 @@
 extends CharacterBody3D
 ## Planar arcade motion; model suspension/lean are visual only. Forward is -Z.
 const ArcadeControl = preload("res://arcade_control.gd")
+const Tuning = preload("res://arcade_tuning.gd")
 const PLANE_Y := 0.145
 const RADIUS := 0.86
 const HALF_STRAIGHT := 1.10
@@ -12,6 +13,7 @@ const BOOST_ACCELERATION := 16.0
 const BRAKE_DECELERATION := 34.0
 const WHEEL_RADIUS := 0.34
 var control = ArcadeControl.new()
+var tuning = Tuning.new()
 var telemetry: Dictionary = {}
 var held_left := false
 var held_right := false
@@ -86,6 +88,7 @@ func _physics_process(dt: float) -> void:
 	if paused:
 		return
 	var started := Time.get_ticks_usec()
+	var rejected_before := rejected_yaws
 	var forward3 := -global_basis.z
 	var forward := Vector2(forward3.x, forward3.z).normalized()
 	var right := Vector2(-forward.y, forward.x)
@@ -95,33 +98,30 @@ func _physics_process(dt: float) -> void:
 	var lateral := motion.dot(right)
 	if driver_enabled:
 		var steer: float = state.steer
-		var speed_gate := clampf(maxf(longitudinal, 0.0) / 4.0, 0.0, 1.0)
-		var max_yaw := lerpf(2.05, 1.22, clampf(absf(longitudinal) / TOP_SPEED, 0.0, 1.0))
-		_try_yaw(-steer * max_yaw * speed_gate * dt)
+		_try_yaw(-steer * tuning.yaw_rate(longitudinal) * dt)
 		# Heading changes first; keep world momentum, then gradually remove sideslip.
 		forward3 = -global_basis.z
 		forward = Vector2(forward3.x, forward3.z).normalized()
 		right = Vector2(-forward.y, forward.x)
 		longitudinal = motion.dot(forward)
 		lateral = motion.dot(right)
-		var grip := 2.8 if steer != 0.0 and longitudinal > 6.0 else 5.8
-		lateral *= exp(-grip * dt)
+		lateral *= tuning.lateral_multiplier(steer != 0.0 and longitudinal > 6.0, dt)
 		if state.mode == "brake":
 			# Existing boost still applies its forward drive; brakes dominate it.
 			longitudinal += BOOST_ACCELERATION * float(state.boost_fraction) * dt
 			longitudinal = move_toward(longitudinal, 0.0, BRAKE_DECELERATION * dt)
 			lateral = move_toward(lateral, 0.0, BRAKE_DECELERATION * dt)
 		elif state.mode == "reverse":
-			longitudinal = move_toward(longitudinal, -REVERSE_SPEED, ACCELERATION * dt)
+			longitudinal = move_toward(longitudinal, -float(tuning.values.top_speed) * 0.25, float(tuning.values.acceleration) * dt)
 		else:
-			var cap := BOOST_SPEED if float(state.boost_fraction) > 0.0 else TOP_SPEED
+			var cap: float = BOOST_SPEED if float(state.boost_fraction) > 0.0 else tuning.values.top_speed
 			# Releasing both keys while reversing first decelerates into forward drive.
-			var engine := ACCELERATION + BOOST_ACCELERATION * float(state.boost_fraction)
+			var engine: float = float(tuning.values.acceleration) + BOOST_ACCELERATION * float(state.boost_fraction)
 			longitudinal = move_toward(longitudinal, cap, engine * dt)
 		motion = forward * longitudinal + right * lateral
-		motion = motion.limit_length(BOOST_SPEED if float(state.boost_fraction) > 0.0 else TOP_SPEED)
+		motion = motion.limit_length(BOOST_SPEED if float(state.boost_fraction) > 0.0 else float(tuning.values.top_speed))
 		if state.mode == "reverse":
-			motion = motion.limit_length(REVERSE_SPEED)
+			motion = motion.limit_length(float(tuning.values.top_speed) * 0.25)
 	else:
 		motion *= exp(-passive_drag * dt)
 	velocity = Vector3(motion.x, 0.0, motion.y)
@@ -154,6 +154,8 @@ func _physics_process(dt: float) -> void:
 	physics_usec_total += Time.get_ticks_usec() - started
 	physics_steps += 1
 	telemetry = {"mode": state.mode, "speed": last_actual_velocity.length(), "forward_speed": last_actual_velocity.dot(forward),
+		"lateral_speed": last_actual_velocity.dot(right), "tuning": tuning.snapshot(),
+		"yaw_blocked_this_tick": rejected_yaws > rejected_before,
 		"fuel": state.fuel, "boost_active": state.boost_active, "boost_remaining": state.boost_remaining,
 		"drifting": state.drifting, "slip_degrees": rad_to_deg(atan2(last_actual_velocity.dot(right), maxf(absf(last_actual_velocity.dot(forward)), 0.01))),
 		"yaw_queries": yaw_queries, "rejected_yaws": rejected_yaws, "wall_contacts": wall_contacts,
@@ -185,7 +187,7 @@ func _try_yaw(amount: float) -> void:
 
 func receive_push(push: Vector3) -> void:
 	if push.is_finite():
-		velocity = (velocity + Vector3(push.x, 0.0, push.z)).limit_length(TOP_SPEED)
+		velocity = (velocity + Vector3(push.x, 0.0, push.z)).limit_length(float(tuning.values.top_speed))
 
 func _sync_visual(steer: float) -> void:
 	visual_root.rotation = Vector3(visual_pitch, 0.0, visual_lean)

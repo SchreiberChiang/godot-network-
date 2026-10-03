@@ -55,6 +55,7 @@ $sources=@{
     'arcade_main.gd'='examples/racing/integration/arcade_main.gd';'arcade_vehicle.gd'='examples/racing/integration/arcade_vehicle.gd'
     'arcade_control.gd'='examples/racing/integration/arcade_control.gd';'arcade_control_test.gd'='examples/racing/integration/arcade_control_test.gd'
     'arcade_acceptance.gd'='examples/racing/integration/arcade_acceptance.gd'
+    'arcade_tuning.gd'='examples/racing/integration/arcade_tuning.gd';'arcade_tuning_panel.gd'='examples/racing/integration/arcade_tuning_panel.gd'
 }
 $hashes=@()
 foreach($relative in $sources.Keys){
@@ -96,7 +97,7 @@ try {
     InvokeEngine 'version' '--version' 30000
     # A failed first cold import stops this run; never warm-import it into a pass.
     InvokeEngine 'cold-import' ('--headless --editor --import --path "'+$project+'"') 120000
-    foreach($script in @('arcade_main.gd','arcade_vehicle.gd','arcade_control.gd','arcade_control_test.gd','arcade_acceptance.gd','main.gd','vehicle.gd','vehicle_base.gd','acceptance.gd','track/harbor.gd','track/track_data.gd')){
+    foreach($script in @('arcade_main.gd','arcade_vehicle.gd','arcade_control.gd','arcade_control_test.gd','arcade_acceptance.gd','arcade_tuning.gd','arcade_tuning_panel.gd','main.gd','vehicle.gd','vehicle_base.gd','acceptance.gd','track/harbor.gd','track/track_data.gd')){
         InvokeEngine ('parse-'+$script.Replace('/','-').Replace('.gd','')) ('--headless --path "'+$project+'" --check-only --script "res://'+$script+'"') 30000
     }
     if($Mode -eq 'Verify'){
