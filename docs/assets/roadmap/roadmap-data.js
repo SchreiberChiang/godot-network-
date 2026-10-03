@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "U1、N1、D1已接入；N2跨机65/0。F1快照候选纯测试通过，真实ENet大状态容量仍失败，未换包。赛车驾驶、检查点、两类车/地图与三套素材库并行；已有部分候选待整合。清理只盘点。",
+  baseline: "14会话现已空闲；12候选交付完整性复核通过，均未合并。驾驶原型已交，整圈整合与发布修复中断未实施；山路碰撞、发布门槛及F1快照容量仍失败。U1/N1/D1已接入，N2跨机65/0；清理未执行，不再派发任务。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -322,10 +322,10 @@ window.ROADMAP_DATA = {
     { id: "game-racing", area: "game", phase: 8, status: "planned",
       title: "赛车最小接入",
       summary: "一条简单赛道，先双人比赛，再补车辆资产，目标最多 8 人。",
-      details: "纯规则a4498a0、驾驶研究99e6df4已交；已续派单刚体四轮驾驶。检查点、街车/越野车、技术美术、港区/山路、自然/城镇/工业素材分别独立制作。部分已交候选待主线整合，不将模型、数学或规则测试称为驾驶/联网通过。",
+      details: "规则a4498a0、研究99e6df4、驾驶591c09c与检查点1ecae47已交。两类车、两条地图、技术美术及素材库均有候选；山路仍有3项碰撞失败。赛车整合会话中断，racing-playable工作树停在523ffa8且无受管修改；离线整圈、联网和框架接入都未完成。驾驶恢复证据是脚本反打，真人手感未验。",
       files: ["tools/new_game.ps1", "templates/managed_game/"],
       docs: ["docs/17_framework_shooter_plan.md#parallel-assets-20261003", "docs/17_framework_shooter_plan.md#forward-route-20261002", "docs/24_managed_game_template.md"],
-      evidence: "规则/研究及部分美术候选已交，整合与试玩未验；仅候选会话报告，不冒称主线独立验收" },
+      evidence: "10-03主线核验交付哈希/ZIP、Git与原结果，抽看四张图；未重跑Godot。驾驶候选物理39/0、窗口42/0，整合仍未验" },
     { id: "sdk-reuse-from-racing", area: "sdk", phase: 9, status: "planned",
       title: "从真实游戏提炼接入积木",
       summary: "赛车接通以后，减少下一款游戏的重复工作。",
