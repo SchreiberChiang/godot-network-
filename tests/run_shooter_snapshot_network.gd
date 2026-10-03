@@ -584,6 +584,18 @@ func _close_network() -> void:
 		authority._publish()
 		authority.flush_snapshot_transport(Time.get_ticks_msec())
 		_check(sender.active.is_empty() and sender.pending.is_empty() and sender.offsets.is_empty() and sender.recipients.is_empty(), "stop then member cleanup and republish keep the real connected authority outbox empty")
+	# Keep the UDP authority alive while clients send their DTLS close_notify.
+	# Closing the server socket first gives Linux clients ECONNREFUSED; Windows
+	# ignores that datagram error, hiding this shared-process fixture mistake.
+	for endpoint in clients:
+		endpoint.peer.close()
+		endpoint.api.multiplayer_peer = null
+	if not endpoints.is_empty():
+		var server_api: SceneMultiplayer = endpoints[0].api
+		var close_deadline := Time.get_ticks_msec() + 1000
+		while not server_api.get_peers().is_empty() and Time.get_ticks_msec() < close_deadline:
+			server_api.poll()
+			await process_frame
 	for endpoint in endpoints:
 		endpoint.peer.close()
 		endpoint.api.multiplayer_peer = null
