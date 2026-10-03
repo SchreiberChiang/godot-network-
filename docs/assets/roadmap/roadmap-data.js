@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车车图后改选街机控制：60Hz双方向/共享氮气、物理136/0和窗口68/0通过，先试玩手感，再接练习圈计时和独立导出。",
+  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车车图后改选街机控制：60Hz双方向/共享氮气、物理136/0和窗口68/0通过，但用户试玩基本感觉不到漂移，手感未通过；三版本对照完成，先改善甩尾再接练习圈计时和独立导出。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -335,11 +335,11 @@ window.ROADMAP_DATA = {
       evidence: "本机独立结构检查退出0、9文件哈希与两端ZIP一致；两图已看。仅能力样本范围，存在已记录拓扑缺项，非游戏接入通过" },
     { id: "game-racing", area: "game", phase: 8, status: "pending",
       title: "赛车最小接入",
-      summary: "街车V2与港区街机控制已过，先试玩手感；练习圈计时、导出与接网后置。",
-      details: "当前采用60Hz平面CharacterBody3D，自动加速、两方向转向/同时制动再直线倒车、真实侧滑充能、三槽共享氮气点按追加时间而不叠推力。已激活氮气不能取消，制动仍有效，喷射结束才倒车；实际倒退拒绝新氮气。车轮与倾斜为视觉，无悬挂射线；相机不跟车头转。V2车与港区平面变体已验12组有限护栏/细柱/脱困/本地推挤与窗口。旧600Hz力式结果保留为历史。OpenRacing只离线驾驶，先试玩手感，再接1ecae47顺序检查点、practice、计时/防刷与独立导出；Linux/真实手机/联机及GameAdapter未验。",
+      summary: "街车V2与港区操作/碰撞通过，用户漂移手感未通过；先改善甩尾，练习圈计时、导出与接网后置。",
+      details: "当前采用60Hz平面CharacterBody3D，自动加速、两方向转向/同时制动再直线倒车、真实侧滑充能、三槽共享氮气点按追加时间而不叠推力。已激活氮气不能取消，制动仍有效，喷射结束才倒车；实际倒退拒绝新氮气。车轮与倾斜为视觉，无悬挂射线；相机不跟车头转。V2车与港区平面变体已验12组有限护栏/细柱/脱困/本地推挤与窗口。旧600Hz力式结果保留为历史。OpenRacing只离线驾驶；用户反馈基本感觉不到漂移，先改善转向与松键甩尾，再接1ecae47顺序检查点、practice、计时/防刷与独立导出；Linux/真实手机/联机及GameAdapter未验。",
       files: ["OpenRacing.cmd", "examples/racing/integration/README.md", "examples/racing/integration/arcade_vehicle.gd", "examples/racing/integration/arcade_control.gd", "prototypes/racing_level/harbor.gd", "prototypes/racing_visual/v2/models/street_car_v2.glb"],
-      docs: ["docs/17_framework_shooter_plan.md#racing-arcade-20261003","docs/17_framework_shooter_plan.md#racing-drift-reference-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
-      evidence: "Windows新工程冷导入/十一解析退出0、物理136/0、窗口68/0，stderr0；两图已看。RTX3080三秒约120.0FPS、最慢8.68ms，只算单车短样本。r1解析/r3记录/r4窗口超时等失败保留轻量证据；街机Verify只留r5/r6，用户删除旧stage1-r1已核对。新SkidStorm重构参考已按哈希归档/只读对照，漂移迟滞和抓地渐变尚未实施，氮气省略，原游戏运行未验；现版手感不变。整圈/导出/Linux/真实手机/真人手感/框架接入未验" },
+      docs: ["docs/17_framework_shooter_plan.md#racing-arcade-20261003","docs/17_framework_shooter_plan.md#racing-drift-reference-20261003","docs/17_framework_shooter_plan.md#racing-three-controller-comparison-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
+      evidence: "Windows新工程冷导入/十一解析退出0、物理136/0、窗口68/0，stderr0；两图已看。RTX3080三秒约120.0FPS、最慢8.68ms，只算单车短样本。r1解析/r3记录/r4窗口超时等失败保留轻量证据；街机Verify只留r5/r6，用户删除旧stage1-r1已核对。新SkidStorm重构参考已按哈希归档/只读对照，漂移迟滞和抓地渐变尚未实施，氮气省略，原游戏运行未验；新TopDown也已对照：侧向阻尼相近、转向请求更快。用户漂移手感未通过，现版代码本轮不变。整圈/导出/Linux/真实手机/框架接入未验" },
     { id: "sdk-reuse-from-racing", area: "sdk", phase: 9, status: "planned",
       title: "从真实游戏提炼接入积木",
       summary: "赛车接通以后，减少下一款游戏的重复工作。",
