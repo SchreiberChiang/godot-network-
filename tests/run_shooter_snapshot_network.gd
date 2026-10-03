@@ -1,8 +1,11 @@
 extends SceneTree
-## Real loopback ENet/RPC regression. No account, storage, DTLS or public-network claim.
+## Real loopback ENet/RPC regression, optionally with actual ENet DTLS.
+## One process with independent multiplayer branches; no account/public-network claim.
 const Shooter = preload("res://examples/shooter/game.gd")
 const Codec = preload("res://examples/shooter/snapshot_codec.gd")
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
+const Secure = preload("res://sdk/roomkit/shared/secure_transport.gd")
+const Sender = preload("res://examples/shooter/snapshot_sender.gd")
 const CLIENTS := 8
 var passed := 0
 var failed := 0
@@ -28,6 +31,14 @@ var stage_publication_ms: Array = []
 var stage_minimum_tick := 0
 var capacity_only := false
 var process_reception: Array = []
+var dtls := false
+var dtls_evidence := {"server_setup": null, "client_setup": [], "handshakes": [], "certificate_sha256": ""}
+var poll_timing: Dictionary = {}
+var slow_polls: Array = []
+var decoder_samples: Array = []
+var next_decoder_sample := 0
+var poll_cursor := 0
+var fixed_poll_order := false
 
 func _initialize() -> void:
 	multiplayer_poll = false
@@ -36,6 +47,10 @@ func _initialize() -> void:
 			evidence = argument.trim_prefix("--evidence=")
 		if argument == "--capacity-only":
 			capacity_only = true
+		if argument == "--dtls":
+			dtls = true
+		if argument == "--fixed-poll-order":
+			fixed_poll_order = true
 	_run.call_deferred()
 
 func _run() -> void:
@@ -64,6 +79,10 @@ func _add_endpoint(label: String, peer: ENetMultiplayerPeer, is_server: bool) ->
 	branch.name = label
 	root.add_child(branch)
 	var api := SceneMultiplayer.new()
+	# Production room_runtime disables relay; clients communicate with the
+	# authority, rather than adding relayed peers to this capacity fixture.
+	if is_server:
+		api.server_relay = false
 	set_multiplayer(api, branch.get_path())
 	api.multiplayer_peer = peer
 	var world = Shooter.new()
@@ -83,6 +102,27 @@ func _open_network() -> bool:
 		return false
 	listening_port = server_peer.host.get_local_port()
 	_check(listening_port > 0, "ephemeral UDP port was assigned")
+	var security: Dictionary = {}
+	if dtls:
+		# Driver supplies a new private evidence folder. Never use an installed CA,
+		# shared host certificate, account fixture, or a flag as handshake evidence.
+		if not _require(evidence != "", "DTLS mode has an isolated evidence directory"):
+			server_peer.close()
+			return false
+		security = Secure.create_local_certificate(evidence.get_base_dir().path_join("dtls-security"))
+		if not _require(not security.is_empty(), "DTLS generates its own local certificate and private key"):
+			server_peer.close()
+			return false
+		dtls_evidence.certificate_sha256 = FileAccess.get_sha256(security.certificate)
+		var server_tls := Secure.server_options(security)
+		if not _require(server_tls != null, "DTLS server loads actual certificate and private key"):
+			server_peer.close()
+			return false
+		var setup: int = server_peer.host.dtls_server_setup(server_tls)
+		dtls_evidence.server_setup = setup
+		if not _require(setup == OK, "actual ENet DTLS server setup returns OK"):
+			server_peer.close()
+			return false
 	var endpoint := _add_endpoint("SnapshotServer", server_peer, true)
 	authority = endpoint.world
 	for index in CLIENTS:
@@ -90,18 +130,31 @@ func _open_network() -> bool:
 		if not _require(client_peer.create_client("127.0.0.1", listening_port, 2) == OK, "create real ENet client %d" % index):
 			client_peer.close()
 			return false
+		if dtls:
+			var client_tls := Secure.client_options(security.certificate)
+			if not _require(client_tls != null, "DTLS client %d loads the test certificate as its trust anchor" % index):
+				client_peer.close()
+				return false
+			var setup: int = client_peer.host.dtls_client_setup(security.hostname, client_tls)
+			dtls_evidence.client_setup.append({"client": index, "code": setup})
+			if not _require(setup == OK, "actual ENet DTLS client %d setup returns OK" % index):
+				client_peer.close()
+				return false
 		clients.append(_add_endpoint("SnapshotClient%d" % index, client_peer, false))
+	var handshake_started := Time.get_ticks_msec()
 	var deadline := Time.get_ticks_msec() + 5000
 	while Time.get_ticks_msec() < deadline:
 		_poll_all()
 		if _connected_count() == CLIENTS and endpoint.api.get_peers().size() == CLIENTS:
 			break
 		await process_frame
-	if not _require(_connected_count() == CLIENTS and endpoint.api.get_peers().size() == CLIENTS, "all eight actual ENet handshakes reach the authority"):
+	if not _require(_connected_count() == CLIENTS and endpoint.api.get_peers().size() == CLIENTS, "all eight actual %s handshakes reach the authority" % ("ENet DTLS" if dtls else "ENet")):
 		return false
 	for index in CLIENTS:
 		var peer_id: int = clients[index].api.get_unique_id()
 		_check(peer_id > 1, "client %d has its actual ENet peer ID" % index)
+		if dtls:
+			dtls_evidence.handshakes.append({"client": index, "peer_id": peer_id, "status": clients[index].peer.get_connection_status(), "authority_observed": peer_id in endpoint.api.get_peers(), "observed_after_ms": Time.get_ticks_msec() - handshake_started})
 		authority.admit({"user_id": "net-player-%02d" % index, "display_name": "Net %d" % index}, peer_id)
 	var actual_peers: Array = []
 	for endpoint_row in clients:
@@ -125,12 +178,44 @@ func _poll_all(flush: bool = true) -> void:
 		var before := Time.get_ticks_usec()
 		authority.flush_snapshot_transport(Time.get_ticks_msec())
 		transport_samples.append(Time.get_ticks_usec() - before)
-	for endpoint in endpoints:
+	# Nine branches share this process. A maximal state's schema validation can
+	# take tens of ms per receiving branch. Rotate client priority so the same
+	# endpoint is not always last behind all seven other validators. Packet
+	# budgets, decoder TTL, duration, client count and convergence gates stay put.
+	for offset in endpoints.size():
+		var endpoint: Dictionary = endpoints[0] if offset == 0 else endpoints[1 + ((offset - 1 + poll_cursor) % clients.size())]
 		if endpoint.api.has_multiplayer_peer():
+			var before := Time.get_ticks_usec()
 			var error: int = endpoint.api.poll()
+			var elapsed := Time.get_ticks_usec() - before
+			var label: String = endpoint.branch.name
+			if not poll_timing.has(label):
+				poll_timing[label] = {"calls": 0, "total_us": 0, "max_us": 0}
+			var timing: Dictionary = poll_timing[label]
+			timing.calls += 1
+			timing.total_us += elapsed
+			timing.max_us = maxi(timing.max_us, elapsed)
+			if elapsed >= 20000 and slow_polls.size() < 256:
+				slow_polls.append({"endpoint": label, "group": stage_name, "at_ms": Time.get_ticks_msec(), "duration_us": elapsed})
 			if error != OK:
 				_check(false, "real SceneMultiplayer poll returns OK")
+	if not fixed_poll_order and not clients.is_empty():
+		poll_cursor = (poll_cursor + 1) % clients.size()
 	_sample_progress()
+	_sample_decoders()
+
+func _sample_decoders() -> void:
+	var now := Time.get_ticks_msec()
+	if stage_name == "" or now < next_decoder_sample or decoder_samples.size() >= 1600:
+		return
+	next_decoder_sample = now + 250
+	for index in clients.size():
+		var decoder = clients[index].world.get("_snapshot_decoder")
+		var partial: Array = []
+		for serial in decoder.get("_frames"):
+			var frame: Dictionary = decoder.get("_frames")[serial]
+			partial.append({"serial": serial, "received": frame.parts.size(), "expected": frame.header.count, "age_ms": now - int(frame.born), "ttl_ms": Codec.frame_ttl_ms(int(frame.header.count))})
+		decoder_samples.append({"group": stage_name, "client": index, "at_ms": now, "accepted_serial": decoder.get("_accepted_serial"), "retired_serial": decoder.get("_retired_serial"), "partial": partial})
 
 func _sample_progress() -> void:
 	while progress.size() < clients.size():
@@ -226,6 +311,7 @@ func _begin_stage(label: String) -> void:
 
 func _finish_stage(value: Dictionary, extra: Dictionary = {}) -> void:
 	var summary := {"group": stage_name, "duration_ms": stage_duration, "period_ms": 50, "published": stage_published, "publication_ms": stage_publication_ms.duplicate(), "convergence_ms": stage_convergence}
+	summary.network_statistics = _network_statistics()
 	for key in extra:
 		summary[key] = extra[key]
 	for index in CLIENTS:
@@ -240,6 +326,17 @@ func _finish_stage(value: Dictionary, extra: Dictionary = {}) -> void:
 		print("INFO group=", stage_name, " client=", index, " complete_frames=", row.serials.size(), " final_tick=", row.final_tick, " complete=", row.complete)
 	observed.append(summary)
 	stage_name = ""
+
+func _network_statistics() -> Array:
+	var rows: Array = []
+	for endpoint in endpoints:
+		var peers: Array = []
+		# SceneMultiplayer's peer list can include relayed peers in older runs;
+		# only physical ENet peers own channel/throttle/RTT statistics.
+		for peer in endpoint.peer.host.get_peers():
+			peers.append({"remote_port": peer.get_remote_port(), "channels": peer.get_channels(), "state": peer.get_state(), "throttle": peer.get_statistic(ENetPacketPeer.PEER_PACKET_THROTTLE), "throttle_limit": peer.get_statistic(ENetPacketPeer.PEER_PACKET_THROTTLE_LIMIT), "rtt_ms": peer.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME)})
+		rows.append({"endpoint": str(endpoint.branch.name), "peers": peers, "sent_udp_packets": endpoint.peer.host.pop_statistic(ENetConnection.HOST_TOTAL_SENT_PACKETS), "received_udp_packets": endpoint.peer.host.pop_statistic(ENetConnection.HOST_TOTAL_RECEIVED_PACKETS)})
+	return rows
 
 func _converge(value: Dictionary) -> bool:
 	# Unreliable delivery never promises a particular final serial. Keep publishing
@@ -522,7 +619,7 @@ func _finish() -> void:
 	if evidence != "":
 		var file := FileAccess.open(evidence, FileAccess.WRITE)
 		if file != null:
-			file.store_string(JSON.stringify({"passed": passed, "failed": failed, "clients": CLIENTS, "transport": "loopback ENet, no DTLS", "capacity_only": capacity_only, "period_ms": 50, "terminal_timeout_ms": 5000, "process_reception": process_reception, "checks": checks, "observed": observed, "reception": reception, "flush_us": transport_samples}))
+			file.store_string(JSON.stringify({"passed": passed, "failed": failed, "clients": CLIENTS, "platform": OS.get_name(), "engine_version": Engine.get_version_info().string, "transport": "loopback ENet DTLS" if dtls else "loopback ENet, no DTLS", "dtls": dtls, "dtls_evidence": dtls_evidence, "capacity_only": capacity_only, "fixed_poll_order": fixed_poll_order, "server_relay": false, "period_ms": 50, "terminal_timeout_ms": 5000, "sender_limits": {"per_peer_burst": Sender.PER_PEER_BURST, "total_burst": Sender.TOTAL_BURST, "minimum_flush_ms": Sender.MIN_FLUSH_MS, "max_rpc_payload_bytes": Codec.MAX_PACKET_BYTES}, "poll_timing": poll_timing, "slow_polls": slow_polls, "decoder_samples": decoder_samples, "process_reception": process_reception, "checks": checks, "observed": observed, "reception": reception, "flush_us": transport_samples}))
 			file.close()
 		else:
 			_check(false, "test evidence file can be written")
