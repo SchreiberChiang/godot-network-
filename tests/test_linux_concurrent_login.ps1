@@ -316,7 +316,8 @@ try {
         for($i=0;$i -lt $Clients;$i++) {
             Check ($progress[$i].advances -ge 3 -and $progress[$i].last -gt $progress[$i].first) ('client '+$i+' receives sustained authoritative snapshots for three seconds')
         }
-        Rk-SaveJson (Join-Path $root 'logs/room-progress.json') @{elapsed_ms=$window.ElapsedMilliseconds;clients=$progress}
+        $progressRows=@(for($i=0;$i -lt $Clients;$i++) { @{client=$i;first=$progress[$i].first;last=$progress[$i].last;advances=$progress[$i].advances} })
+        Rk-SaveJson (Join-Path $root 'logs/room-progress.json') @{elapsed_ms=$window.ElapsedMilliseconds;clients=$progressRows}
         foreach($client in $burst) {
             $left=Rk-Command $client 'leave' @{} 20
             Check ($null -ne $left -and $left.ok) ('client '+$client.name+' leaves the room back to the lobby')

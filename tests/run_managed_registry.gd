@@ -156,6 +156,12 @@ func _run() -> void:
 	var invalid_receipt := prepared.duplicate(true)
 	invalid_receipt.race.prepared_input_receipt.algorithm = "unknown"
 	_reject(registry, invalid_receipt, "INVALID_GAME_REGISTRY", "unknown frozen input algorithm")
+	invalid_receipt = prepared.duplicate(true)
+	invalid_receipt.race.prepared_input_receipt.sha256 += "\n"
+	_reject(registry, invalid_receipt, "INVALID_GAME_REGISTRY", "trailing newline in frozen input digest")
+	invalid_receipt = prepared.duplicate(true)
+	invalid_receipt.race.prepared_input_receipt.files[0].sha256 += "\n"
+	_reject(registry, invalid_receipt, "INVALID_GAME_REGISTRY", "trailing newline in frozen file digest")
 	for receipt_path in ["../private", "/private", "game/../private", "game\\private", "C:/private"]:
 		invalid_receipt = prepared.duplicate(true)
 		invalid_receipt.race.prepared_input_receipt.files[0].path = receipt_path
