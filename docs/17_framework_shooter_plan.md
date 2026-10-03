@@ -34,17 +34,62 @@
 <a id="next-checkpoints-20261003"></a>
 ## 当前后续检查点（2026-10-03）
 
-用户已自行切换 GPT-6.1 Sol / Ultra；后续新建 Codex 会话、任务及子代理只用 GPT-6.1 Sol，子任务思考程度按需要选择。当前主线负责关键实现和整合；按需使用范围明确的子代理，继续遵守独立目录、交付后回收和产物最多两份的要求。第一检查点结果见下文；现用服务与试玩包未替换，也未新增侧栏会话。
+用户已自行切换 GPT-6.1 Sol / Ultra；后续新任务及子代理只用 GPT-6.1 Sol，子任务思考程度按需要选择。当前主线负责关键实现和整合；按需使用范围明确的子代理，继续遵守隔离、交付后回收和产物最多两份。发布补修与快照 v3 成品交付已完成，正式更新器保留旧账号切换新版，没有新增侧栏会话。
 
 1. **发布检查补修（已通过此范围门槛）**：三类缺口的复现、修复、定向回归与真实配套导出已完成，见[本轮结果](#release-guards-20261003)。原审计失败保留；不把这个检查点扩展为新版 Linux 联机、TLS 或真人试玩通过。
-2. **射击新版配套交付**：在独立 Linux 目录复验快照 v3 的严格 4/8 人与 DTLS，构建同源 Windows 客户端和 Linux 服务端，把本地邮件草稿/复制功能与公开收件地址一起交付。跨机连接、版本配对、退出清理和账号/资产保留通过后再更换现用包。现用 v2 包仍有效，源码检查不能代替成品验收。
+2. **射击新版配套交付（此门槛已完成）**：独立 Linux 源码严格 4/8 人与两平台 DTLS 通过，真实 Windows Client.exe → Linux 成品 69/0、退出 0；正式离线更新 SEALED，试玩指针及入口 Start 通过，公开 QQ 收件地址已配置。源码多人、成品双人、真人公网分别记录，见[交付结果](#snapshot-v3-delivery-20261003)。
 3. **一次用户短试玩**：进入房间观察移动/转枪和网络详情，准备反馈邮件并核对收件地址与摘要；由用户自行发送，确认真实收信。报告不经过游戏服务器，未收到邮件不能记作发送成功。
 4. **赛车完整一圈**：先接一辆原创车、一条候选赛道、检查点和计圈，交一个能本地开车完成一圈的入口；通过驾驶/碰撞与用户手感验收后再接双人竞速及通用框架。山路已有碰撞失败保留，不把所有素材候选一次合并。
 
 每个验收完成的实施检查点提交推送主线，同步 STATUS 与 ROADMAP，并保存必要轻量证据及恢复输入，收回临时目录。Linux 同时只跑一批引擎/构建任务；需要 SSH 密码时由用户在窗口输入。
 
+<a id="snapshot-v3-delivery-20261003"></a>
+## 快照 v3 源码跨平台与配套成品验收（2026-10-03）
+
+主线在隔离 Linux 源码目录 `/home/zhao/roomkit/work/snapshot-v3-20261003/` 串行完成测试；使用现有 Godot 4.7.2 与 pwsh，不安装依赖、不改防火墙或全局配置。产品源码为 `b43165a14d02123816fca404a483b20352af9d50`；`74bf080` **只改测试关闭顺序**。两平台 DTLS、Linux 源码严格 4/8 人及跨机成品门槛通过后，用正式更新器沿用旧实例名称、账号、资产、配置和证书，替换试玩指针；旧 Linux 包目录保留。
+
+**回执结构与证据修复**：`schemas/managed_game_registry.schema.json` 补齐可选 `prepared_input_receipt` 的结构，并为总哈希及逐文件 SHA256 增加明确的 64 字符长度界限；原 prepared 索引校验继续执行既有语义。此处是注册表 Schema 接受新可选元数据与边界校验，**不是宿主运行时重新扫描/计算原始输入哈希**。registry 定向 94/0。Linux 三秒进展记录原用整数键字典，JSON 序列化失败；改为包含 client/first/last/advances 的行数组，未删持续快照断言。
+
+| 本轮门槛 | 已取得的真实结果 | 范围 |
+|---|---|---|
+| Linux 真实 ENet DTLS 快照网络 | **158/0，engine/driver 退出 0，stderr 0 bytes** | 单进程独立 SceneMultiplayer 八端的真实 setup、握手、完整快照、87 片最大合法状态、坏片/缺片及慢调度恢复、关闭和端口释放；不是八个成品客户端 |
+| Windows 最终 DTLS 回归 | **158/0，engine/driver 退出 0，stderr 0 bytes** | 同一最终测试关闭顺序；真实回环网络，不代替 Linux 或跨机成品 |
+| Linux 源码严格 4 人 | **94/0，退出 0** | 全四人注册后一次突发登录成功、同房准确身份集合、持续三秒每端至少三次快照推进、退房/清理确认、逐个重新登录 |
+| Linux 源码严格 8 人 | **158/0，退出 0** | 相同严格门槛对全八人通过；拒绝/超时不通过重试隐藏 |
+| 注册表与可选输入回执 | **94/0** | 有界结构与拒绝边界；不算导出包运行或运行时文件重哈希 |
+| 最终配套目录导出与 Linux CheckPackage | **通过，导出退出 0** | Windows 主机使用现有 4.7.2 导出，远端检查通过；目录/依赖检查不能代替联机 |
+| 真实 Windows Client.exe → Linux 成品 | **69/0，退出 0** | 两源码 SDK 客户端账号/资产及射击/取石子生命周期；两份真实 EXE 约四秒同一 DTLS 房间、准确身份集合、持续快照/收流量、本地报告与正常退出；备份恢复和重启持久化。未运行 FullRound，不算成品完整对局/八人成品 |
+| 正式旧→新迁移、指针与试玩入口 | **prepare/verify/seal/start/入口 Start 全部退出 0** | 先离线 PREPARED→VERIFIED→SEALED，再启动；Start 检查 saved bind/advertised_host、真实证书和 SSH 隧道。旧目录保留，seal 后禁止工具 rollback，不声称启动失败自动回退 |
+
+可复用的源码验收入口如下，在上述 Linux 目录执行；两个工具参数须替换为现有官方 Godot 4.7.2 与 pwsh 的实际绝对路径：
+
+```sh
+bash tests/support/linux_snapshot_network.sh /absolute/Godot4.7.2 /absolute/pwsh dtls
+bash tests/support/linux_concurrent_login.sh /absolute/Godot4.7.2 /absolute/pwsh all
+```
+
+入口先隔离 HOME/XDG/TMP、umask 077 并忽略 SIGPIPE，Linux 重任务依次运行。最终严格 4/8 batch 为 `linux-concurrent-20261003T062450Z-0I2oJQ`；原始结果已取回本机 [Linux 证据目录](../logs/snapshot-v3-delivery-20261003/linux-evidence/)，对应 `data/<batch>/group-4|group-8/logs/` 内的 `result.json`、`room-seen-*.json`、`room-progress.json`、退出和进程/端口检查。Linux DTLS 最终运行号 `snapshot-network-20261003T062404-e1d2d88b`，报告在该取回目录的 `logs/shooter-snapshot-nettest/runs/<run>/`；Windows 最终运行号 `snapshot-network-20261003T062542-1d74909a`。本机汇总、源哈希、导出记录和候选归档位于 [本轮证据目录](../logs/snapshot-v3-delivery-20261003/)；Windows 最终控制台与退出码为 `windows-dtls-final-console.txt` / `windows-dtls-final-exit.txt`，registry 的两轮原输出均保留在 `registry/`。
+
+Linux 取回的 121 文件共 696,657 bytes，加 tar 与 manifest 已由主线逐项回读，见 `linux-evidence.sha256.json`。顶层 SSH 包装层 `exit.txt` 曾因 printf 转义写出 `0n` / `1n` / `127n`，原样保留，**不把 `0n` 当数值退出码**；门槛退出结论依据各 batch 的 `driver-result.json` / `result.json` 与真实 SSH 进程退出码。
+
+**本轮失败保留**：旧注册表 Schema 阻断新回执，两组各 7/3；补结构后的中轮多人进展字典无法写 JSON，4 人 68/1、8 人 112/1；最终行数组后为 94/0、158/0。Linux DTLS 首轮检查计数虽 158/0，先关闭回环服务端再关闭客户端，使 DTLS close_notify 期间出现 **3672 bytes 关闭 stderr**，驱动退出 1，因此该轮仍判失败。测试改为先关闭客户端，服务端继续 poll 至 peer 退出，再关闭监听；最终两平台计数相同且 stderr 0。此前固定轮询的 151/7、普通 ENet 131/7、诊断夹具 148/10 及固定顺序 capacity 117/2，也保留在 `dtls/runs/`；默认轮转客户端轮询首位，不增加生产寿命，不放宽人数或五秒收敛门槛。
+
+最终配套为 `artifacts/deployments/snapshot-v3-final-20261003/`：父构建 `20261003061937-a4d83b3b`，Server 子构建 `20261003061938-442f278d`，射击身份 `shooter-dev-002-src-e1bbf7b65cc9`、协议 3，包含匹配的未配置 Windows PlayerClient。远端新包 `/home/zhao/roomkit/releases/linux-20261003061938-442f278d/` 的独立验收实例 `export-442f278d` 已正常停止；正式迁移的原实例 `export-b5777ad3` 管理服务运行，面板仍只在回环 28691，由 SSH 转发。只使用已经授权的 TCP 28300/UDP 28400–28431，不改防火墙。旧包 `/home/zhao/roomkit/releases/linux-20261002150342-90e43f24/` 保留，更新器对旧数据和复制候选完成离线指纹/SQLite 检查。
+
+成品真实命令：`tests/test_linux_server_package.ps1 -ContextPath logs/snapshot-v3-delivery-20261003/package-context.json -PreparedPlayer <final>/PlayerClient`；真实退出 0、69/0，结果在 `data/codex-linux-package-20261003061938-442f278d-ff6cde75/result.json`，完整原始输出在本轮 `native-console.txt`。维护与资产由源码 SDK 客户端验证，EXE 双人入退房另列，不混称 EXE 业务全对局。正式更新器依次 prepare→verify→seal，之后 RoomKit.sh start；原始输出/真实退出码分别保存于 `update-*.txt`、`live-start*.txt`。主线 `open_linux_package.ps1 -Action Start -NoBrowser -HoldSeconds 3` 实际通过配置、证书、SSH 检查，输出 `LINUX_PACKAGE_PLAYTEST_STARTED` 和 `LINUX_MANAGEMENT_READY`；三秒后只关测试隧道，管理服务继续运行。
+
+**当前玩家入口**：仍双击根目录 `PlayLinuxPackage.cmd`，在后台用原管理员账号点“启动服务器”；新个人客户端在 `artifacts/linux-package-player-20261003061938-442f278d/shooter-windows/`，双击 StartGame.cmd，用原玩家账号登录。旧 client-data 只有空的 legacy 目录，复制其结构到新个人目录并保留旧目录；不声称此次测到真实待确认操作的迁移。初次配置导出用 pwsh 7 调用 Windows ACL 助手失败、退出 1，没有进入导出；改用项目既定 Windows PowerShell 5.1 后成功，原失败保存在 `configured-client-pwsh7-rejected.txt`。
+
+配置版重新导出与已测 PCK 都有 75 资源；74 项资源路径和原始字节完全相同，唯一差异是空 Bootstrap 场景的四字节生成 node ID，隔离只加载 PackedScene 的结构核对通过、退出 0、stderr 0；没有实例化游戏，不以此代替网络测试，见 `pck-equivalence/`。给朋友用 `artifacts/friend-clients/snapshot-v3-20261003/RoomKit-player-snapshot-v3.zip`：14 文件、38,168,885 bytes，SHA256 `0f6334d4c65867a66f4bf71eee37cbd16d368451c2f4152e127b09c09295d435`。每个 ZIP entry 解压读取哈希匹配干净目录，公开 QQ 收件地址已配置；不含 client-data、账号、私钥或测试日志。准备器仍校验冻结源回执，未手改已冻结配套目录。
+
+**本地邮件反馈已交付，仍待实际收信**：公开配置指定 `3455859197@qq.com`。玩家点“标记卡顿”再“提交报告”，本机整理脱敏摘要并打开邮件草稿/复制文本，由玩家确认发送，不经游戏服务器、不使用 SMTP 授权码。既有 Windows 50/0 使用邮件/剪贴板替身；本轮真实 EXE 产出两份独立、多采样的脱敏报告，不等于真实邮件软件或 QQ 收信。真人公网、手感、画面和实际发送仍由用户确认；极限大帧不承诺 20 Hz，没有 16 个真实连接者、八人成品或长期负载门槛。
+
+**收尾与审批限制**：DTLS 工作树已物理移除，F 盘目录逻辑长度 **12,128,472 bytes（约 11.57 MiB）**，不算 C 盘释放；bundle 与 63 项轻量证据共 1,403,140 bytes 保全回读。旧夹具约 0.286 MiB，以及本轮两个已被最终版替代的目录 `artifacts/deployments/snapshot-v3-20261003/` 和 `artifacts/linux-server-build-20261003061805-3f717e40/`，均被自动审批拒绝删除，只返回 `blocked by policy`，没有具体理由；未执行、不重试换工具。后两项 644 文件、410,286,563 bytes（约 391.28 MiB）的链接/进程/引用/哈希评估保存在 `intermediate-retirement.json`，拒绝记于 `cleanup-blocked.json`。这不是测试失败，不将保留目录计作释放。五项 Windows 真实数据库/operator.json/公开配置与证书的哈希、大小及修改时间均不变；第六项 Linux 试玩指针按迁移有意更新。恢复、当前门槛及交付哈希见 `ownership.json`、`accepted-gates.json`、`protected-after.json`、`player-delivery.json`。
+
 <a id="release-guards-20261003"></a>
 ## 发布检查三项补修与真实导出（2026-10-03）
+
+以下保留该检查点当时的结果和未运行项；后续 Linux/DTLS 与最终配套验收见 [快照 v3 本轮交付](#snapshot-v3-delivery-20261003)。
 
 基准 `d8a1258`，实现提交 `19c60a3`。主线亲自实现构建输入回执及两套构建器接线；两名 GPT-6.1 Sol / high 在 F 盘独立树分别实现启动回执和公开配置校验，第三名 Sol 只读审查。没有新建侧栏会话，没有运行 Operator/房间服务、接触真实数据或替换现用包。
 
@@ -126,6 +171,8 @@ Godot4.7.2 Windows真实通过：codec 33/0（含typed容器和64位整数）、
 <a id="local-player-report-20261003"></a>
 ## 玩家本地邮件反馈（2026-10-03）
 
+以下保留本地功能首次验收；最终配套候选及实际收信边界见 [快照 v3 本轮交付](#snapshot-v3-delivery-20261003)。
+
 用户明确改为由玩家自己发邮件，避免报告经过游戏服务器。最终仅增加客户端本地功能：在“网络详情 / 报告”点击“准备反馈邮件”，整理近期脱敏指标并调用系统 `mailto:` 打开草稿；玩家检查后自行发送。另有显式“复制诊断摘要”“复制收件地址”及既有报告目录入口。不要求登录或游戏服务器在线，不保存邮箱授权码，不增加服务器 API、SMTP、队列或端口。没有默认邮件软件时使用复制回退；没有预填收件人时明确提示，不能谎报已提交。
 
 **数据边界**：内存最多 32 条、仅保留 120 秒内的白名单记录，报告不超过 12,000 UTF-8 字节；即使本地日志写入失败，仍能整理当前进程的内存记录。唯一字段契约为 `schemas/player_report.schema.json`，账号、令牌、IP、路径与原始错误文本不采集。完整 JSONL 日志仍留在原 `client-data/reports`。邮件 URI 整体不超过 1,800 字节，超长改用短草稿并提示粘贴摘要；`mailto:` 不自动附加文件。未成熟丢包值显示“未知”，成熟测得零保留为零，并注明仅为 ENet 可靠发送估计。
@@ -140,6 +187,8 @@ Godot4.7.2 Windows真实通过：codec 33/0（含typed容器和64位整数）、
 
 <a id="snapshot-capacity-20261003"></a>
 ## 快照分批发送与 Windows 容量验收（2026-10-03）
+
+以下保留 Windows 容量检查点当时的结果和未运行项；后续 Linux/DTLS、严格多人和成品验收见 [快照 v3 本轮交付](#snapshot-v3-delivery-20261003)。
 
 用户重新授权主线按需使用 6.1 Sol 子代理推进。主线恢复两棵 F 盘工作树，亲自修改游戏发送逻辑；两名 Sol / high 分别只读审查和维护真实网络验收，没有新增侧栏会话，也没有派发外部 5x dot。原归档和未提交诊断副本均保留。产品候选 `84293b1`、验收候选 `430528c` 已按依赖接入主线（主线产品 `0c10eb5`、最终测试 `ad05497`）；Git blob 核对一致，没有把测试树的诊断 codec 混入生产。
 

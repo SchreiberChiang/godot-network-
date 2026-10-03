@@ -11,7 +11,9 @@
 
 资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
-**分支和本地目录看这里：[主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)。** 日常仍用此项目根目录；主线已接收本地转枪方案，两个历史候选目录继续保留供对照。双击根目录 **PreviewAim.cmd** 可离线看旧/新转枪（TAB 切换、ESC 退出），配套联网试玩目录尚未更新。
+**分支和本地目录看这里：[主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)。** 日常仍用此项目根目录；转枪、移动及快照 v3 已交配套联网新版，双击根目录 **PreviewAim.cmd** 可离线看旧/新转枪（TAB 切换、ESC 退出）。
+
+**当前 Linux 新版试玩：双击 `PlayLinuxPackage.cmd`**，用原管理员账号在后台点“启动服务器”，再打开新版客户端 StartGame.cmd。旧账号、资产和证书保留；两平台 DTLS、Linux 源码 4/8 人与真实 Windows EXE→Linux 双人短验通过，真人公网/画面手感另验。给朋友用 `artifacts/friend-clients/snapshot-v3-20261003/RoomKit-player-snapshot-v3.zip`，不要发自己的 client-data。玩家“标记卡顿”后点“提交报告”，在本机准备到 `3455859197@qq.com` 的邮件，由玩家确认发送，不占游戏服务器的报告中转带宽。实际收信待确认，见 [交付与限制](docs/17_framework_shooter_plan.md#snapshot-v3-delivery-20261003)。
 
 配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环。[朋友公网试玩](docs/17_framework_shooter_plan.md#friends-public-preparation) 已收到人工通过反馈。诊断和枪口呈现已进主线，当前是移动候选复验、同源交付与短试玩，之后再接赛车；职责与完成门槛见 [当前执行表](docs/17_framework_shooter_plan.md#active-execution-board)。
 
