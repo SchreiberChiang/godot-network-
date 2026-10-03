@@ -14,6 +14,7 @@ const MAX_ENCODED_BYTES := MAX_RAW_BYTES
 const MAX_FRAGMENTS := 544
 const MAX_IN_FLIGHT := 3
 const FRAME_TTL_MS := 250
+const MAX_FRAME_TTL_MS := 2500
 const UINT32_MAX := 0xffffffff
 const FLAG_ZSTD := 1
 var _stream_id := 0
@@ -148,10 +149,17 @@ func _retire(serial: int) -> void:
 func _expire(now_ms: int) -> void:
 	var expired := 0
 	for serial in _frames:
-		if now_ms - int(_frames[serial].born) >= FRAME_TTL_MS:
+		if now_ms - int(_frames[serial].born) >= frame_ttl_ms(int(_frames[serial].header.count)):
 			expired = maxi(expired, int(serial))
 	if expired > 0:
 		_retire(expired)
+
+static func frame_ttl_ms(fragment_count: int) -> int:
+	# The sender gives each of at most 16 peers >=8 packets per flush. Allow
+	# 30 Hz scheduling plus 150 ms for delivery/polling, bounded even for the
+	# 512 KiB safety ceiling. Small frames keep the original 250 ms lifetime.
+	var batches := int(ceil(float(clampi(fragment_count, 1, MAX_FRAGMENTS)) / 8.0))
+	return clampi((batches - 1) * 34 + 150, FRAME_TTL_MS, MAX_FRAME_TTL_MS)
 
 static func _plain(value: Variant) -> Variant:
 	if value is Dictionary:

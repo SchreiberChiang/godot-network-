@@ -2,6 +2,7 @@ extends Node
 ## This game owns movement, life states and firearms. The SDK never imports it.
 const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const SnapshotCodec = preload("snapshot_codec.gd")
+const SnapshotSender = preload("snapshot_sender.gd")
 const SIZE := Vector2(960, 540)
 const HALF := Vector2(14, 22)
 const SPEED := 235.0
@@ -49,9 +50,11 @@ var _diagnostic_tick := -1
 var _diagnostic_received_ms := -1
 var _diagnostic_interval_ms := -1
 var _snapshot_decoder := SnapshotCodec.new()
+var _snapshot_sender := SnapshotSender.new()
 var _snapshot_stream := 0
 var _snapshot_serial := 0
 var _snapshot_send_failed := false
+var _snapshot_stopped := false
 const BLEND_SECONDS := 0.05
 # Body-only arrival smoothing: steady 20 Hz stays at 50 ms. Recent jitter can
 # extend a new transition to at most 100 ms, at the cost of extra display lag.
@@ -102,6 +105,7 @@ func remove_player(user_id: String) -> void:
 	asset_states.erase(user_id)
 	for peer in peers.keys():
 		if peers[peer] == user_id:
+			_snapshot_sender.forget(int(peer))
 			peers.erase(peer)
 	_publish()
 
@@ -391,6 +395,7 @@ func _process(delta: float) -> void:
 		advance(Time.get_ticks_msec() - roundi(accumulator * 1000.0))
 		if tick % 3 == 0:
 			_publish()
+	flush_snapshot_transport(Time.get_ticks_msec())
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 1)
 func input_command(command: Dictionary) -> void:
@@ -450,6 +455,11 @@ func world_state(value: Dictionary) -> void:
 ## a previous room's stream/partial snapshot would otherwise block the next one.
 func reset_network_state() -> void:
 	_snapshot_decoder.reset()
+	_snapshot_sender.reset()
+	_snapshot_stream = 0
+	_snapshot_serial = 0
+	_snapshot_send_failed = false
+	_snapshot_stopped = false
 	latest.clear()
 	render_tracks.clear()
 	aim_tracks.clear()
@@ -626,7 +636,7 @@ static func tracer_segment(origin: Vector2, end: Vector2, age: float) -> PackedV
 
 func _publish() -> void:
 	latest = state_snapshot()
-	if not is_inside_tree() or not multiplayer.has_multiplayer_peer():
+	if _snapshot_stopped or not is_inside_tree() or not multiplayer.has_multiplayer_peer():
 		return
 	if _snapshot_serial >= 0xffffffff:
 		if not _snapshot_send_failed:
@@ -643,9 +653,25 @@ func _publish() -> void:
 		_snapshot_send_failed = true
 		return
 	_snapshot_send_failed = false
+	_snapshot_sender.enqueue(packets)
+
+func flush_snapshot_transport(now_ms: int) -> void:
+	if _snapshot_stopped or not server or not is_inside_tree() or not multiplayer.has_multiplayer_peer():
+		return
+	var connected := PackedInt32Array()
+	var live := multiplayer.get_peers()
 	for peer in peers:
-		for packet in packets:
-			world_chunk.rpc_id(peer, packet)
+		if live.has(int(peer)):
+			connected.append(int(peer))
+	for delivery in _snapshot_sender.take(now_ms, connected):
+		world_chunk.rpc_id(int(delivery.peer), delivery.packet)
+
+func stop_snapshot_transport() -> void:
+	_snapshot_stopped = true
+	_snapshot_sender.reset()
+
+func _exit_tree() -> void:
+	stop_snapshot_transport()
 
 func _reject() -> bool:
 	rejected += 1

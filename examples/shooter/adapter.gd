@@ -53,6 +53,7 @@ func on_player_left(identity: Dictionary, _reason: String) -> void:
 func on_shutdown_requested(_reason: String) -> void:
 	# An interrupted round produces no completed result and therefore no reward.
 	world.set_process(false)
+	world.stop_snapshot_transport()
 
 func _respawn_requested(user_id: String) -> void:
 	asset_refresh_requested.emit(user_id, "respawn")
