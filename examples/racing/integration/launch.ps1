@@ -57,6 +57,13 @@ $sources=@{
     'arcade_acceptance.gd'='examples/racing/integration/arcade_acceptance.gd'
     'arcade_tuning.gd'='examples/racing/integration/arcade_tuning.gd';'arcade_tuning_panel.gd'='examples/racing/integration/arcade_tuning_panel.gd'
     'player-feedback.json'='docs/assets/racing/handling-approved-20261003.json'
+    'practice_session.gd'='examples/racing/integration/practice_session.gd'
+    'practice_acceptance.gd'='examples/racing/integration/practice_acceptance.gd'
+    'examples/racing/race_rules.gd'='examples/racing/race_rules.gd'
+    'examples/racing/checkpoints/checkpoint_detector.gd'='examples/racing/checkpoints/checkpoint_detector.gd'
+    'tests/test_racing_rules.gd'='tests/test_racing_rules.gd';'tests/run_racing_rules.gd'='tests/run_racing_rules.gd'
+    'tests/test_racing_checkpoints.gd'='tests/test_racing_checkpoints.gd';'tests/run_racing_checkpoints.gd'='tests/run_racing_checkpoints.gd'
+    'tests/test_racing_practice.gd'='tests/test_racing_practice.gd'
 }
 $hashes=@()
 foreach($relative in $sources.Keys){
@@ -74,6 +81,8 @@ function InvokeEngine([string]$Phase,[string]$Arguments,[int]$Timeout){
     foreach($k in @('HOME','USERPROFILE','APPDATA','LOCALAPPDATA','TEMP','TMP','XDG_CONFIG_HOME','XDG_DATA_HOME','XDG_CACHE_HOME')){
         $dir=Join-Path $run ('env/'+$k);[void][IO.Directory]::CreateDirectory($dir);$info.EnvironmentVariables[$k]=$dir
     }
+    $info.EnvironmentVariables['RACING_RULES_ISOLATION']=$run
+    $info.EnvironmentVariables['RACING_CHECKPOINTS_ISOLATION']=$run
     $child=New-Object Diagnostics.Process;$child.StartInfo=$info;$started=$false
     try {
         $started=$child.Start();if(-not $started){throw 'Engine did not start'}
@@ -98,12 +107,16 @@ try {
     InvokeEngine 'version' '--version' 30000
     # A failed first cold import stops this run; never warm-import it into a pass.
     InvokeEngine 'cold-import' ('--headless --editor --import --path "'+$project+'"') 120000
-    foreach($script in @('arcade_main.gd','arcade_vehicle.gd','arcade_control.gd','arcade_control_test.gd','arcade_acceptance.gd','arcade_tuning.gd','arcade_tuning_panel.gd','main.gd','vehicle.gd','vehicle_base.gd','acceptance.gd','track/harbor.gd','track/track_data.gd')){
+    foreach($script in @($sources.Keys|Where-Object {$_ -like '*.gd'}|Sort-Object)){
         InvokeEngine ('parse-'+$script.Replace('/','-').Replace('.gd','')) ('--headless --path "'+$project+'" --check-only --script "res://'+$script+'"') 30000
     }
     if($Mode -eq 'Verify'){
+        InvokeEngine 'rules' ('--headless --path "'+$project+'" --script res://tests/run_racing_rules.gd') 30000
+        InvokeEngine 'checkpoints' ('--headless --fixed-fps 120 --path "'+$project+'" --script res://tests/run_racing_checkpoints.gd') 30000
         InvokeEngine 'physics' ('--headless --fixed-fps 60 --path "'+$project+'" -- --test=physics --evidence-dir="'+$run+'"') 120000
         InvokeEngine 'render' ('--path "'+$project+'" -- --test=render --evidence-dir="'+$run+'"') 120000
+        InvokeEngine 'practice' ('--headless --fixed-fps 60 --path "'+$project+'" -- --test=practice --evidence-dir="'+$run+'"') 120000
+        InvokeEngine 'practice-render' ('--fixed-fps 60 --path "'+$project+'" -- --test=practice-render --evidence-dir="'+$run+'"') 120000
     }else{InvokeEngine 'play' ('--path "'+$project+'"') 0}
     $outcome='success'
 } finally {
@@ -119,7 +132,7 @@ try {
     }
     if($outcome -ne 'success'){
         foreach($file in Get-ChildItem -LiteralPath $run -File -Filter '*.txt'){
-            $lines=@([IO.File]::ReadAllLines($file.FullName) | Where-Object {$_ -match 'SCRIPT ERROR|ERROR:|WARNING:|ARCADE_FAILED|ARCADE_PHASE|ARCADE_ACCEPTANCE_RESULT|at: GDScript'})
+            $lines=@([IO.File]::ReadAllLines($file.FullName) | Where-Object {$_ -match 'SCRIPT ERROR|ERROR:|WARNING:|ARCADE_FAILED|ARCADE_PHASE|ARCADE_ACCEPTANCE_RESULT|PRACTICE_FAILED|PRACTICE_ACCEPTANCE_RESULT|at: GDScript'})
             if($lines.Count){$summary.failure_excerpts+=@{file=$file.Name;lines=@($lines|Select-Object -First 80)}}
         }
     }

@@ -1,4 +1,5 @@
 extends CharacterBody3D
+signal movement_completed(previous: Vector3, current: Vector3, dt: float)
 ## Planar arcade motion; model suspension/lean are visual only. Forward is -Z.
 const ArcadeControl = preload("res://arcade_control.gd")
 const Tuning = preload("res://arcade_tuning.gd")
@@ -18,6 +19,7 @@ var telemetry: Dictionary = {}
 var held_left := false
 var held_right := false
 var paused := false
+var practice_hold := false
 var driver_enabled := true
 var passive_drag := 3.0
 var visual_root: Node3D
@@ -72,7 +74,7 @@ func request_nitro() -> bool:
 	# Input is applied before the next physics tick; check the latest completed
 	# movement here as well, rather than the control's previous observation.
 	var heading := Vector2(-global_basis.z.x, -global_basis.z.z).normalized()
-	if paused or not last_actual_velocity.is_finite() or last_actual_velocity.dot(heading) < -ArcadeControl.SPEED_EPSILON:
+	if paused or practice_hold or not last_actual_velocity.is_finite() or last_actual_velocity.dot(heading) < -ArcadeControl.SPEED_EPSILON:
 		return false
 	return control.request_nitro(held_left, held_right)
 
@@ -93,6 +95,14 @@ func request_reset(pose: Transform3D) -> void:
 
 func _physics_process(dt: float) -> void:
 	if paused:
+		return
+	var previous_position := global_position
+	if practice_hold:
+		velocity = Vector3.ZERO
+		last_actual_velocity = Vector2.ZERO
+		telemetry["speed"] = 0.0
+		telemetry["forward_speed"] = 0.0
+		movement_completed.emit(previous_position, global_position, dt)
 		return
 	var started := Time.get_ticks_usec()
 	for i in range(wall_release_contacts.size() - 1, -1, -1):
@@ -215,6 +225,7 @@ func _physics_process(dt: float) -> void:
 		"yaw_queries": yaw_queries, "rejected_yaws": rejected_yaws, "wall_contacts": wall_contacts,
 		"physics_steps": physics_steps, "mean_script_usec": float(physics_usec_total) / physics_steps,
 		"suspension_ray_queries": 0}
+	movement_completed.emit(previous_position, global_position, dt)
 
 func _try_yaw(amount: float) -> void:
 	if absf(amount) < 0.000001:
