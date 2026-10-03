@@ -31,7 +31,13 @@ func _physics_process(_dt: float) -> void:
 	rail_sample.finite = bool(rail_sample.finite) and _valid_car()
 	var normal: Vector3 = rail_sample.outward
 	var face: Vector3 = rail_sample.face
-	rail_sample.escaped = bool(rail_sample.escaped) or normal.dot(lab.car.global_position - face) > float(rail_sample.wall_width) + PENETRATION_GATE
+	# Sliding around a bend can cross the initial rail's infinite plane after
+	# passing its finite end. Only crossing alongside that actual box is escape.
+	var target: CollisionShape3D = rail_sample.target
+	var local: Vector3 = target.global_transform.affine_inverse() * lab.car.global_position
+	var target_half: Vector3 = (target.shape as BoxShape3D).size * 0.5
+	var alongside := absf(local.z) < target_half.z
+	rail_sample.escaped = bool(rail_sample.escaped) or (alongside and normal.dot(lab.car.global_position - face) > float(rail_sample.wall_width) + PENETRATION_GATE)
 	if int(rail_sample.contact_tick) < 0 and not lab.car.contacted_rail_shapes.is_empty():
 		rail_sample.contact_tick = int(rail_sample.ticks)
 		rail_sample.pre_contact_speed = float(rail_sample.previous_speed)
@@ -129,6 +135,12 @@ func run() -> void:
 	await tick()
 	print("ARCADE_PHASE first_tick")
 	await tuning_run()
+	await player_run()
+	if lab.test_mode == "physics":
+		await player_wall_run()
+	lab.car.tuning.use_preset("original")
+	lab.tuning_panel._sync()
+	reset_at()
 	if lab.test_mode == "render":
 		await render_run()
 	elif lab.test_mode == "physics":
@@ -248,6 +260,175 @@ func tuning_run() -> void:
 	tuning.use_preset(str(saved.profile))
 	lab.tuning_panel._sync()
 	reset_at()
+
+func player_run() -> void:
+	print("ARCADE_PHASE player_start")
+	var tuning = lab.car.tuning
+	tuning.use_preset("player")
+	var feedback: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://player-feedback.json"))
+	var matches: bool = feedback.get("values", {}).size() == 5
+	for key in feedback.get("values", {}):
+		matches = matches and absf(float(tuning.values.get(key, -1000)) - float(feedback.values[key])) < 0.000001
+	check("player five driving values match archived user feedback", matches, tuning.snapshot())
+	check("new nitro and contact bounds reject invalid values", not tuning.set_value("nitro_speed_multiplier", 1) and not tuning.set_value("nitro_extra_acceleration", 61) and not tuning.set_value("wall_slide_drag", -1) and not tuning.set_value("wall_slide_drag", NAN))
+	check("fractional retention rejects even tiny negative values", not tuning.set_value("lateral_keep_turn", -0.0000001) and not tuning.set_value("lateral_keep_release", -0.0000001) and is_finite(tuning.lateral_multiplier(true, 1.0 / 60.0)))
+	lab.tuning_panel._sync()
+	lab.tuning_panel.sliders.nitro_speed_multiplier.value = 1.6
+	lab.tuning_panel.sliders.nitro_extra_acceleration.value = 40
+	lab.tuning_panel.sliders.wall_slide_drag.value = 0.4
+	check("three new sliders reach the live physics model", absf(tuning.nitro_speed() - 48) < 0.00001 and float(tuning.values.nitro_extra_acceleration) == 40 and absf(float(tuning.values.wall_slide_drag) - 0.4) < 0.00001)
+	tuning.use_preset("player")
+	lab.tuning_panel._sync()
+	reset_at()
+	await seconds(1.4)
+	check("player straight ordinary speed remains 30 m/s", float(lab.car.telemetry.speed) >= 29.9 and float(lab.car.telemetry.speed) <= 30.05 and _valid_car(), _telemetry())
+	var turning := true
+	var charge_end := Engine.get_physics_frames() + 540
+	while Engine.get_physics_frames() < charge_end:
+		var forward_speed: float = lab.car.telemetry.forward_speed
+		if forward_speed < 10: turning = false
+		if forward_speed > 16: turning = true
+		buttons(turning, false)
+		await tick()
+	check("player sustained driving earns two real nitro units", lab.car.control._fuel >= 2 and lab.car.telemetry.drifting and _valid_car(), _telemetry())
+	buttons(false, false)
+	# Preserve only fuel earned above. Pose/velocity staging isolates straight
+	# acceleration from the preceding real drift, without manufacturing charge.
+	lab.car.global_transform = Transform3D(Basis.IDENTITY, EMPTY_ORIGIN)
+	lab.car.reset_physics_interpolation()
+	inject_velocity(Vector3.FORWARD * 30)
+	await tick()
+	nitro_edge()
+	await seconds(0.15)
+	var launch_speed: float = lab.car.telemetry.speed
+	check("player boost gives stronger initial straight acceleration", launch_speed >= 37.5 and launch_speed <= 45.05, _telemetry())
+	await seconds(0.3)
+	check("player boost reaches new 45 m/s cap", float(lab.car.telemetry.speed) >= 44.9 and float(lab.car.telemetry.speed) <= 45.05, _telemetry())
+	var decay: Array[Dictionary] = []
+	var last_speed: float = lab.car.velocity.length()
+	var expired := false
+	var first_drop := 0.0
+	var maximum_drop := 0.0
+	var monotonic := true
+	var expiry_end := Engine.get_physics_frames() + 120
+	while Engine.get_physics_frames() < expiry_end:
+		await tick()
+		var speed: float = lab.car.velocity.length()
+		if not bool(lab.car.telemetry.boost_active):
+			if not expired: first_drop = last_speed - speed
+			expired = true
+			maximum_drop = maxf(maximum_drop, last_speed - speed)
+			monotonic = monotonic and speed <= last_speed + 0.001
+			decay.append({"physics_frame": Engine.get_physics_frames(), "speed_mps": speed, "speed_limit": lab.car.telemetry.speed_limit})
+		last_speed = speed
+		if expired and speed <= 30.01: break
+	check("nitro expiry recovers existing overspeed without one-frame clipping", expired and first_drop <= 1.1 and maximum_drop <= 1.1 and monotonic and last_speed <= 30.01, {"first_drop_mps": first_drop, "max_drop_mps": maximum_drop, "end_speed_mps": last_speed, "samples": decay})
+	check("expired nitro cannot regain its former high cap", float(lab.car.telemetry.speed_limit) <= 30.01)
+	# A second genuinely earned unit exercises the strongest exposed boost.
+	tuning.set_value("nitro_speed_multiplier", 1.8)
+	tuning.set_value("nitro_extra_acceleration", 60)
+	nitro_edge()
+	await seconds(0.4)
+	check("maximum slider boost stays within 54 m/s", float(lab.car.telemetry.speed) > 53 and float(lab.car.telemetry.speed) <= 54.05, _telemetry())
+	buttons(true, true)
+	var brake_samples: Array[float] = []
+	var prior: float = lab.car.velocity.length()
+	var brakes_dominate := true
+	var reverse_during_boost := false
+	var brake_end := Engine.get_physics_frames() + 35
+	while Engine.get_physics_frames() < brake_end:
+		await tick()
+		var now: float = lab.car.velocity.length()
+		brakes_dominate = brakes_dominate and now < prior - 0.15
+		reverse_during_boost = reverse_during_boost or (lab.car.telemetry.boost_active and lab.car.telemetry.mode == "reverse")
+		brake_samples.append(now)
+		prior = now
+	check("dual-key brake dominates even maximum active nitro", brakes_dominate and not reverse_during_boost and lab.car.telemetry.mode == "brake", brake_samples)
+	await seconds(2.5)
+	var reverse_yaw: float = lab.car.rotation.y
+	await seconds(0.2)
+	check("player reverse remains straight and limited to quarter speed", lab.car.telemetry.mode == "reverse" and float(lab.car.telemetry.forward_speed) <= -7.4 and float(lab.car.telemetry.speed) <= 7.55 and absf(angle_difference(reverse_yaw, lab.car.rotation.y)) < 0.00001, _telemetry())
+	measurements.player_nitro = {"five_user_values_preserved": matches, "launch_after_150ms_mps": launch_speed, "expiry": decay, "maximum_boost_brake_speeds": brake_samples, "earned_fuel_only": true}
+	tuning.use_preset("player")
+	lab.tuning_panel._sync()
+	if lab.test_mode == "render":
+		lab.tuning_panel.visible = true
+		await tick()
+		await RenderingServer.frame_post_draw
+		check("player eight-slider panel frame saved", get_viewport().get_texture().get_image().save_png(lab.evidence_dir.path_join("nitro-panel.png")) == OK)
+		lab.tuning_panel.visible = false
+	reset_at()
+	print("ARCADE_PHASE player_complete")
+
+func player_wall_run() -> void:
+	print("ARCADE_PHASE wall_contact_start")
+	lab.car.tuning.use_preset("player")
+	var wall := _box_body(Vector3(225, 0.8, 0), Vector3(0.45, 2.4, 200))
+	var collider := wall.get_child(0) as CollisionShape3D
+	var reports: Array[Dictionary] = []
+	for degrees in [5.0, 15.0]:
+		var angle := deg_to_rad(degrees)
+		var direction := Vector3(sin(angle), 0, -cos(angle))
+		var extent := RADIUS + HALF_STRAIGHT * absf(sin(angle))
+		reset_at(Vector3(225 - 0.225 - extent - 0.03, PLANE_Y, 0), direction)
+		await tick()
+		inject_velocity(direction * 30)
+		var initial: Vector3 = lab.car.global_position
+		var contacts := 0
+		var first_ratio := 0.0
+		var prior_tangent := absf(lab.car.velocity.z)
+		var deepest := -INF
+		var once_per_tick := true
+		for _i in range(120):
+			await tick()
+			deepest = maxf(deepest, capsule_depth(lab.car, collider))
+			once_per_tick = once_per_tick and int(lab.car.telemetry.wall_friction_applications) <= 1
+			if lab.car.get_slide_collision_count() > 0:
+				if contacts == 0: first_ratio = absf(lab.car.velocity.z) / prior_tangent
+				contacts += 1
+			prior_tangent = absf(lab.car.velocity.z)
+		var tangent: float = absf(lab.car.velocity.z)
+		var distance := absf(lab.car.global_position.z - initial.z)
+		check("glancing contact keeps tangential motion %.0f degrees" % degrees, contacts > 90 and first_ratio > 0.95 and tangent > 16 and distance > 35 and once_per_tick and deepest <= PENETRATION_GATE and _valid_car(), {"contact_ticks": contacts, "first_tangent_ratio": first_ratio, "end_tangent_mps": tangent, "distance_m": distance, "max_depth_m": deepest})
+		# Do not reset or move the body before testing escape from real contact.
+		var attached_x: float = lab.car.global_position.x
+		var attached_yaw: float = lab.car.rotation.y
+		var max_assist := 0.0
+		buttons(true, false)
+		for _i in range(60):
+			await tick()
+			deepest = maxf(deepest, capsule_depth(lab.car, collider))
+			max_assist = maxf(max_assist, float(lab.car.telemetry.wall_release_motion_mps))
+		var turn_change := absf(angle_difference(attached_yaw, lab.car.rotation.y))
+		var separation: float = attached_x - lab.car.global_position.x
+		check("turning away escapes actual attached wall %.0f degrees" % degrees, turn_change > 0.2 and separation > 0.3 and deepest <= PENETRATION_GATE and max_assist <= 6.001 and _valid_car(), {"turn_radians": turn_change, "separation_m": separation, "max_depth_m": deepest, "max_assist_mps": max_assist})
+		reports.append({"angle_degrees": degrees, "contact_ticks": contacts, "first_tangent_ratio": first_ratio, "end_tangent_mps": tangent, "distance_m": distance, "escape_rotation_radians": turn_change, "escape_separation_m": separation, "max_depth_m": deepest, "teleport_before_escape": false})
+	wall.queue_free()
+	await tick()
+	# Passive high-speed staging isolates the sweep from the ordinary speed cap.
+	var pole := _box_body(Vector3(226, 0.8, 0), Vector3(0.2, 2.4, 0.2))
+	var pole_shape := pole.get_child(0) as CollisionShape3D
+	for speed in [45.0, 54.0]:
+		reset_at()
+		lab.car.driver_enabled = false
+		lab.car.passive_drag = 0
+		await tick()
+		inject_velocity(Vector3.RIGHT * speed)
+		var contact := false
+		var deepest := -INF
+		var crossed := false
+		for _i in range(30):
+			await tick()
+			deepest = maxf(deepest, capsule_depth(lab.car, pole_shape))
+			crossed = crossed or lab.car.global_position.x > 226.15
+			for j in range(lab.car.get_slide_collision_count()):
+				contact = contact or lab.car.get_slide_collision(j).get_collider() == pole
+		check("thin pole blocks new boost speed %.0f m/s" % speed, contact and not crossed and deepest <= PENETRATION_GATE and _valid_car(), {"contacted": contact, "max_depth_m": deepest, "speed_staged_mps": speed})
+	measurements.player_wall = reports
+	pole.queue_free()
+	await tick()
+	reset_at()
+	print("ARCADE_PHASE wall_contact_complete")
 
 func driving_run() -> void:
 	reset_at()
@@ -540,7 +721,7 @@ func rail_run() -> void:
 		await tick()
 		inject_velocity(forward * float(spec.speed))
 		var measured: Dictionary = {}
-		rail_sample = {"measured": measured, "max_depth": maxf(-1.0, _nearby_depth(lab.car, measured)), "finite": _valid_car(), "escaped": false, "outward": outward, "face": face, "wall_width": half.x * 2.0, "contact_tick": -1, "pre_contact_speed": 0.0, "previous_speed": lab.car.velocity.length(), "ticks": 0}
+		rail_sample = {"target": target, "measured": measured, "max_depth": maxf(-1.0, _nearby_depth(lab.car, measured)), "finite": _valid_car(), "escaped": false, "outward": outward, "face": face, "wall_width": half.x * 2.0, "contact_tick": -1, "pre_contact_speed": 0.0, "previous_speed": lab.car.velocity.length(), "ticks": 0}
 		await seconds(2.0)
 		var sample := rail_sample.duplicate(true)
 		rail_sample.clear()

@@ -56,6 +56,7 @@ $sources=@{
     'arcade_control.gd'='examples/racing/integration/arcade_control.gd';'arcade_control_test.gd'='examples/racing/integration/arcade_control_test.gd'
     'arcade_acceptance.gd'='examples/racing/integration/arcade_acceptance.gd'
     'arcade_tuning.gd'='examples/racing/integration/arcade_tuning.gd';'arcade_tuning_panel.gd'='examples/racing/integration/arcade_tuning_panel.gd'
+    'player-feedback.json'='docs/assets/racing/handling-feedback-20261003.json'
 }
 $hashes=@()
 foreach($relative in $sources.Keys){
@@ -108,18 +109,25 @@ try {
 } finally {
     # Immutable completed runs only; live runs and changed files cannot be pruned.
     # Keep receipts and full test result values in the light retention ledger.
-    $summary=@{mode=$Mode;run=$RunName;sources=$hashes;results=@();failure_excerpts=@()}
+    Write-Output 'RACING_RETENTION summary_start'
+    # Store immutable raw JSON strings rather than PowerShell ETS-wrapped
+    # parse objects. Full phase/results survive retention without recursively
+    # serializing live FileInfo/string wrapper properties at high JSON depth.
+    $summary=@{mode=$Mode;run=$RunName;sources_json=[IO.File]::ReadAllText((Join-Path $run 'sources.json'));results=@();failure_excerpts=@()}
     foreach($file in Get-ChildItem -LiteralPath $run -File -Filter '*.json'){
-        if($file.Name -ne 'sources.json'){$summary.results+=@{file=$file.Name;value=(Get-Content -LiteralPath $file.FullName -Encoding UTF8 -Raw|ConvertFrom-Json)}}
+        if($file.Name -ne 'sources.json'){$summary.results+=@{file=[string]$file.Name;json=[IO.File]::ReadAllText($file.FullName)}}
     }
     if($outcome -ne 'success'){
         foreach($file in Get-ChildItem -LiteralPath $run -File -Filter '*.txt'){
-            $lines=@(Get-Content -LiteralPath $file.FullName -Encoding UTF8 | Where-Object {$_ -match 'SCRIPT ERROR|ERROR:|WARNING:|ARCADE_FAILED|ARCADE_PHASE|ARCADE_ACCEPTANCE_RESULT|at: GDScript'})
+            $lines=@([IO.File]::ReadAllLines($file.FullName) | Where-Object {$_ -match 'SCRIPT ERROR|ERROR:|WARNING:|ARCADE_FAILED|ARCADE_PHASE|ARCADE_ACCEPTANCE_RESULT|at: GDScript'})
             if($lines.Count){$summary.failure_excerpts+=@{file=$file.Name;lines=@($lines|Select-Object -First 80)}}
         }
     }
     $category='racing-arcade-'+$Mode.ToLowerInvariant()
+    Write-Output 'RACING_RETENTION register_start'
     Register-RoomKitArtifact -ProjectRoot $storageRoot -Category $category -Paths @($run) -Outcome $outcome -Summary $summary|Out-Null
+    Write-Output 'RACING_RETENTION prune_start'
     Invoke-RoomKitArtifactRetention -ProjectRoot $storageRoot -Category $category -Keep 2
+    Write-Output 'RACING_RETENTION completed'
 }
 } finally {$lease.Dispose()}
