@@ -101,12 +101,14 @@ README 已改为当前身份 `e1bbf7b65cc9` / 协议 3 和同一 PlayLinuxPackag
 
 第一轮practice-r1已全部通过（360/0、607/0、181/0、103/0、136/0、139/0）。第二轮由新增门面R/末门后失效/结构反例、失焦与按钮接线、独立重算成绩断言驱动，无放宽物理门槛；两轮没有游戏失败。一次证据回读错误地在工作树相对artifacts下查结果，路径不存在，随后按入口既定主检出输出路径正确回读，不计入运行结果。旧nitro-wall-r7缺物理目录的保留警告继续记录，不重建或绕过；原归档未变。保留本用途最后两轮practice-r1/r2，approved-handling-r1的轻量来源/结果原已保全。
 
-**证据与回收**：所有退出码、来源、原始输出、PNG和输入归档在logs/racing-practice-20261003/与artifacts/racing-practice-candidate/；恢复bundle、ZIP逐文件哈希回读后，仅回收本轮两棵干净F树，具体路径/逻辑长度见reclaim.json。保留候选分支，不把归档标签当空间释放；原受保护树不动。六项真实文件哈希/大小/修改时间与朋友ZIP再次核验。当前路线图、STATUS及README统一为“离线练习圈源码通过、下一步独立包”，框架最小接入仍待验证。
+**证据与回收**：所有退出码、来源、原始输出、PNG和输入归档在logs/racing-practice-20261003/与artifacts/racing-practice-candidate/。源码恢复bundle依赖35a6c64，37,333字节，SHA256 `0b980a5247cc8062d5f31dd5c8b15e60893c18751c62d677a546b114f2d61c89`；manifest已回读核对。证据ZIP 1,755,769字节，SHA256 `14b7855f6b6ff5c21b45aab73dd9a039857c722e2812fd14c28a81d2a0f13336`，含256项逐文件哈希回读。仅回收本轮两棵干净F树，原生git移除后路径不存在，登记13→11；具体路径见reclaim.json。回收脚本在两次删除都完成后，用PowerShell5.1的Measure-Object读取hashtable汇总属性失败，容量/文件数未落盘；随后只读核实路径与分支登记，不重建目录或声称可靠删除容量/空闲增量。归档脚本第一次也因git把成功信息写stderr而被PS包装抛错，修正后bundle退出0、补丁在基准apply-check退出0、ZIP回读通过；另一次Select-Object展示空属性不影响已写manifest，原件已再次回读。保留候选分支和原受保护树。六项真实文件哈希/大小/修改时间与朋友ZIP再次核验。当前路线图、STATUS及README统一为“离线练习圈源码通过、下一步独立包”，框架最小接入仍待验证。
 
 **下一步**：用户可先用同一入口跑一圈、试R中途重开；随后干净Windows导出启动→整圈→退出→重开，再安排双人权威竞速。dot的可选HUD任务单放artifacts/dot-racing-practice-hud-candidate/TASK.md，提交后更新精确基准与现有snapshot字段；准备完成但尚未派发，不阻塞本轮。
 
 <a id="racing-approved-handling-20261003"></a>
 ### 八项最终手感固化与下一阶段（2026-10-03）
+
+本节保留该检查点当时结果；后续练习圈已接入，当前下一步见[练习圈验收](#racing-practice-20261003)。
 
 用户试玩后给出八项JSON，并明确“就这个了，非常不错”。本轮以`main / 5b71151`为基准，单方写入主目录，GPT-6.1 Sol只读交叉核对；未创建新会话或工作树。原始精度保存在[最终参数](assets/racing/handling-approved-20261003.json)，[此前五项](assets/racing/handling-feedback-20261003.json)保留历史。重新启动仍采用这组默认值，F2八项继续可调；未另改漂移、碰撞、充能或操作机制。
 
