@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-04",
-  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车60Hz默认采用用户最终认可的八值，转向120、氮气约46.2、额外60、擦墙6.2；冷导入与24解析0、HUD68/0、规则360/0、检测607/0、驾驶181/0与窗口103/0、练习377/0与窗口385/0。单人一圈3秒倒计时、顺序过点、线间计时与R整场重开已接；自动实车33.933秒，dot HUD已适配；F2八项驾驶与两项相机可调，默认56°/44.5m。下一步漂移胎痕与基础音效，再干净Windows独立包，再双人权威竞速/框架；真人整圈、Linux、手机和联机未验。",
+  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车60Hz默认采用用户最终认可的八值，转向120、氮气约46.2、额外60、擦墙6.2；冷导入与24解析0、HUD68/0、规则360/0、检测607/0、驾驶181/0与窗口103/0、练习377/0与窗口385/0。单人一圈3秒倒计时、顺序过点、线间计时与R整场重开已接；自动实车33.933秒，dot HUD已适配；F2八项驾驶与两项相机可调，默认56°/44.5m。下一步轻量四射线视觉悬挂、漂移胎痕与基础音效，再干净Windows独立包，再双人权威竞速/框架；真人整圈、Linux、手机和联机未验。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -335,8 +335,8 @@ window.ROADMAP_DATA = {
       evidence: "本机独立结构检查退出0、9文件哈希与两端ZIP一致；两图已看。仅能力样本范围，存在已记录拓扑缺项，非游戏接入通过" },
     { id: "game-racing", area: "game", phase: 8, status: "pending",
       title: "赛车最小接入",
-      summary: "最新八值、练习HUD/相机可调已接；源码整圈通过，下一步胎痕与基础音效，再独立包。",
-      details: "60Hz平面CharacterBody3D，默认120°/s、0.97/0.989、加速度24、普通30、氮气约46.2/额外60、沿墙6.2，F2八项驾驶和两项相机可调；35–85°/12–50m，默认56°/44.5m；R保留镜头，窄屏调参暂停。显式practice只允许一人，竞赛默认2至8人；3秒冻结后物理门0仅发车，1至11再0完赛。线间fraction计时、失焦暂停、R重新建立规则/检测器并清旧成绩；异常轨迹无成绩。实际车辆仅数字方向/制动连续完成整圈，无位置或速度注入。真人整圈、独立导出、Linux/手机/联机/GameAdapter另验；原山路失败保留。",
+      summary: "最新八值、练习HUD/相机可调已接；源码整圈通过，下一步轻量悬挂、胎痕与基础音效，再独立包。",
+      details: "60Hz平面CharacterBody3D，默认120°/s、0.97/0.989、加速度24、普通30、氮气约46.2/额外60、沿墙6.2，F2八项驾驶和两项相机可调；35–85°/12–50m，默认56°/44.5m；R保留镜头，窄屏调参暂停。显式practice只允许一人，竞赛默认2至8人；3秒冻结后物理门0仅发车，1至11再0完赛。线间fraction计时、失焦暂停、R重新建立规则/检测器并清旧成绩；异常轨迹无成绩。实际车辆仅数字方向/制动连续完成整圈，无位置或速度注入。新增四轮射线视觉悬挂仅已规划：每步最多4次，独立轮位/弹簧/阻尼和地面层8；不影响八项驾驶或固定Y，真实跳坡另设阶段，新增性能未测。真人整圈、独立导出、Linux/手机/联机/GameAdapter另验；原山路失败保留。",
       files: ["examples/racing/ui/practice_hud.gd", "tests/run_racing_hud.gd", "docs/assets/racing/handling-approved-20261003-v2.json", "OpenRacing.cmd", "examples/racing/integration/README.md", "examples/racing/integration/practice_session.gd", "examples/racing/integration/arcade_main.gd", "examples/racing/integration/arcade_vehicle.gd", "examples/racing/race_rules.gd", "examples/racing/checkpoints/checkpoint_detector.gd", "tests/test_racing_practice.gd"],
       docs: ["docs/17_framework_shooter_plan.md#racing-feedback-20261004","docs/17_framework_shooter_plan.md#racing-hud-camera-20261003","docs/17_framework_shooter_plan.md#racing-practice-20261003","docs/17_framework_shooter_plan.md#racing-approved-handling-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
       evidence: "Windows camera-default-r1首次冷导入/24解析全0、HUD68/0、规则360/0、检测607/0、驾驶181/0与窗口103/0、练习377/0与窗口385/0，各退出0/stderr0。0→1…11→0过线33.933s；本轮新默认倒计时/进行中2图已查看，旧hud-r7共8图已看；暂停/按钮为事件信号注入。失败轮次保全；用户手删此前被拒预览后，Git正常回收自己的HUD树12,142,342字节，当前11棵。生成运行保留hud-r7/camera-default-r1两份（hud-r6及旧practice-r2已保全后按规则移除），原真实数据/朋友包保持。框架接入仍pending。" },
