@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "本轮玩家报告改为本机邮件草稿/复制，由玩家确认发送，不经游戏服务器。Windows本地50/0、地址13/0、生成器只解析2/0；真实邮箱、Linux、新包待验。快照v3源码已入主线但现用v2包未换，后续仍需发布门槛和跨平台交付。临时树已收回，登记11。",
+  baseline: "后续新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。先修发布漏检，再验Linux/DTLS及配套新包（含本地邮件反馈），短试玩后接赛车完整一圈。快照v3与邮件源码已入主线，现用v2包未换；真实邮箱、新版Linux与导出待验。临时树已收回，登记11。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -31,15 +31,15 @@ window.ROADMAP_DATA = {
     { id: 5, label: "阶段 5：小规模联机稳定性", hint: "Windows多人通过；Linux 4/8人登录互见通过，MTU警告待修，备份专项待补" },
     { id: 6, label: "阶段 6：新机准备与持续开房", hint: "依赖检查/离线准备、七天授权回收和两份产物策略完成；WSL源码与Mint导出包短验通过" },
     { id: 7, label: "阶段 7：朋友实际试玩", hint: "公网试玩获人工通过反馈；卡顿诊断与优化、GitHub 获取仍待验收" },
-    { id: 8, label: "阶段 8：赛车最小接入", hint: "简单赛道双人竞速，再补车辆解锁与默认车辆，目标最多 8 人" },
+    { id: 8, label: "阶段 8：赛车最小接入", hint: "先一车一图本地完整一圈，再接双人竞速与车辆资产，目标最多 8 人" },
     { id: 9, label: "以后 / 未排期", hint: "已记录边界，未安排阶段" }
   ],
   nodes: [
     { id: "framework-first-release", area: "deliver", phase: 7, status: "pending",
       title: "首版框架收束门槛",
       summary: "稳定试玩能排障、接游戏可复用、干净交付可获取。",
-      details: "已有账号资产、房间、后台、Windows/Linux、射击/取石子与模板。剩余先验最终诊断包、当前Linux严格多人及朋友日志；再接赛车最小闭环，最后固定支持矩阵与获取/更新边界。不以虚构完成百分比或任意平台全通过作承诺。",
-      files: ["STATUS.md"], docs: ["docs/17_framework_shooter_plan.md#framework-closeout-20261002"],
+      details: "已有账号资产、房间、后台、Windows/Linux、射击/取石子与模板。先补内容篡改、提前退出与证书/端口的发布漏检，再验快照v3的Linux/DTLS及配套导出，交付本地邮件反馈并短试玩；之后接赛车完整一圈。每个完成检查点提交推送并收回临时目录。新任务只用GPT-6.1 Sol。不以虚构完成百分比或任意平台全通过作承诺。",
+      files: ["STATUS.md", "AGENTS.md"], docs: ["docs/17_framework_shooter_plan.md#next-checkpoints-20261003", "docs/17_framework_shooter_plan.md#framework-closeout-20261002"],
       evidence: "N2跨机65/0、正式迁移SEALED；D1核心+Edge真实file验收10/10；F1 89/1与149/1：多人流程通过，MTU警告未解决" },
     { id: "shooter-snapshot-budget", area: "game", phase: 7, status: "pending",
       title: "射击快照 MTU 负载修复",
@@ -328,7 +328,7 @@ window.ROADMAP_DATA = {
       evidence: "本机独立结构检查退出0、9文件哈希与两端ZIP一致；两图已看。仅能力样本范围，存在已记录拓扑缺项，非游戏接入通过" },
     { id: "game-racing", area: "game", phase: 8, status: "planned",
       title: "赛车最小接入",
-      summary: "一条简单赛道，先双人比赛，再补车辆资产，目标最多 8 人。",
+      summary: "先一辆车、一条赛道、完整一圈，再接双人比赛与车辆资产。",
       details: "规则a4498a0、研究99e6df4、驾驶591c09c与检查点1ecae47已交。两类车、两条地图、技术美术及素材库均有候选；山路仍有3项碰撞失败。赛车整合会话中断，racing-playable工作树停在523ffa8且无受管修改；离线整圈、联网和框架接入都未完成。驾驶恢复证据是脚本反打，真人手感未验。",
       files: ["tools/new_game.ps1", "templates/managed_game/"],
       docs: ["docs/17_framework_shooter_plan.md#parallel-assets-20261003", "docs/17_framework_shooter_plan.md#forward-route-20261002", "docs/24_managed_game_template.md"],
