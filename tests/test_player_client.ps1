@@ -79,6 +79,7 @@ $sharedBefore=(Tree $sharedPublic)+'|'+$(if(Test-Path $sharedIndex){(Get-FileHas
 $gamesIndex=Join-Path $evidence 'framework-games.json'
 & (Join-Path $project 'tools\build_framework.ps1') -IndexPath $gamesIndex | Out-Null
 . (Join-Path $project 'tools\content_digest.ps1')
+. (Join-Path $project 'tools\prepared_input.ps1')
 $builtIndex=Get-Content -Encoding UTF8 -Raw -LiteralPath $gamesIndex | ConvertFrom-Json
 $secondIndex=Join-Path $evidence 'framework-games-second.json'
 & (Join-Path $project 'tools\build_framework.ps1') -IndexPath $secondIndex | Out-Null
@@ -298,6 +299,7 @@ try {
     $alt=Get-Content -Encoding UTF8 -Raw -LiteralPath $gamesIndex | ConvertFrom-Json
     $alt.shooter.project=$mismatchProject
     $alt.shooter.manifest.build_id=$changedId
+    $alt.shooter.prepared_input_receipt=GetPreparedInputReceipt $mismatchProject
     [IO.File]::WriteAllText($mismatchIndex,($alt|ConvertTo-Json -Depth 30),$utf8)
     $mismatchOut=Join-Path $evidence 'mismatch-out'
     [void](Prepare @('-IndexPath',$mismatchIndex,'-ConnectionDirectory',$publicDir,'-OutputRoot',$mismatchOut))

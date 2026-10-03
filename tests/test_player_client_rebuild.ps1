@@ -11,6 +11,7 @@ if(-not $evidence.StartsWith((Join-Path $repository 'logs')+[IO.Path]::Directory
 $project=Join-Path $evidence 'fixture';[void][IO.Directory]::CreateDirectory($project)
 $utf8=New-Object Text.UTF8Encoding($false)
 . (Join-Path $repository 'tools/artifact_retention.ps1')
+. (Join-Path $repository 'tools/prepared_input.ps1')
 $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repository 'tools/prepare_player_client.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw ($errors|Out-String)}
@@ -150,6 +151,7 @@ Check (-not @((Get-ChildItem $work -Recurse -File) | Where-Object { [IO.File]::R
 Check (-not @(Get-ChildItem $work -Recurse -Directory | Where-Object Name -in @('data','client-data','logs','run','backups')).Count) 'runtime directories excluded at every export-work depth'
 $pair=MakePair 'check-client';AddRuntimeData $pair.target
 Copy-Item -LiteralPath (Join-Path $repository 'tools/shooter_client/CheckClient.ps1') -Destination $pair.target
+Copy-Item -LiteralPath (Join-Path $repository 'tools/shooter_client/public_config.ps1') -Destination $pair.target
 $checkOutput=& (Join-Path $pair.target 'CheckClient.ps1')
 Check ($LASTEXITCODE -eq 0 -and ($checkOutput -join ' ') -match 'CLIENT_DATA_PRESENT') 'player selfcheck reports private runtime data without hashing it'
 $link=Join-Path $pair.target 'client-data/link';New-Item -ItemType $linkType -Path $link -Target $canary | Out-Null

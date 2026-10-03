@@ -18,6 +18,7 @@ $IndexPath=[IO.Path]::GetFullPath($IndexPath)
 if (-not $IndexPath.StartsWith($projectRoot+$sep,$comparison)) { throw 'Framework index must stay within this project.' }
 New-Item -ItemType Directory -Force -Path ([IO.Path]::GetDirectoryName($IndexPath)) | Out-Null
 . (Join-Path $PSScriptRoot 'content_digest.ps1')
+. (Join-Path $PSScriptRoot 'prepared_input.ps1')
 foreach($item in @(@{id='shooter';source='shooter'},@{id='turns';source='turn_based'})) {
     $destination=Join-Path $buildRoot $item.id
     New-Item -ItemType Directory -Force -Path (Join-Path $destination 'game'),(Join-Path $destination 'schemas') | Out-Null
@@ -61,7 +62,7 @@ file_logging/enable_file_logging=false
     $manifestText=$manifest | ConvertTo-Json -Depth 20
     [IO.File]::WriteAllText((Join-Path $destination 'game_manifest.json'),$manifestText,$utf8)
     [IO.File]::WriteAllText((Join-Path $destination 'game\game_manifest.json'),$manifestText,$utf8)
-    $entries[$item.id]=@{project=$destination;manifest=$manifest}
+    $entries[$item.id]=@{project=$destination;manifest=$manifest;prepared_input_receipt=(GetPreparedInputReceipt $destination)}
     foreach($field in $services.($item.id).PSObject.Properties) { $entries[$item.id][$field.Name]=$field.Value }
 }
 [IO.File]::WriteAllText($IndexPath,($entries | ConvertTo-Json -Depth 20),$utf8)

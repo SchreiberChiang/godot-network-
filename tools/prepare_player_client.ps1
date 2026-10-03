@@ -17,6 +17,7 @@
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
 . (Join-Path $PSScriptRoot 'artifact_retention.ps1')
+. (Join-Path $PSScriptRoot 'prepared_input.ps1')
 $utf8=New-Object Text.UTF8Encoding($false)
 $helpers=Join-Path $PSScriptRoot 'shooter_client'
 if($IndexPath -eq '') { $IndexPath=Join-Path $project 'artifacts\framework-games.json' }
@@ -82,25 +83,7 @@ function CopyPlayerProject([string]$Source,[string]$Destination) {
     # Prepared-project resources are an explicit allowlist. A played source
     # project may hold credentials/pending operations in data/; those bytes must
     # never reach export work or Client.pck, even under an innocuous *.json name.
-    $pending=New-Object Collections.Queue
-    foreach($item in Get-ChildItem -LiteralPath $Source -Force) {
-        if(($item.PSIsContainer -and $item.Name -in @('game','sdk','schemas')) -or
-           (-not $item.PSIsContainer -and ($item.Name -in @('project.godot','game_manifest.json') -or $item.Extension -in @('.gd','.uid')))) { $pending.Enqueue($item.FullName) }
-    }
-    while($pending.Count) {
-        $path=[string]$pending.Dequeue();$item=Get-Item -LiteralPath $path -Force -ErrorAction Stop
-        if($item.Name -in @('.godot','data','client-data','logs','run','backup','backups')) { continue }
-        if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or ($item.PSObject.Properties['LinkType'] -and $item.LinkType)) { throw 'CLIENT_LINKED_EXPORT_RESOURCE' }
-        $relative=$item.FullName.Substring($Source.Length+1)
-        $destinationPath=Join-Path $Destination $relative
-        if($item.PSIsContainer) {
-            [void][IO.Directory]::CreateDirectory($destinationPath)
-            foreach($child in Get-ChildItem -LiteralPath $path -Force) { $pending.Enqueue($child.FullName) }
-        } else {
-            [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destinationPath))
-            Copy-Item -LiteralPath $path -Destination $destinationPath
-        }
-    }
+    CopyPreparedInput $Source $Destination
 }
 function AssertCleanClientStage([string]$Directory) {
     AssertPlainClientTree $Directory
@@ -284,10 +267,14 @@ $index=Get-Content -Encoding UTF8 -Raw -LiteralPath $IndexPath | ConvertFrom-Jso
 $source=[string]$index.shooter.project
 $manifest=$index.shooter.manifest
 if(-not $source -or -not (Test-Path -LiteralPath (Join-Path $source 'client.gd') -PathType Leaf)) { throw '缺少已准备的射击工程，请先运行 StartManagement.cmd。' }
-$onDisk=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $source 'game_manifest.json') | ConvertFrom-Json
-foreach($key in @('game_id','build_id','compatibility_id','game_protocol')) {
-    if([string]$onDisk.$key -ne [string]$manifest.$key) { throw ('Prepared project manifest differs from the server index: '+$key) }
+foreach($copy in @('game_manifest.json','game/game_manifest.json')) {
+    $onDisk=Get-Content -Encoding UTF8 -Raw -LiteralPath (Join-Path $source $copy) | ConvertFrom-Json
+    foreach($key in @('game_id','build_id','compatibility_id','game_protocol')) {
+        if([string]$onDisk.$key -cne [string]$manifest.$key) { throw ('Prepared project manifest differs from the server index: '+$key) }
+    }
 }
+$inputReceipt=$index.shooter.prepared_input_receipt
+AssertPreparedInputReceipt $source $inputReceipt
 
 $id=[Guid]::NewGuid().ToString('N')
 $staging=Join-Path $OutputRoot ('.staging-'+$id)
@@ -299,11 +286,20 @@ $retentionOutcome='failure'
 $script:preserveStaging=$false
 try {
     CopyPlayerProject $source $work
-    [IO.File]::WriteAllText((Join-Path $work 'main.gd'),"class_name PlayerClientMain`nextends `"res://client.gd`"`n",$utf8)
-    [IO.File]::WriteAllText((Join-Path $work 'empty.tscn'),"[gd_scene format=3]`n[node name=`"Bootstrap`" type=`"Node`"]`n",$utf8)
+    AssertPreparedInputReceipt $source $inputReceipt
+    AssertPreparedInputReceipt $work $inputReceipt
+    $mainText="class_name PlayerClientMain`nextends `"res://client.gd`"`n"
+    $sceneText="[gd_scene format=3]`n[node name=`"Bootstrap`" type=`"Node`"]`n"
+    [IO.File]::WriteAllText((Join-Path $work 'main.gd'),$mainText,$utf8)
+    [IO.File]::WriteAllText((Join-Path $work 'empty.tscn'),$sceneText,$utf8)
     $settingsFile=Join-Path $work 'project.godot'
-    $text=[IO.File]::ReadAllText($settingsFile) -replace '(?m)^run/main_scene=.*\r?\n','' -replace '(?m)^run/main_loop_type=.*\r?\n',''
-    [IO.File]::WriteAllText($settingsFile,$text.Replace('[application]',"[application]`nrun/main_loop_type=`"PlayerClientMain`"`nrun/main_scene=`"res://empty.tscn`""),$utf8)
+    $settingsBytes=[IO.File]::ReadAllBytes($settingsFile)
+    $settingsHash=@($inputReceipt.files | Where-Object { $_.path -ceq 'project.godot' })[0].sha256
+    if((PreparedInputHash $settingsBytes) -cne $settingsHash){throw 'PREPARED_INPUT_CHANGED'}
+    $text=$utf8.GetString($settingsBytes) -replace '(?m)^run/main_scene=.*\r?\n','' -replace '(?m)^run/main_loop_type=.*\r?\n',''
+    $settingsText=$text.Replace('[application]',"[application]`nrun/main_loop_type=`"PlayerClientMain`"`nrun/main_scene=`"res://empty.tscn`"")
+    [IO.File]::WriteAllText($settingsFile,$settingsText,$utf8)
+    $bootstrapHashes=@{'main.gd'=(PreparedInputHash $utf8.GetBytes($mainText));'empty.tscn'=(PreparedInputHash $utf8.GetBytes($sceneText));'project.godot'=(PreparedInputHash $utf8.GetBytes($settingsText))}
     $preset=@'
 [preset.0]
 name="Windows Desktop"
@@ -319,6 +315,9 @@ script_export_mode=0
 binary_format/architecture="x86_64"
 '@
     [IO.File]::WriteAllText((Join-Path $work 'export_presets.cfg'),$preset,$utf8)
+    $bootstrapHashes['export_presets.cfg']=PreparedInputHash $utf8.GetBytes($preset)
+    $exportReceipt=NewPreparedExportReceipt $work $inputReceipt $bootstrapHashes
+    AssertPreparedInputReceipt $source $inputReceipt
     $pack=Join-Path $stage 'Client.pck'
     $stdout=Join-Path $project ('logs\player-client-export-'+$id+'.log')
     $stderr=Join-Path $project ('logs\player-client-export-'+$id+'-stderr.log')
@@ -328,8 +327,10 @@ binary_format/architecture="x86_64"
     $ownedHandle=$process.Handle
     if(-not $process.WaitForExit(180000)) { $process.Kill(); $process.WaitForExit(); throw 'Client export timed out.' }
     if($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $pack -PathType Leaf) -or (Select-String -LiteralPath $stderr -Pattern 'SCRIPT ERROR|Parse Error|Compile Error|Failed to load script' -Quiet)) { throw ('Client export failed; see '+$stderr) }
+    AssertPreparedInputReceipt $work $exportReceipt -ExportWork -AllowGeneratedUids
+    AssertPreparedInputReceipt $source $inputReceipt
     Copy-Item -LiteralPath $template -Destination (Join-Path $stage 'Client.exe')
-    foreach($name in @('RunGame.ps1','StartGame.cmd','SetServer.ps1','SetServer.cmd','CheckClient.ps1','CheckClient.cmd')) { Copy-Item -LiteralPath (Join-Path $helpers $name) -Destination $stage }
+    foreach($name in @('RunGame.ps1','client_startup.ps1','StartGame.cmd','SetServer.ps1','public_config.ps1','SetServer.cmd','CheckClient.ps1','CheckClient.cmd')) { Copy-Item -LiteralPath (Join-Path $helpers $name) -Destination $stage }
 
     $pckHash=(Get-FileHash -LiteralPath $pack -Algorithm SHA256).Hash.ToLowerInvariant()
     $tag='shooter-client-'+(([string]$manifest.build_id) -replace '[^A-Za-z0-9.-]','-')+'-'+$pckHash.Substring(0,8)

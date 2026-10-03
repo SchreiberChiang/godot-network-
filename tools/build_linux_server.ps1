@@ -8,6 +8,7 @@ $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\','/')
 $id=[DateTime]::UtcNow.ToString('yyyyMMddHHmmss')+'-'+[Guid]::NewGuid().ToString('N').Substring(0,8)
 $utf8=New-Object Text.UTF8Encoding($false)
+. (Join-Path $PSScriptRoot 'prepared_input.ps1')
 function SafeArtifact([string]$Path) {
     $full=[IO.Path]::GetFullPath($Path).TrimEnd('\','/')
     if(-not $full.StartsWith($project+'\artifacts\',[StringComparison]::OrdinalIgnoreCase)){throw 'Linux build output must be inside this project artifacts folder.'}
@@ -17,11 +18,18 @@ function SafeArtifact([string]$Path) {
     return $full
 }
 function WriteUtf8([string]$Path,[string]$Text){[void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path));[IO.File]::WriteAllText($Path,$Text,$utf8)}
-function SetEntry([string]$Folder,[string]$Entry){
-    WriteUtf8 (Join-Path $Folder 'main.gd') ("class_name FrameworkExportMain`nextends `""+$Entry+"`"`n")
-    WriteUtf8 (Join-Path $Folder 'empty.tscn') "[gd_scene format=3]`n[node name=`"Bootstrap`" type=`"Node`"]`n"
-    $settings=[IO.File]::ReadAllText((Join-Path $Folder 'project.godot')) -replace '(?m)^run/main_scene=.*\r?\n','' -replace '(?m)^run/main_loop_type=.*\r?\n',''
-    WriteUtf8 (Join-Path $Folder 'project.godot') ($settings.Replace('[application]',"[application]`nrun/main_loop_type=`"FrameworkExportMain`"`nrun/main_scene=`"res://empty.tscn`""))
+function SetEntry([string]$Folder,[string]$Entry,[string]$SettingsSource='',$PreparedReceipt=$null,[switch]$ReturnHashes){
+    $mainText="class_name FrameworkExportMain`nextends `""+$Entry+"`"`n"
+    $sceneText="[gd_scene format=3]`n[node name=`"Bootstrap`" type=`"Node`"]`n"
+    WriteUtf8 (Join-Path $Folder 'main.gd') $mainText
+    WriteUtf8 (Join-Path $Folder 'empty.tscn') $sceneText
+    if(-not $SettingsSource){$SettingsSource=$Folder}
+    $bytes=[IO.File]::ReadAllBytes((Join-Path $SettingsSource 'project.godot'))
+    if($null -ne $PreparedReceipt){$hash=@($PreparedReceipt.files | Where-Object {$_.path -ceq 'project.godot'})[0].sha256;if((PreparedInputHash $bytes) -cne $hash){throw 'PREPARED_INPUT_CHANGED'}}
+    $settings=$utf8.GetString($bytes) -replace '(?m)^run/main_scene=.*\r?\n','' -replace '(?m)^run/main_loop_type=.*\r?\n',''
+    $text=$settings.Replace('[application]',"[application]`nrun/main_loop_type=`"FrameworkExportMain`"`nrun/main_scene=`"res://empty.tscn`"")
+    WriteUtf8 (Join-Path $Folder 'project.godot') $text
+    if($ReturnHashes){return @{'main.gd'=(PreparedInputHash $utf8.GetBytes($mainText));'empty.tscn'=(PreparedInputHash $utf8.GetBytes($sceneText));'project.godot'=(PreparedInputHash $utf8.GetBytes($text))}}
 }
 $preset=@'
 [preset.0]
@@ -37,8 +45,9 @@ script_export_mode=0
 [preset.0.options]
 binary_format/architecture="x86_64"
 '@
-function ExportPack([string]$Folder,[string]$Pack,[string]$Label){
+function ExportPack([string]$Folder,[string]$Pack,[string]$Label,$PreparedReceipt=$null,$BootstrapHashes=$null){
     WriteUtf8 (Join-Path $Folder 'export_presets.cfg') $preset
+    if($null -ne $PreparedReceipt){$BootstrapHashes['export_presets.cfg']=PreparedInputHash $utf8.GetBytes($preset);$exportReceipt=NewPreparedExportReceipt $Folder $PreparedReceipt $BootstrapHashes}
     $arguments=@('--headless','--path',$Folder,'--export-pack','Linux Server',$Pack)
     $quoted=@($arguments|ForEach-Object {'"'+($_ -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"'})
     $process=Start-Process -FilePath $Godot -ArgumentList $quoted -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $work ($Label+'.out')) -RedirectStandardError (Join-Path $work ($Label+'.err'))
@@ -46,6 +55,7 @@ function ExportPack([string]$Folder,[string]$Pack,[string]$Label){
     try {
         if(-not $process.WaitForExit(180000)){$process.Kill();[void]$process.WaitForExit(5000);throw ('Export timed out: '+$Label)}
         if($process.ExitCode -ne 0 -or -not(Test-Path -LiteralPath $Pack -PathType Leaf) -or (Select-String -LiteralPath (Join-Path $work ($Label+'.err')) -Pattern 'SCRIPT ERROR|Parse Error|Compile Error|Failed to load script' -Quiet)){throw ('Export failed: '+$Label+'; see '+$work)}
+        if($null -ne $PreparedReceipt){AssertPreparedInputReceipt $Folder $exportReceipt -ExportWork -AllowGeneratedUids}
     }finally{$process.Dispose()}
     Write-Output ('LINUX_EXPORT_OK '+$Label)
 }
@@ -79,7 +89,7 @@ foreach($notice in @('LICENSE.txt','COPYRIGHT.txt')){
     if(-not(Test-Path -LiteralPath $noticeSource -PathType Leaf)){throw 'Godot runtime copyright notices are required for distribution.'}
     Copy-Item -LiteralPath $noticeSource -Destination (Join-Path $bundle ('GODOT-'+$notice))
 }
-foreach($inputFile in @('RoomKit.sh','tools/roomkit.ps1','tools/roomkit_entry.ps1','project.godot','LICENSE','PrepareEnvironment.sh','tools/prepare_environment.sh','tools/runtime_paths.sh','tools/build_linux_server.ps1','tools/build_framework.ps1','tools/content_digest.ps1','tools/roomkit_linux.sh','tools/linux_package_check.sh')){
+foreach($inputFile in @('RoomKit.sh','tools/roomkit.ps1','tools/roomkit_entry.ps1','project.godot','LICENSE','PrepareEnvironment.sh','tools/prepare_environment.sh','tools/runtime_paths.sh','tools/build_linux_server.ps1','tools/build_framework.ps1','tools/content_digest.ps1','tools/prepared_input.ps1','tools/roomkit_linux.sh','tools/linux_package_check.sh')){
     [void]$sourceFiles.Add(@{path=$inputFile;sha256=(Get-FileHash -LiteralPath (Join-Path $project $inputFile) -Algorithm SHA256).Hash.ToLowerInvariant()})
 }
 foreach($helper in @('sqlite_store.ps1','account_store.ps1','storage_worker.ps1','operator_maintenance.ps1')){
@@ -95,8 +105,12 @@ foreach($game in @('shooter','turns')){
     $directory=Join-Path $bundle ('games/'+$game);[void][IO.Directory]::CreateDirectory($directory)
     $index[$game]=[ordered]@{project=('games/'+$game);server_pack=('games/'+$game+'/Server.pck');server_executable=('games/'+$game+'/Server.x86_64');manifest=$entry.manifest}
     foreach($field in @('name','asset_catalog','asset_policy','result_schema','reward_script')){if($entry.PSObject.Properties[$field]){$index[$game][$field]=$entry.$field}}
-    SetEntry $entry.project 'res://game/room.gd'
-    ExportPack $entry.project (Join-Path $directory 'Server.pck') ($game+'-room')
+    $exportProject=Join-Path $work ('game-export/'+$game)
+    CopyPreparedInput $entry.project $exportProject
+    AssertPreparedInputReceipt $exportProject $entry.prepared_input_receipt
+    $bootstrapHashes=SetEntry $exportProject 'res://game/room.gd' -SettingsSource $entry.project -PreparedReceipt $entry.prepared_input_receipt -ReturnHashes
+    ExportPack $exportProject (Join-Path $directory 'Server.pck') ($game+'-room') -PreparedReceipt $entry.prepared_input_receipt -BootstrapHashes $bootstrapHashes
+    AssertPreparedInputReceipt $entry.project $entry.prepared_input_receipt
     Copy-Item -LiteralPath $template -Destination (Join-Path $directory 'Server.x86_64')
 }
 WriteUtf8 (Join-Path $bundle 'games.json') ($index|ConvertTo-Json -Depth 30)

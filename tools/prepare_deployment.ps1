@@ -41,7 +41,7 @@ foreach($folder in @('host','sdk','schemas','config','examples')){
         if($file.Extension -in @('.gd','.json','.tscn','.html')){$sourceFiles+=@{path=$file.FullName.Substring($project.Length+1).Replace('\','/');sha256=(Hash $file.FullName)}}
     }
 }
-foreach($relative in @('project.godot','tools/prepare_deployment.ps1','tools/check_deployment.ps1','tools/build_framework.ps1','tools/build_linux_server.ps1','tools/build_framework_release.ps1','tools/prepare_player_client.ps1','tools/content_digest.ps1')){$sourceFiles+=@{path=$relative;sha256=(Hash (Join-Path $project $relative))}}
+foreach($relative in @('project.godot','tools/prepare_deployment.ps1','tools/check_deployment.ps1','tools/build_framework.ps1','tools/build_linux_server.ps1','tools/build_framework_release.ps1','tools/prepare_player_client.ps1','tools/content_digest.ps1','tools/prepared_input.ps1')){$sourceFiles+=@{path=$relative;sha256=(Hash (Join-Path $project $relative))}}
 $server=Join-Path $delivery 'Server'
 [void][IO.Directory]::CreateDirectory($delivery)
 $retentionOutcome='failure'

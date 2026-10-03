@@ -20,6 +20,7 @@ $source=Join-Path $work 'host-project'
 $templates=Join-Path ([IO.Path]::GetDirectoryName($Godot)) 'editor_data\export_templates\4.7.2.stable'
 $template=Join-Path $templates 'windows_release_x86_64.exe'
 $utf8=New-Object Text.UTF8Encoding($false)
+. (Join-Path $PSScriptRoot 'prepared_input.ps1')
 if (-not (Test-Path -LiteralPath $Godot -PathType Leaf)) { throw 'Godot editor executable is missing.' }
 if (-not (Test-Path -LiteralPath $template -PathType Leaf)) { throw 'The tested Godot 4.7.2 Windows release export template is missing.' }
 New-Item -ItemType Directory -Force -Path $work,$source,$bundle,(Join-Path $project 'logs') | Out-Null
@@ -51,16 +52,23 @@ function CopyRuntime([string]$From,[string]$To) {
         Copy-Item -LiteralPath $file.FullName -Destination $destination
     }
 }
-function SetMainLoop([string]$Project,[string]$Entry) {
-    WriteUtf8 (Join-Path $Project 'main.gd') ("class_name FrameworkExportMain`nextends `""+$Entry+"`"`n")
-    WriteUtf8 (Join-Path $Project 'empty.tscn') "[gd_scene format=3]`n[node name=`"Bootstrap`" type=`"Node`"]`n"
+function SetMainLoop([string]$Project,[string]$Entry,[string]$SettingsSource='', $PreparedReceipt=$null,[switch]$ReturnHashes) {
+    $mainText="class_name FrameworkExportMain`nextends `""+$Entry+"`"`n"
+    $sceneText="[gd_scene format=3]`n[node name=`"Bootstrap`" type=`"Node`"]`n"
+    WriteUtf8 (Join-Path $Project 'main.gd') $mainText
+    WriteUtf8 (Join-Path $Project 'empty.tscn') $sceneText
     $file=Join-Path $Project 'project.godot'
-    $text=[IO.File]::ReadAllText($file) -replace '(?m)^run/main_scene=.*\r?\n','' -replace '(?m)^run/main_loop_type=.*\r?\n',''
+    if(-not $SettingsSource){$SettingsSource=$Project}
+    $bytes=[IO.File]::ReadAllBytes((Join-Path $SettingsSource 'project.godot'))
+    if($null -ne $PreparedReceipt){$hash=@($PreparedReceipt.files | Where-Object {$_.path -ceq 'project.godot'})[0].sha256;if((PreparedInputHash $bytes) -cne $hash){throw 'PREPARED_INPUT_CHANGED'}}
+    $text=$utf8.GetString($bytes) -replace '(?m)^run/main_scene=.*\r?\n','' -replace '(?m)^run/main_loop_type=.*\r?\n',''
     $text=$text.Replace('[application]',"[application]`nrun/main_loop_type=`"FrameworkExportMain`"`nrun/main_scene=`"res://empty.tscn`"")
     WriteUtf8 $file $text
+    if($ReturnHashes){return @{'main.gd'=(PreparedInputHash $utf8.GetBytes($mainText));'empty.tscn'=(PreparedInputHash $utf8.GetBytes($sceneText));'project.godot'=(PreparedInputHash $utf8.GetBytes($text))}}
 }
-function ExportPack([string]$ProjectPath,[string]$Pack,[string]$Label) {
+function ExportPack([string]$ProjectPath,[string]$Pack,[string]$Label,$PreparedReceipt=$null,$BootstrapHashes=$null) {
     WriteUtf8 (Join-Path $ProjectPath 'export_presets.cfg') $preset
+    if($null -ne $PreparedReceipt){$BootstrapHashes['export_presets.cfg']=PreparedInputHash $utf8.GetBytes($preset);$exportReceipt=NewPreparedExportReceipt $ProjectPath $PreparedReceipt $BootstrapHashes}
     $arguments=@('--headless','--path',$ProjectPath,'--export-pack','Windows Desktop',$Pack)
     $quoted=foreach($argument in $arguments) { '"'+($argument -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }
     $stdout=Join-Path $project ('logs\framework-export-'+$id+'-'+$Label+'.log')
@@ -69,6 +77,7 @@ function ExportPack([string]$ProjectPath,[string]$Pack,[string]$Label) {
     $ownedHandle=$process.Handle
     if(-not $process.WaitForExit(120000)) { $process.Kill(); $process.WaitForExit(); throw ('Export timed out: '+$Label) }
     if($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $Pack -PathType Leaf) -or (Select-String -LiteralPath $stderr -Pattern 'SCRIPT ERROR|Parse Error|Compile Error|Failed to load script' -Quiet)) { throw ('Export failed: '+$Label+'; see '+$stderr) }
+    if($null -ne $PreparedReceipt){AssertPreparedInputReceipt $ProjectPath $exportReceipt -ExportWork -AllowGeneratedUids}
     Write-Output ('FRAMEWORK_EXPORT_OK '+$Label)
 }
 function WriteCmd([string]$Path,[string]$Command) {
@@ -103,6 +112,7 @@ foreach($game in @('shooter','turns')) {
     $manifestText=$entry.manifest | ConvertTo-Json -Depth 20
     WriteUtf8 (Join-Path $entry.project 'game_manifest.json') $manifestText
     WriteUtf8 (Join-Path $entry.project 'game\game_manifest.json') $manifestText
+    $entry.prepared_input_receipt=GetPreparedInputReceipt $entry.project
     $serverDirectory=Join-Path $bundle ('games\'+$game)
     $clientDirectory=Join-Path $bundle ('clients\'+$game)
     New-Item -ItemType Directory -Force -Path $serverDirectory,$clientDirectory | Out-Null
@@ -111,12 +121,16 @@ foreach($game in @('shooter','turns')) {
         if($entry.PSObject.Properties[$field]) { $index[$game][$field]=$entry.$field }
     }
     if(-not $PrepareOnly) {
-        SetMainLoop $entry.project 'res://game/room.gd'
-        ExportPack $entry.project (Join-Path $serverDirectory 'Server.pck') ($game+'-server')
+        $exportProject=Join-Path $work ('game-export/'+$game)
+        CopyPreparedInput $entry.project $exportProject
+        AssertPreparedInputReceipt $exportProject $entry.prepared_input_receipt
+        $bootstrapHashes=SetMainLoop $exportProject 'res://game/room.gd' -SettingsSource $entry.project -PreparedReceipt $entry.prepared_input_receipt -ReturnHashes
+        ExportPack $exportProject (Join-Path $serverDirectory 'Server.pck') ($game+'-server') -PreparedReceipt $entry.prepared_input_receipt -BootstrapHashes $bootstrapHashes
         Copy-Item -LiteralPath $template -Destination (Join-Path $serverDirectory 'Server.exe')
-        SetMainLoop $entry.project 'res://client.gd'
-        ExportPack $entry.project (Join-Path $clientDirectory 'Client.pck') ($game+'-client')
+        $bootstrapHashes=SetMainLoop $exportProject 'res://client.gd' -SettingsSource $entry.project -PreparedReceipt $entry.prepared_input_receipt -ReturnHashes
+        ExportPack $exportProject (Join-Path $clientDirectory 'Client.pck') ($game+'-client') -PreparedReceipt $entry.prepared_input_receipt -BootstrapHashes $bootstrapHashes
         Copy-Item -LiteralPath $template -Destination (Join-Path $clientDirectory 'Client.exe')
+        AssertPreparedInputReceipt $entry.project $entry.prepared_input_receipt
     }
 }
 # Publish the final release manifests in this build's private source index as
@@ -190,7 +204,7 @@ if($Operation -eq 'client') {
     $clientDirectory=Join-Path $packageRoot ('clients\'+$Game)
     foreach($name in @('RunGame.ps1','Client.exe','Client.pck')){Assert-RoomKitPath (Join-Path $clientDirectory $name)}
     & (Join-Path $clientDirectory 'RunGame.ps1')
-    exit 0
+    exit $LASTEXITCODE
 }
 Assert-RoomKitTree $dataRoot
 Assert-RoomKitTree $publicRoot
@@ -273,11 +287,15 @@ $directory=[IO.Path]::GetFullPath($PSScriptRoot)
 $configuration=Join-Path $directory 'connection.json'
 if(-not (Test-Path -LiteralPath $configuration -PathType Leaf)) { throw 'Missing public connection.json. On the server run StartPanel.cmd then PublishClients.cmd, and copy this entire client directory.' }
 $arguments=@('--','--game=__GAME__',('--connection-config='+$configuration))
-$quoted=foreach($argument in $arguments) { '"'+($argument -replace '(\\*)"','$1$1\"' -replace '(\\+)$','$1$1')+'"' }
-Start-Process -FilePath (Join-Path $directory 'Client.exe') -ArgumentList $quoted -WorkingDirectory $directory | Out-Null
+. (Join-Path $directory 'client_startup.ps1')
+$result=Start-ClientObserved -FilePath (Join-Path $directory 'Client.exe') -Arguments $arguments -Directory $directory
+if($result.status -eq 'observed') { Write-Output ('CLIENT_STARTUP_OBSERVED pid='+$result.pid+' observation_ms='+$result.observation_ms+' receipt='+$result.receipt_path) }
+else { Write-Output ('CLIENT_STARTUP_FAILED status='+$result.status+' native_exit_code='+$result.native_exit_code+' stderr='+$result.stderr+' receipt='+$result.receipt_path) }
+exit $result.launcher_exit_code
 '@
 foreach($game in @('shooter','turns')) {
     $directory=Join-Path $bundle ('clients\'+$game)
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'shooter_client/client_startup.ps1') -Destination (Join-Path $directory 'client_startup.ps1')
     WriteUtf8 (Join-Path $directory 'RunGame.ps1') $playerLauncher.Replace('__GAME__',$game)
     WriteCmd (Join-Path $directory 'StartGame.cmd') 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0RunGame.ps1" %*'
 }

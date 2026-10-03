@@ -10,8 +10,9 @@ $utf8=New-Object Text.UTF8Encoding($false)
 $source=Join-Path $work 'source'; $target=Join-Path $work 'client'
 New-Item -ItemType Directory -Path $source,$target -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $Project 'tools/shooter_client/SetServer.ps1') -Destination $target
-# SetServer checks public PEM framing only; no TLS, game or email is started.
-[IO.File]::WriteAllText((Join-Path $source 'server.crt'),"-----BEGIN CERTIFICATE-----`nfixture`n-----END CERTIFICATE-----`n",$utf8)
+# Shared offline validation uses a fixed PUBLIC test certificate; no TLS/game/mail.
+Copy-Item -LiteralPath (Join-Path $Project 'tools/shooter_client/public_config.ps1') -Destination $target
+Copy-Item -LiteralPath (Join-Path $Project 'tests/support/public-test-certificate.crt') -Destination (Join-Path $source 'server.crt')
 $script:passed=0; $script:failed=0
 function Check([bool]$Ok,[string]$Name) { if($Ok){$script:passed++}else{$script:failed++}; Write-Output ((@('FAIL','PASS')[[int]$Ok])+' '+$Name) }
 function Run([object]$Address,[bool]$WithField=$true,[string]$Override='') {
