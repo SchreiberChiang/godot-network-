@@ -1,0 +1,13 @@
+{
+  "format": 1,
+  "legacy_steering": false,
+  "profile": "custom",
+  "reference_hz": 50,
+  "values": {
+    "acceleration": 24.0,
+    "lateral_keep_release": 0.989,
+    "lateral_keep_turn": 0.97,
+    "top_speed": 30.0,
+    "turn_degrees": 127.0
+  }
+}
