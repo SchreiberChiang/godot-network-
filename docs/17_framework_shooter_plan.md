@@ -99,6 +99,8 @@ README 已改为当前身份 `e1bbf7b65cc9` / 协议 3 和同一 PlayLinuxPackag
 
 **收尾与保护**：街机Play/Verify分用途各保留最近两份，当前Verify为r5/r6，旧阶段1的r2/r3属于另一历史用途。被用户指定删除的旧 `stage1-r1` 已核实不存在，本次没有重试此前审批拒绝；轻量失败摘要/哈希继续保留。六项真实数据/公开文件/试玩指针和朋友ZIP前后回读一致，未开服、SSH或修改现用交付。三棵本轮临时树保全、合入和实际回收的最终回执见本目录completion/recovery/reclaim文件。
 
+**合入与实际回收**：源码 `2985609` 已快进合入 main；候选 bundle 保存三个分支并验证，14份原始/暂存输入回读哈希一致，主线换行规范化后的代码与实际验收输入一致。135项恢复/轻量证据回读通过，保留r5/r6原始回执和图片；已删除的更早生成目录只留账本哈希、结果与失败摘要，不冒称原始stdout仍在。核对三树干净、无忽略输入/链接/进程引用且HEAD都在bundle后，用原生Git逐项移除，确认不存在，登记14→11；移除逻辑长度35,728,424 bytes（约34.07 MiB），不算C盘释放或磁盘实际净增。首次回收准备脚本遇PowerShell哈希表统计属性错误，在任何删除前停止，修正后完成；不是审批拒绝，也没有绕过。结果见 [recovery-manifest.json](../logs/racing-arcade-20261003/recovery-manifest.json)、[completion.json](../logs/racing-arcade-20261003/completion.json) 和 [reclaim-after.json](../logs/racing-arcade-20261003/reclaim-after.json)。最终入口追加失败摘要保留，PowerShell解析通过；没有为这项回执改动重复引擎测试。
+
 **下一步**：用户先试玩自动加速、松转向抓地、撞墙双键脱困和可追加氮气，按手感调参数；随后接正确检查点顺序、单人practice、计圈/计时、复位防刷和干净Windows导出。真实双人权威竞速及通用框架仍后置。
 
 <a id="racing-offline-stage1"></a>
