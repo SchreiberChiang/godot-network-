@@ -56,7 +56,9 @@ $sources=@{
     'arcade_control.gd'='examples/racing/integration/arcade_control.gd';'arcade_control_test.gd'='examples/racing/integration/arcade_control_test.gd'
     'arcade_acceptance.gd'='examples/racing/integration/arcade_acceptance.gd'
     'arcade_tuning.gd'='examples/racing/integration/arcade_tuning.gd';'arcade_tuning_panel.gd'='examples/racing/integration/arcade_tuning_panel.gd'
-    'player-feedback.json'='docs/assets/racing/handling-approved-20261003.json'
+    'player-feedback.json'='docs/assets/racing/handling-approved-20261003-v2.json'
+    'practice_hud.gd'='examples/racing/ui/practice_hud.gd'
+    'tests/run_racing_hud.gd'='tests/run_racing_hud.gd'
     'practice_session.gd'='examples/racing/integration/practice_session.gd'
     'practice_acceptance.gd'='examples/racing/integration/practice_acceptance.gd'
     'examples/racing/race_rules.gd'='examples/racing/race_rules.gd'
@@ -111,6 +113,7 @@ try {
         InvokeEngine ('parse-'+$script.Replace('/','-').Replace('.gd','')) ('--headless --path "'+$project+'" --check-only --script "res://'+$script+'"') 30000
     }
     if($Mode -eq 'Verify'){
+        InvokeEngine 'hud' ('--headless --path "'+$project+'" --script res://tests/run_racing_hud.gd') 30000
         InvokeEngine 'rules' ('--headless --path "'+$project+'" --script res://tests/run_racing_rules.gd') 30000
         InvokeEngine 'checkpoints' ('--headless --fixed-fps 120 --path "'+$project+'" --script res://tests/run_racing_checkpoints.gd') 30000
         InvokeEngine 'physics' ('--headless --fixed-fps 60 --path "'+$project+'" -- --test=physics --evidence-dir="'+$run+'"') 120000

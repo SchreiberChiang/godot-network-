@@ -2,8 +2,8 @@
 // 维护规则：状态与结论引用 STATUS / 专题文档，这里不另写测试数字以外的第三套结论；
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
-  checkedAt: "2026-10-03",
-  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车60Hz默认采用用户最终认可的八值，转向120、氮气约51.6、额外59、擦墙6.2；冷导入与二十二解析0、规则360/0、检测607/0、驾驶181/0与窗口103/0、练习356/0与窗口359/0。单人一圈3秒倒计时、顺序过点、线间计时与R整场重开已接；自动实车33.933秒，F2八项可调。下一步干净Windows独立包，再双人权威竞速/框架；真人整圈、Linux、手机和联机未验。",
+  checkedAt: "2026-10-04",
+  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车60Hz默认采用用户最终认可的八值，转向120、氮气约46.2、额外60、擦墙6.2；冷导入与24解析0、HUD68/0、规则360/0、检测607/0、驾驶181/0与窗口103/0、练习377/0与窗口385/0。单人一圈3秒倒计时、顺序过点、线间计时与R整场重开已接；自动实车33.933秒，dot HUD已适配；F2八项驾驶与两项相机可调，默认65°/22m。下一步干净Windows独立包，再双人权威竞速/框架；真人整圈、Linux、手机和联机未验。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -335,11 +335,11 @@ window.ROADMAP_DATA = {
       evidence: "本机独立结构检查退出0、9文件哈希与两端ZIP一致；两图已看。仅能力样本范围，存在已记录拓扑缺项，非游戏接入通过" },
     { id: "game-racing", area: "game", phase: 8, status: "pending",
       title: "赛车最小接入",
-      summary: "八值手感保持；单人练习源码整圈通过，下一步独立包，再双人接网。",
-      details: "60Hz平面CharacterBody3D，默认120°/s、0.97/0.989、加速度24、普通30、氮气约51.6/额外59、沿墙6.2，F2八项可调。显式practice只允许一人，竞赛默认2至8人；3秒冻结后物理门0仅发车，1至11再0完赛。线间fraction计时、失焦暂停、R重新建立规则/检测器并清旧成绩；异常轨迹无成绩。实际车辆仅数字方向/制动连续完成整圈，无位置或速度注入。真人整圈、独立导出、Linux/手机/联机/GameAdapter另验；原山路失败保留。",
-      files: ["OpenRacing.cmd", "examples/racing/integration/README.md", "examples/racing/integration/practice_session.gd", "examples/racing/integration/arcade_main.gd", "examples/racing/integration/arcade_vehicle.gd", "examples/racing/race_rules.gd", "examples/racing/checkpoints/checkpoint_detector.gd", "tests/test_racing_practice.gd"],
-      docs: ["docs/17_framework_shooter_plan.md#racing-practice-20261003","docs/17_framework_shooter_plan.md#racing-approved-handling-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
-      evidence: "Windows practice-r2首次冷导入/二十二解析全0、规则360/0、检测607/0、原驾驶181/0与窗口103/0、练习356/0与窗口359/0，各退出0/stderr0。0→1…11→0首末过线33.933s，含起跑前观察段2085步449.367m、零复位。截图已查看，失焦/按钮为事件信号注入。两树保全后回收，两份重型记录，真实数据/朋友包保持；框架接入仍pending。" },
+      summary: "最新八值、练习HUD/相机可调已接；源码整圈通过，下一步独立包。",
+      details: "60Hz平面CharacterBody3D，默认120°/s、0.97/0.989、加速度24、普通30、氮气约46.2/额外60、沿墙6.2，F2八项驾驶和两项相机可调；35–85°/12–50m、R保留镜头，窄屏调参暂停。显式practice只允许一人，竞赛默认2至8人；3秒冻结后物理门0仅发车，1至11再0完赛。线间fraction计时、失焦暂停、R重新建立规则/检测器并清旧成绩；异常轨迹无成绩。实际车辆仅数字方向/制动连续完成整圈，无位置或速度注入。真人整圈、独立导出、Linux/手机/联机/GameAdapter另验；原山路失败保留。",
+      files: ["examples/racing/ui/practice_hud.gd", "tests/run_racing_hud.gd", "docs/assets/racing/handling-approved-20261003-v2.json", "OpenRacing.cmd", "examples/racing/integration/README.md", "examples/racing/integration/practice_session.gd", "examples/racing/integration/arcade_main.gd", "examples/racing/integration/arcade_vehicle.gd", "examples/racing/race_rules.gd", "examples/racing/checkpoints/checkpoint_detector.gd", "tests/test_racing_practice.gd"],
+      docs: ["docs/17_framework_shooter_plan.md#racing-hud-camera-20261003","docs/17_framework_shooter_plan.md#racing-practice-20261003","docs/17_framework_shooter_plan.md#racing-approved-handling-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
+      evidence: "Windows hud-r7首次冷导入/24解析全0、HUD68/0、规则360/0、检测607/0、驾驶181/0与窗口103/0、练习377/0与窗口385/0，各退出0/stderr0。0→1…11→0过线33.933s；实际8图已查看，暂停/按钮为事件信号注入。失败轮次保全，自己的独立预览删除被自动审批拒绝、F树保留，当前12棵；hud-r6/r7及引用保护的旧practice-r2，原真实数据/朋友包保持。框架接入仍pending。" },
     { id: "sdk-reuse-from-racing", area: "sdk", phase: 9, status: "planned",
       title: "从真实游戏提炼接入积木",
       summary: "赛车接通以后，减少下一款游戏的重复工作。",

@@ -3,6 +3,10 @@ const Vehicle = preload("res://arcade_vehicle.gd")
 const Harbor = preload("res://track/harbor.gd")
 const TuningPanel = preload("res://arcade_tuning_panel.gd")
 const Practice = preload("res://practice_session.gd")
+const PracticeHUD = preload("res://practice_hud.gd")
+const VIEW_LIMITS := {"view_pitch_degrees": Vector2(35, 85), "view_size_m": Vector2(12, 50)}
+var view_pitch_degrees := 65.0
+var view_size_m := 22.0
 var car
 var track
 var camera: Camera3D
@@ -21,9 +25,9 @@ var touch_stamp := -1000
 var pause_panel: PanelContainer
 var flames: Array[MeshInstance3D] = []
 var tuning_panel
+var tuning_paused := false
 var practice
-var finish_panel: PanelContainer
-var finish_label: Label
+var practice_hud
 
 func practice_enabled() -> bool:
 	return test_mode.is_empty() or test_mode.begins_with("practice")
@@ -106,14 +110,20 @@ func _planar_collision_layers(node: Node) -> void:
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	var panel := PanelContainer.new()
-	panel.position = Vector2(16, 14)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(panel)
-	hud = Label.new()
-	hud.add_theme_font_size_override("font_size", 18)
-	hud.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	panel.add_child(hud)
+	if practice != null:
+		practice_hud = PracticeHUD.new()
+		layer.add_child(practice_hud)
+		practice_hud.reset_requested.connect(reset_car)
+		hud = practice_hud.driving_label
+	else:
+		var panel := PanelContainer.new()
+		panel.position = Vector2(16, 14)
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(panel)
+		hud = Label.new()
+		hud.add_theme_font_size_override("font_size", 18)
+		hud.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		panel.add_child(hud)
 	for kind in ["left", "right", "nitro_left", "nitro_right"]:
 		var button := ColorRect.new()
 		button.color = Color(0.12, 0.22, 0.26, 0.87)
@@ -142,23 +152,9 @@ func _build_ui() -> void:
 	resume.pressed.connect(func(): car.paused = false; held.clear(); pointers.clear(); nitro_edge = false; nitro_requests = 0)
 	pause_panel.add_child(resume)
 	pause_panel.visible = false
-	finish_panel = PanelContainer.new()
-	layer.add_child(finish_panel)
-	var finished_box := VBoxContainer.new()
-	finish_panel.add_child(finished_box)
-	finish_label = Label.new()
-	finish_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	finish_label.add_theme_font_size_override("font_size", 22)
-	finished_box.add_child(finish_label)
-	var restart := Button.new()
-	restart.name = "RestartPractice"
-	restart.text = "重开练习 · R"
-	restart.custom_minimum_size = Vector2(260, 48)
-	restart.pressed.connect(reset_car)
-	finished_box.add_child(restart)
-	finish_panel.visible = false
 	tuning_panel = TuningPanel.new()
 	tuning_panel.vehicle = car
+	tuning_panel.view_controller = self
 	layer.add_child(tuning_panel)
 	_layout_controls()
 
@@ -173,10 +169,10 @@ func _layout_controls() -> void:
 	for i in range(3):
 		fuel_bars[i].position = Vector2(size.x * 0.5 - 94 + i * 65, size.y - 47)
 		fuel_bars[i].size = Vector2(58, 14)
-	hud.custom_minimum_size = Vector2(minf(560, size.x - 32), 0)
+	if practice_hud == null: hud.custom_minimum_size = Vector2(minf(560, size.x - 32), 0)
 	pause_panel.position = (size - Vector2(260, 64)) * 0.5
-	finish_panel.position = (size - Vector2(260, 100)) * 0.5
 	tuning_panel.layout(size)
+	sync_tuning_pause()
 	pointers.clear()
 	nitro_edge = false
 	nitro_requests = 0
@@ -188,10 +184,12 @@ func reset_car() -> void:
 	nitro_requests = 0
 	var p: Vector3 = track.layout.spawns[0].position
 	car.request_reset(Transform3D(Basis.IDENTITY, p))
+	tuning_paused = false
 	car.paused = false
 	if practice != null:
 		practice.restart(track.layout.checkpoints, car.global_position)
 		car.practice_hold = practice.holds_vehicle()
+	sync_tuning_pause()
 	resets += 1
 
 func _practice_step(previous: Vector3, current: Vector3, dt: float) -> void:
@@ -204,6 +202,7 @@ func _practice_step(previous: Vector3, current: Vector3, dt: float) -> void:
 
 func _pointer_kind(position: Vector2) -> String:
 	if tuning_panel.visible and tuning_panel.get_global_rect().has_point(position): return ""
+	if practice_hud != null and practice_hud.is_visible_in_tree() and practice_hud.card.get_global_rect().has_point(position): return ""
 	for kind in controls:
 		if controls[kind].get_global_rect().has_point(position): return kind
 	return ""
@@ -211,6 +210,9 @@ func _pointer_kind(position: Vector2) -> String:
 func _pointer_down(id, position: Vector2) -> void:
 	if tuning_panel.visible and tuning_panel.get_global_rect().has_point(position):
 		pointers[id] = "tuning" # Captured until release, including drags outside UI.
+		return
+	if practice_hud != null and practice_hud.is_visible_in_tree() and practice_hud.card.get_global_rect().has_point(position):
+		pointers[id] = "practice-ui"
 		return
 	var kind := _pointer_kind(position)
 	pointers[id] = kind
@@ -227,7 +229,7 @@ func _input(event: InputEvent) -> void:
 		var key: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
 		held[key] = event.pressed
 		if event.pressed:
-			if key == KEY_F2: tuning_panel.visible = not tuning_panel.visible; tuning_panel.layout(get_viewport().get_visible_rect().size)
+			if key == KEY_F2: toggle_tuning()
 			if key == KEY_R: reset_car()
 			if key == KEY_TAB: overview = not overview
 			if key == KEY_ESCAPE: get_tree().quit()
@@ -237,14 +239,14 @@ func _input(event: InputEvent) -> void:
 		else: pointers.erase(event.index)
 	elif event is InputEventScreenDrag:
 		touch_stamp = Time.get_ticks_msec()
-		if pointers.has(event.index) and pointers[event.index] != "tuning":
+		if pointers.has(event.index) and pointers[event.index] not in ["tuning", "practice-ui"]:
 			pointers[event.index] = _pointer_kind(event.position)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed:
 			pointers.erase("mouse")
 		elif Time.get_ticks_msec() - touch_stamp > 150:
 			_pointer_down("mouse", event.position)
-	elif event is InputEventMouseMotion and pointers.has("mouse") and pointers.mouse != "tuning":
+	elif event is InputEventMouseMotion and pointers.has("mouse") and pointers.mouse not in ["tuning", "practice-ui"]:
 		pointers.mouse = _pointer_kind(event.position)
 	# One logical action for both screen buttons and the keyboard. A release
 	# followed by another press remains another edge, even within one tick.
@@ -262,7 +264,9 @@ func _notification(what: int) -> void:
 		pointers.clear()
 		nitro_edge = false
 		nitro_requests = 0
-		if test_mode.is_empty() and is_instance_valid(car): car.paused = true
+		if test_mode.is_empty() and is_instance_valid(car):
+			tuning_paused = false
+			car.paused = true
 
 func _physics_process(_dt: float) -> void:
 	if test_mode.is_empty() and not car.paused:
@@ -284,28 +288,22 @@ func apply_controls() -> void:
 
 func _process(_dt: float) -> void:
 	var target: Vector3 = car.get_global_transform_interpolated().origin
-	camera.size = 175 if overview else 25
-	camera.position = Vector3(0, 180, 12) if overview else target + Vector3(13, 19, 17)
-	camera.look_at(Vector3.ZERO if overview else target + Vector3(0, 0, -3), Vector3.UP)
+	var focus := Vector3.ZERO if overview else target + Vector3(0, 0, -3)
+	var pitch := deg_to_rad(view_pitch_degrees)
+	var offset := Vector3(13, 0, 20).normalized() * cos(pitch) * 32.0 + Vector3.UP * sin(pitch) * 32.0
+	camera.size = 175 if overview else view_size_m
+	camera.position = Vector3(0, 180, 12) if overview else focus + offset
+	camera.look_at(focus, Vector3.UP)
 	var fuel := float(car.telemetry.get("fuel", 0))
 	var remaining := float(car.telemetry.get("boost_remaining", 0))
 	var mode: String = car.telemetry.get("mode", "forward")
 	hud.text = "港区 · 单人练习\n←/A  →/D 转向；双键制动/倒车；空格 氮气\n%.0f km/h  氮气 %.1f/3  喷射 %.1f 秒  %s\n漂移充能 · R重开  F2调参  TAB全景  ESC退出" % [
 		float(car.telemetry.get("speed", 0)) * 3.6, fuel, remaining,
 		"倒车" if mode == "reverse" else ("制动" if mode == "brake" else ("漂移" if car.telemetry.get("drifting", false) else "前进"))]
-	finish_panel.visible = false
 	if practice != null:
-		var state: Dictionary = practice.snapshot()
-		var clock := _practice_clock(int(state.elapsed_ms))
-		var line := "穿过起跑线开始计时 · 目标 1 圈"
-		if state.phase == "countdown": line = "准备 %d · 目标 1 圈" % ceili(float(state.countdown_remaining_ms) / 1000.0)
-		elif state.phase == "running": line = "圈速 %s · 检查点 %d/%d · 下个 %02d" % [clock, state.passed_checkpoints, state.checkpoint_count, state.next_physical_gate]
-		elif state.phase == "finished":
-			line = "完成 1 圈 · %s" % clock
-			finish_label.text = line
-			finish_panel.visible = true
-		elif state.phase == "invalid": line = "本次练习无效 · 按 R 重开（%s）" % state.error
-		hud.text += "\n" + line
+		practice_hud.set_state(practice.snapshot())
+		practice_hud.visible = not (tuning_panel.visible and get_viewport().get_visible_rect().size.x < 900.0)
+		hud.text = "%.0f km/h · 氮气 %.1f/3 · %s" % [float(car.telemetry.get("speed", 0)) * 3.6, fuel, "倒车" if mode == "reverse" else ("漂移" if car.telemetry.get("drifting", false) else "前进")]
 	for i in range(3):
 		var amount := clampf(fuel - i, 0.0, 1.0)
 		fuel_bars[i].color = Color("46ccd2").lerp(Color("213c49"), 1.0 - amount)
@@ -316,8 +314,35 @@ func _process(_dt: float) -> void:
 	controls.nitro_left.color = nitro_color
 	controls.nitro_right.color = nitro_color
 	for flame in flames: flame.visible = bool(car.telemetry.get("boost_active", false))
-	pause_panel.visible = car.paused
+	pause_panel.visible = car.paused and not tuning_panel.visible
 
 func _practice_clock(ms: int) -> String:
 	var seconds := floori(float(ms) / 1000.0)
 	return "%02d:%02d.%03d" % [floori(float(seconds) / 60.0), seconds % 60, ms % 1000]
+
+func set_view_value(key: String, value: float) -> bool:
+	if not VIEW_LIMITS.has(key) or not is_finite(value): return false
+	var bounds: Vector2 = VIEW_LIMITS[key]
+	if value < bounds.x or value > bounds.y: return false
+	set(key, value)
+	return true
+
+func toggle_tuning() -> void:
+	tuning_panel.visible = not tuning_panel.visible
+	tuning_panel.layout(get_viewport().get_visible_rect().size)
+	held.clear()
+	pointers.clear()
+	nitro_requests = 0
+	nitro_edge = false
+	sync_tuning_pause()
+
+func sync_tuning_pause() -> void:
+	var needs_pause: bool = tuning_panel.visible and get_viewport().get_visible_rect().size.x < 900.0
+	if needs_pause and not car.paused:
+		tuning_paused = true
+		car.paused = true
+	elif not needs_pause and tuning_paused:
+		car.paused = false
+		tuning_paused = false
+	if is_instance_valid(practice_hud): practice_hud.visible = not needs_pause
+	if is_instance_valid(pause_panel): pause_panel.visible = car.paused and not tuning_panel.visible

@@ -304,7 +304,7 @@ func player_run() -> void:
 	var approved_boost_cap: float = tuning.nitro_speed()
 	check("approved boost gives stronger initial straight acceleration", launch_speed >= 41.0 and launch_speed <= approved_boost_cap + 0.05, _telemetry())
 	await seconds(0.3)
-	check("approved boost reaches archived 51.6 m/s cap", absf(approved_boost_cap - 51.6) < 0.00001 and float(lab.car.telemetry.speed) >= approved_boost_cap - 0.1 and float(lab.car.telemetry.speed) <= approved_boost_cap + 0.05, _telemetry())
+	check("approved boost reaches revised 46.2 m/s cap", absf(approved_boost_cap - 46.2) < 0.00001 and float(lab.car.telemetry.speed) >= approved_boost_cap - 0.1 and float(lab.car.telemetry.speed) <= approved_boost_cap + 0.05, _telemetry())
 	var decay: Array[Dictionary] = []
 	var last_speed: float = lab.car.velocity.length()
 	var expired := false

@@ -1,5 +1,8 @@
 extends PanelContainer
 var vehicle
+var view_controller
+var view_sliders: Dictionary = {}
+var view_values: Dictionary = {}
 var sliders: Dictionary = {}
 var values_text: Dictionary = {}
 var syncing := false
@@ -20,6 +23,25 @@ func _ready() -> void:
 	heading.text = "实时调参 · F2 收起"
 	heading.add_theme_font_size_override("font_size", 20)
 	box.add_child(heading)
+	if view_controller != null:
+		for item in [["view_pitch_degrees", "俯视角 °（越大越垂直）", 35, 85, 1], ["view_size_m", "视野 m（越小车越大）", 12, 50, 0.5]]:
+			var view_row := HBoxContainer.new()
+			var caption := Label.new()
+			caption.text = item[1]
+			caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			view_row.add_child(caption)
+			var number := Label.new()
+			view_row.add_child(number)
+			view_values[item[0]] = number
+			box.add_child(view_row)
+			var slider := HSlider.new()
+			slider.min_value = item[2]
+			slider.max_value = item[3]
+			slider.step = item[4]
+			slider.focus_mode = Control.FOCUS_NONE
+			slider.value_changed.connect(_view_changed.bind(item[0]))
+			view_sliders[item[0]] = slider
+			box.add_child(slider)
 	var preset_row := HBoxContainer.new()
 	box.add_child(preset_row)
 	for item in [["玩家调校", "player"], ["参考街机", "reference"], ["原参数", "original"]]:
@@ -53,14 +75,14 @@ func _ready() -> void:
 		sliders[key] = slider
 		box.add_child(slider)
 	var hint := Label.new()
-	hint.text = "保留率越大越滑：0.2 更抓地，0.95 更滑。\n调整不清空氮气；R 复位并清空氮气，保留参数。\n侧滑保留按参考 50 Hz 换算，实际物理 60 Hz。"
+	hint.text = "保留率越大越滑：0.2 更抓地，0.95 更滑。\nR 重开练习并清空氮气，保留参数和相机。\n复制仅包含八项驾驶参数，相机本窗口内保留。\n侧滑保留按参考 50 Hz 换算，实际物理 60 Hz。"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(hint)
 	status = Label.new()
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(status)
 	var copy := Button.new()
-	copy.text = "复制当前参数 · 方便反馈"
+	copy.text = "复制驾驶参数 · 方便反馈"
 	copy.focus_mode = Control.FOCUS_NONE
 	copy.pressed.connect(_copy)
 	box.add_child(copy)
@@ -77,12 +99,22 @@ func _value_changed(value: float, key: String) -> void:
 		values_text[key].text = _format_value(key, value)
 		status.text = "自定义 · 正在生效，本窗口内保留"
 
+func _view_changed(value: float, key: String) -> void:
+	if syncing: return
+	if view_controller.set_view_value(key, value):
+		view_values[key].text = "%.1f" % value
+		status.text = "相机已调整 · 不影响驾驶参数，本窗口内保留"
+
 func _sync() -> void:
 	syncing = true
 	for key in sliders:
 		var value: float = vehicle.tuning.values[key]
 		sliders[key].value = value
 		values_text[key].text = _format_value(key, value)
+	for key in view_sliders:
+		var value: float = view_controller.get(key)
+		view_sliders[key].value = value
+		view_values[key].text = "%.1f" % value
 	syncing = false
 	status.text = "当前：" + str({"original": "原参数", "reference": "参考街机", "player": "玩家调校"}.get(vehicle.tuning.profile, "自定义")) + " · 可实时调整"
 

@@ -90,6 +90,21 @@ func run() -> void:
 	check("practice has twelve actual track gates", lab.track.layout.checkpoints.size() == 12)
 	check("approved values remain in vehicle", lab.car.tuning.values == lab.car.tuning.get_script().new().values)
 	check("real renderer when requested", lab.test_mode != "practice-render" or DisplayServer.get_name() != "headless", DisplayServer.get_name())
+	var driving_values: Dictionary = lab.car.tuning.values.duplicate()
+	check("camera controls are separate from eight driving values", lab.tuning_panel.view_sliders.size() == 2 and lab.tuning_panel.sliders.size() == 8 and lab.view_pitch_degrees == 65.0 and lab.view_size_m == 22.0)
+	check("invalid camera settings rejected", not lab.set_view_value("view_pitch_degrees", NAN) and not lab.set_view_value("view_pitch_degrees", 90) and not lab.set_view_value("view_size_m", 0) and not lab.set_view_value("other", 10))
+	lab.tuning_panel.view_sliders.view_pitch_degrees.value = 82.0
+	lab.tuning_panel.view_sliders.view_size_m.value = 18.0
+	await tick()
+	var actual_pitch := rad_to_deg(asin(clampf(lab.camera.global_basis.z.y, -1, 1)))
+	check("camera sliders affect actual camera without changing driving", absf(actual_pitch - 82.0) < 0.01 and lab.camera.size == 18.0 and lab.car.tuning.values == driving_values, {"actual_pitch": actual_pitch, "orthographic_size": lab.camera.size})
+	_r()
+	check("R preserves chosen camera view", lab.view_pitch_degrees == 82.0 and lab.view_size_m == 18.0)
+	lab.tuning_panel.visible = true
+	await image_file("practice-camera-tuning")
+	lab.tuning_panel.visible = false
+	lab.tuning_panel.view_sliders.view_pitch_degrees.value = 65.0
+	lab.tuning_panel.view_sliders.view_size_m.value = 22.0
 	_r()
 	var spawn: Vector3 = lab.car.global_position
 	check("R begins a new countdown with no results", lab.practice.phase == "countdown" and lab.practice.snapshot().results.is_empty() and lab.practice.events.is_empty())
@@ -141,9 +156,10 @@ func run() -> void:
 		var finish_position: Vector3 = lab.car.global_position
 		for _i in range(8): await tick()
 		check("finish freezes vehicle and timing", lab.car.global_position == finish_position and lab.practice.elapsed_ms == finish_time)
-		check("finish HUD presents actual lap and restart", lab.finish_panel.visible and lab.finish_label.text.contains(lab._practice_clock(finish_time)))
+		check("finish HUD presents actual lap and restart", lab.practice_hud.visible and lab.practice_hud.state.phase == "finished" and lab.practice_hud.clock_label.text.contains(lab._practice_clock(finish_time)))
 		await image_file("practice-finished")
-		(lab.finish_panel.find_child("RestartPractice", true, false) as Button).pressed.emit()
+		await layout_checks()
+		lab.practice_hud.restart_button.pressed.emit()
 		check("finish restart button starts a fresh session", lab.practice.phase == "countdown" and lab.practice.events.is_empty() and lab.practice.elapsed_ms == 0 and lab.practice.snapshot().results.is_empty())
 	_r()
 	check("actual R after lap clears results, sequence and nitro", lab.practice.phase == "countdown" and lab.practice.expected_gate == 0 and lab.practice.event_sequence == 0 and lab.practice.elapsed_ms == 0 and lab.practice.snapshot().results.is_empty() and lab.car.control._fuel == 0.0)
@@ -166,6 +182,78 @@ func run() -> void:
 	_r()
 	check("repeated R cannot preserve any prior crossing", lab.practice.events.is_empty() and lab.practice.event_sequence == 0 and lab.practice.snapshot().results.is_empty())
 	finish()
+
+func layout_checks() -> void:
+	var window := get_tree().root
+	# The headless display starts at 64x64. Use an explicit desktop fixture
+	# so returning from compact mode actually crosses the 900px threshold.
+	var original_size := Vector2i(1280, 800)
+	window.size = original_size
+	await tick()
+	await tick()
+	check("explicit desktop viewport for responsive gate", get_viewport().get_visible_rect().size.x >= 900.0)
+	for size in [Vector2i(844, 390), Vector2i(640, 360)]:
+		window.size = size
+		await tick()
+		await tick()
+		var actual: Vector2 = get_viewport().get_visible_rect().size
+		var card: Rect2 = lab.practice_hud.card.get_global_rect()
+		var clear := true
+		for control in lab.controls.values(): clear = clear and not card.intersects(control.get_global_rect())
+		check("actual compact HUD clears driving buttons " + str(size), clear and card.end.x <= actual.x - 16 and card.end.y <= actual.y - 174, {"card_end": [card.end.x, card.end.y], "viewport": [actual.x, actual.y]})
+		var touch := InputEventScreenTouch.new()
+		touch.index = 8
+		touch.pressed = true
+		touch.position = lab.practice_hud.restart_button.get_global_rect().get_center()
+		lab._input(touch)
+		var drag := InputEventScreenDrag.new()
+		drag.index = 8
+		drag.position = lab.controls.nitro_left.get_global_rect().get_center()
+		lab._input(drag)
+		check("HUD pointer remains captured outside card " + str(size), lab.pointers.get(8) == "practice-ui" and lab.button_state() == Vector2i.ZERO and lab.nitro_requests == 0)
+		touch.pressed = false
+		lab._input(touch)
+		await image_file("practice-" + str(size.x) + "x" + str(size.y))
+		lab.toggle_tuning()
+		await tick()
+		check("compact tuning is paused and mutually exclusive " + str(size), lab.car.paused and not lab.practice_hud.visible and not lab.pause_panel.visible)
+		await image_file("practice-tuning-" + str(size.x))
+		_r()
+		await tick()
+		check("R while compact tuning open remains paused " + str(size), lab.car.paused and lab.practice.phase == "countdown" and lab.practice.snapshot().countdown_remaining_ms == 3000)
+		var paused_position: Vector3 = lab.car.global_position
+		for _i in range(12): await tick()
+		check("compact F2 freezes countdown and car " + str(size), lab.practice.snapshot().countdown_remaining_ms == 3000 and lab.car.global_position == paused_position)
+		lab.toggle_tuning()
+		await tick()
+		check("closing compact tuning resumes its own pause " + str(size), not lab.car.paused and lab.practice_hud.visible)
+	window.size = original_size
+	await tick()
+	lab.toggle_tuning()
+	window.size = Vector2i(844, 390)
+	await tick()
+	check("resize into compact tuning acquires a pause", lab.car.paused and lab.tuning_paused)
+	var paused_countdown: int = lab.practice.snapshot().countdown_remaining_ms
+	var paused_position: Vector3 = lab.car.global_position
+	for _i in range(12): await tick()
+	check("resize pause actually freezes countdown and car", lab.practice.snapshot().countdown_remaining_ms == paused_countdown and lab.car.global_position == paused_position)
+	window.size = original_size
+	await tick()
+	await tick()
+	check("resize wide releases only tuning-owned pause", not lab.car.paused and not lab.tuning_paused, {"paused": lab.car.paused, "tuning_paused": lab.tuning_paused, "viewport": str(get_viewport().get_visible_rect().size), "requested": str(original_size)})
+	window.size = Vector2i(844, 390)
+	await tick()
+	var saved_mode: String = lab.test_mode
+	lab.test_mode = ""
+	lab._notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
+	lab.test_mode = saved_mode
+	window.size = original_size
+	await tick()
+	lab.toggle_tuning()
+	await tick()
+	check("resize and F2 close do not release focus-owned pause", lab.car.paused and not lab.tuning_paused)
+	(lab.pause_panel.find_child("ResumeDriving", true, false) as Button).pressed.emit()
+	await tick()
 
 func finish() -> void:
 	var result := {"passed": passed, "failed": failed, "mode": lab.test_mode, "checks": checks,
