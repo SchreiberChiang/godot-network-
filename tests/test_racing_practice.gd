@@ -14,6 +14,9 @@ func run() -> Dictionary:
 	_fraction_time()
 	_reverse_skips_and_repeats()
 	_restart()
+	_restart_on_start_plane()
+	_invalid_before_finish()
+	_invalid_track_structure()
 	_invalid_trajectory()
 	_snapshot_copies()
 	return {"passed": passed, "failed": failed, "checks": checks.duplicate(true)}
@@ -120,6 +123,100 @@ func _restart() -> void:
 	_check(session.snapshot().results.size() == 1, "restarted session can complete a clean lap")
 	_check(session.restart(_gates(), SPAWN), "restart after finish succeeds")
 	_assert_fresh(session, "restart clears previous result")
+
+
+func _restart_on_start_plane() -> void:
+	var session = _fresh()
+	_ready(session)
+	_step(session, Vector3(11, 1, 20), 0.04)
+	_to_last_gate(session)
+	_check(session.event_sequence == 3, "start-plane restart fixture has old lap sequence")
+	var on_plane := Vector3(10, 1, 20)
+	_check(session.restart(_gates(), on_plane), "restart exactly on start plane succeeds")
+	_check(session.snapshot().next_physical_gate == 0 and session.event_sequence == 0 and session.events.is_empty(), "plane restart discards old expected gate and sequence")
+	_ready(session)
+	_step(session, Vector3(11, 1, 20), 0.04)
+	var ahead: Dictionary = session.snapshot()
+	_check(ahead.phase == "ready" and ahead.elapsed_ms == 0 and ahead.next_physical_gate == 0 and session.events.is_empty(), "leaving unarmed start plane forward cannot manufacture start")
+	_step(session, SPAWN, 0.04)
+	_check(session.snapshot().phase == "ready" and session.events.is_empty(), "retreat behind start plane only arms a new approach")
+	_step(session, Vector3(11, 1, 20), 0.04)
+	_check(session.snapshot().phase == "running" and session.snapshot().next_physical_gate == 1 and session.snapshot().passed_checkpoints == 0, "new forward approach starts clean after retreat")
+	_check(session.event_sequence == 0 and session.events.size() == 1 and session.events[0].kind == "start", "new start has no carried checkpoint sequence")
+	_to_last_gate(session)
+	_finish(session)
+	_check(session.snapshot().results == [{"user_id": "local-practice", "rank": 1, "completed_laps": 1, "finish_time_ms": 480}], "plane restart finishes with only the new lap clock and sequence")
+
+
+func _invalid_before_finish() -> void:
+	for code in ["DISCONTINUITY", "SEGMENT_TOO_LONG"]:
+		var session = _fresh()
+		_ready(session)
+		_step(session, Vector3(11, 1, 20), 0.04)
+		_to_last_gate(session)
+		var before: Dictionary = session.snapshot()
+		_check(before.phase == "running" and before.passed_checkpoints == 3 and before.next_physical_gate == 0 and before.results.is_empty(), code + " fixture needs only the finish plane")
+		if code == "DISCONTINUITY":
+			session.step(Vector3(8.1, 1, 21), Vector3(8, 1, 20), 0.04)
+		else:
+			# This 3.16m chord crosses x=10 at z=20.333, inside gate zero.
+			# Geometric finish eligibility cannot excuse an oversized movement.
+			_step(session, Vector3(11, 1, 20), 0.04)
+		var invalid: Dictionary = session.snapshot()
+		_check(invalid.phase == "invalid" and invalid.error == code and session.holds_vehicle(), code + " after last numbered gate invalidates lap")
+		_check(invalid.passed_checkpoints == 3 and invalid.lap == 0 and invalid.results.is_empty() and session.event_sequence == 3, code + " never awards finish event or result")
+		var physical_previous := Vector3(8, 1, 21)
+		for point in [Vector3(8, 1, 20), Vector3(9, 1, 20), Vector3(11, 1, 20)]:
+			session.step(physical_previous, point, 0.04)
+			physical_previous = point
+		_check(session.snapshot() == invalid and session.rules.results().is_empty(), code + " later valid finish trajectory cannot complete invalid lap")
+		_check(session.restart(_gates(), SPAWN), code + " requires explicit whole-session restart")
+		_assert_fresh(session, code + " pre-finish restart")
+		_ready(session)
+		_step(session, Vector3(11, 1, 20), 0.04)
+		_to_last_gate(session)
+		_finish(session)
+		_check(session.snapshot().phase == "finished" and session.snapshot().results.size() == 1, code + " clean full lap works only after restart")
+
+
+func _invalid_track_structure() -> void:
+	for value in [null, 3, [], "checkpoint"]:
+		var track: Array = _gates()
+		track[2] = value
+		_expect_bad_track(track, "non-dictionary checkpoint " + str(value))
+	for field in ["id", "position", "right", "forward", "height_m", "half_width_m"]:
+		var track: Array = _gates()
+		track[2].erase(field)
+		_expect_bad_track(track, "missing checkpoint field " + field)
+	var wrong_types := [
+		{"field": "id", "value": 2.0}, {"field": "id", "value": "2"}, {"field": "id", "value": true},
+		{"field": "position", "value": Vector2(10, 20)}, {"field": "position", "value": [10, 0, 20]},
+		{"field": "right", "value": null}, {"field": "right", "value": "right"},
+		{"field": "forward", "value": {"x": 1}}, {"field": "forward", "value": Vector2.RIGHT},
+		{"field": "height_m", "value": "2"}, {"field": "height_m", "value": true}, {"field": "height_m", "value": null},
+		{"field": "half_width_m", "value": "0.4"}, {"field": "half_width_m", "value": true}, {"field": "half_width_m", "value": Vector3.ONE},
+	]
+	for item in wrong_types:
+		var track: Array = _gates()
+		track[2][item.field] = item.value
+		_expect_bad_track(track, "wrong field type " + item.field + " = " + str(item.value))
+	# A failed restart must also remove an already completed lap's public result.
+	var finished = _fresh()
+	_ready(finished)
+	_step(finished, Vector3(11, 1, 20), 0.04)
+	_to_last_gate(finished)
+	_finish(finished)
+	_check(finished.snapshot().results.size() == 1, "malformed restart fixture begins with genuine finished result")
+	var missing: Array = _gates()
+	missing[0].erase("position")
+	_check(not finished.restart(missing, SPAWN), "bad restart after finish returns false")
+	_check(finished.snapshot().error == "INVALID_TRACK" and finished.snapshot().results.is_empty() and finished.event_sequence == 0, "failed restart hides old result and clears old sequence")
+
+
+func _expect_bad_track(track: Array, label: String) -> void:
+	var session = Session.new()
+	_check(not session.restart(track, SPAWN), label + " returns false without a successful countdown")
+	_assert_invalid(session, "INVALID_TRACK", label)
 
 
 func _invalid_trajectory() -> void:
