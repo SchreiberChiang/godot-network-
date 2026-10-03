@@ -7,6 +7,7 @@ const Validator = preload("res://sdk/roomkit/shared/schema_validator.gd")
 const View = preload("view.gd")
 const Sound = preload("sound.gd")
 const ClientData = preload("client_data.gd")
+const PlayerReport = preload("res://sdk/roomkit/shared/player_report.gd")
 var client
 var sound
 var local_data
@@ -42,6 +43,9 @@ var last_life := ""
 var client_started := 0
 var close_acknowledged := false
 var account_error := ""
+var report_busy := false
+var report_message := "打开本机邮件草稿后由你确认发送；离线也可复制诊断摘要"
+var report_email := ""
 
 func _initialize() -> void:
 	for argument in OS.get_cmdline_user_args():
@@ -109,6 +113,9 @@ func _run() -> void:
 	if not connection is Dictionary:
 		message = "公共连接配置格式错误"
 		return
+	# Optional external public contact, separate from the SDK/session credentials.
+	if PlayerReport.valid_email(connection.get("report_email")):
+		report_email = str(connection.report_email)
 	var settings := manifest.duplicate(true)
 	for key in ["url", "ca_certificate", "server_hostname"]:
 		if connection.has(key):
@@ -533,10 +540,59 @@ func diagnostic_metrics() -> Dictionary:
 	return metrics
 
 func mark_stall() -> void:
-	if local_data != null and local_data.mark():
+	if local_data == null:
+		message = "诊断采集未启动，无法标记"
+		return
+	var previous_marks: int = local_data.status().get("memory_marks", 0)
+	if local_data.mark():
 		message = "已在本次脱敏报告中标记刚才卡顿"
+	elif int(local_data.status().get("memory_marks", 0)) > previous_marks:
+		message = "已保留内存卡顿标记；当前磁盘日志未写入，可继续游戏"
 	else:
-		message = "当前诊断日志未写入；可继续游戏，检查数据目录权限或容量"
+		message = "未新增标记：请间隔一秒再点，或检查诊断采集是否已关闭"
+
+func submit_diagnostic_report() -> void:
+	if report_busy or local_data == null:
+		return
+	var report: Dictionary = local_data.diagnostic_report()
+	if report.is_empty():
+		report_message = "近期没有可整理的诊断记录，请稍后再试"
+		return
+	if not PlayerReport.valid_email(report_email):
+		report_message = "未配置有效收件地址；可复制诊断摘要，或从本地报告目录手动分享"
+		return
+	var uri := PlayerReport.mailto(report, report_email)
+	if uri.is_empty():
+		report_message = "邮件草稿太长；请复制诊断摘要和收件地址，在邮件应用中粘贴发送"
+		return
+	report_busy = true
+	var result: int = _open_mail_draft(uri)
+	report_busy = false
+	report_message = "已请求打开本机邮件草稿；请检查内容后自行点击发送" if result == OK else "无法打开邮件应用；请复制摘要和收件地址，在邮件应用或网页邮箱中粘贴发送"
+
+func _open_mail_draft(uri: String) -> int:
+	return OS.shell_open(uri)
+
+func _copy_report_text(text: String) -> bool:
+	DisplayServer.clipboard_set(text)
+	return DisplayServer.clipboard_get() == text
+
+func copy_diagnostic_report() -> void:
+	if local_data == null:
+		report_message = "诊断采集未启动"
+		return
+	var report: Dictionary = local_data.diagnostic_report()
+	var text := PlayerReport.summary(report)
+	if text.is_empty():
+		report_message = "近期没有可复制的诊断记录，请稍后再试"
+		return
+	report_message = "诊断摘要已复制；可粘贴到邮件中，检查后自行发送" if _copy_report_text(text) else "无法复制摘要；请打开本地报告目录，手动选择 JSONL 附件"
+
+func copy_report_recipient() -> void:
+	if not PlayerReport.valid_email(report_email):
+		report_message = "未配置有效收件地址，请向服主索取联系方式"
+		return
+	report_message = "收件地址已复制；请自行打开邮件应用发送" if _copy_report_text(report_email) else "无法复制收件地址，请向服主索取联系方式"
 
 func open_report_directory() -> void:
 	if local_data == null or local_data.report_directory() == "":

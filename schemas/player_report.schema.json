@@ -1,0 +1,225 @@
+{
+    "$schema":  "https://json-schema.org/draft/2020-12/schema",
+    "title":  "Sanitized player diagnostic report v1",
+    "description":  "Application additionally enforces 12000 UTF-8 bytes and collector retains at most 120 seconds.",
+    "type":  "object",
+    "additionalProperties":  false,
+    "required":  [
+                     "format",
+                     "report_id",
+                     "platform",
+                     "records"
+                 ],
+    "properties":  {
+                       "format":  {
+                                      "const":  1
+                                  },
+                       "report_id":  {
+                                         "type":  "string",
+                                         "pattern":  "^[0-9a-f]{32}$"
+                                     },
+                       "platform":  {
+                                        "enum":  [
+                                                     "Windows",
+                                                     "Linux",
+                                                     "Other"
+                                                 ]
+                                    },
+                       "records":  {
+                                       "minItems":  1,
+                                       "items":  {
+                                                     "$ref":  "#/$defs/record"
+                                                 },
+                                       "type":  "array",
+                                       "maxItems":  32
+                                   }
+                   },
+    "$defs":  {
+                  "record":  {
+                                 "type":  "object",
+                                 "additionalProperties":  false,
+                                 "required":  [
+                                                  "utc",
+                                                  "monotonic_ms",
+                                                  "session_id",
+                                                  "build",
+                                                  "kind",
+                                                  "phase",
+                                                  "error"
+                                              ],
+                                 "properties":  {
+                                                    "utc":  {
+                                                                "type":  "string",
+                                                                "pattern":  "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                                                            },
+                                                    "monotonic_ms":  {
+                                                                         "maximum":  9007199254740991,
+                                                                         "type":  "integer",
+                                                                         "minimum":  0
+                                                                     },
+                                                    "session_id":  {
+                                                                       "type":  "string",
+                                                                       "pattern":  "^[0-9a-f]{32}$"
+                                                                   },
+                                                    "build":  {
+                                                                  "type":  "string",
+                                                                  "pattern":  "^[A-Za-z0-9._-]{1,96}$"
+                                                              },
+                                                    "kind":  {
+                                                                 "enum":  [
+                                                                              "sample",
+                                                                              "mark"
+                                                                          ]
+                                                             },
+                                                    "phase":  {
+                                                                  "enum":  [
+                                                                               "IDLE",
+                                                                               "CLOSED",
+                                                                               "CONNECTING_LOBBY",
+                                                                               "LOBBY",
+                                                                               "CONNECTING",
+                                                                               "AUTHENTICATING",
+                                                                               "AUTHENTICATING_ACCOUNT",
+                                                                               "LOADING",
+                                                                               "SYNCHRONIZING",
+                                                                               "IN_ROOM",
+                                                                               "OTHER"
+                                                                           ]
+                                                              },
+                                                    "error":  {
+                                                                  "enum":  [
+                                                                               "NONE",
+                                                                               "OTHER",
+                                                                               "AUTH_FAILED",
+                                                                               "AUTH_REQUIRED",
+                                                                               "BUILD_MISMATCH",
+                                                                               "CONTROL_UNAVAILABLE",
+                                                                               "DISCONNECTED",
+                                                                               "INVALID_SNAPSHOT",
+                                                                               "LOAD_FAILED",
+                                                                               "LOAD_TIMEOUT",
+                                                                               "INVALID_RESPONSE",
+                                                                               "UNEXPECTED_REPLY",
+                                                                               "INVALID_OPTIONS",
+                                                                               "RATE_LIMITED",
+                                                                               "ALREADY_IN_ROOM",
+                                                                               "ALREADY_CONNECTED",
+                                                                               "ROOM_NOT_FOUND",
+                                                                               "ROOM_FULL",
+                                                                               "ROOM_NOT_READY",
+                                                                               "ROOM_STOPPED",
+                                                                               "TICKET_EXPIRED",
+                                                                               "VERSION_MISMATCH"
+                                                                           ]
+                                                              },
+                                                    "loss_state":  {
+                                                                       "enum":  [
+                                                                                    "unavailable",
+                                                                                    "collecting",
+                                                                                    "available"
+                                                                                ]
+                                                                   },
+                                                    "fps":  {
+                                                                "maximum":  9007199254740991,
+                                                                "type":  "integer",
+                                                                "minimum":  0
+                                                            },
+                                                    "frame_max_ms":  {
+                                                                         "maximum":  9007199254740991,
+                                                                         "type":  "number",
+                                                                         "minimum":  0
+                                                                     },
+                                                    "rtt_ms":  {
+                                                                   "maximum":  9007199254740991,
+                                                                   "type":  "number",
+                                                                   "minimum":  0
+                                                               },
+                                                    "rtt_variance_ms":  {
+                                                                            "maximum":  9007199254740991,
+                                                                            "type":  "number",
+                                                                            "minimum":  0
+                                                                        },
+                                                    "reliable_loss_percent":  {
+                                                                                  "maximum":  100,
+                                                                                  "type":  "number",
+                                                                                  "minimum":  0
+                                                                              },
+                                                    "rx_bytes_per_sec":  {
+                                                                             "maximum":  9007199254740991,
+                                                                             "type":  "number",
+                                                                             "minimum":  0
+                                                                         },
+                                                    "tx_bytes_per_sec":  {
+                                                                             "maximum":  9007199254740991,
+                                                                             "type":  "number",
+                                                                             "minimum":  0
+                                                                         },
+                                                    "snapshot_interval_ms":  {
+                                                                                 "maximum":  9007199254740991,
+                                                                                 "type":  "number",
+                                                                                 "minimum":  0
+                                                                             },
+                                                    "snapshot_age_ms":  {
+                                                                            "maximum":  9007199254740991,
+                                                                            "type":  "number",
+                                                                            "minimum":  0
+                                                                        },
+                                                    "snapshot_interval_p50_ms":  {
+                                                                                     "maximum":  9007199254740991,
+                                                                                     "type":  "number",
+                                                                                     "minimum":  0
+                                                                                 },
+                                                    "snapshot_interval_p95_ms":  {
+                                                                                     "maximum":  9007199254740991,
+                                                                                     "type":  "number",
+                                                                                     "minimum":  0
+                                                                                 },
+                                                    "snapshot_samples":  {
+                                                                             "maximum":  9007199254740991,
+                                                                             "type":  "integer",
+                                                                             "minimum":  0
+                                                                         },
+                                                    "rtt_p50_ms":  {
+                                                                       "maximum":  9007199254740991,
+                                                                       "type":  "number",
+                                                                       "minimum":  0
+                                                                   },
+                                                    "rtt_p95_ms":  {
+                                                                       "maximum":  9007199254740991,
+                                                                       "type":  "number",
+                                                                       "minimum":  0
+                                                                   },
+                                                    "sample_count":  {
+                                                                         "maximum":  9007199254740991,
+                                                                         "type":  "integer",
+                                                                         "minimum":  0
+                                                                     },
+                                                    "rtt_sample_count":  {
+                                                                             "maximum":  9007199254740991,
+                                                                             "type":  "integer",
+                                                                             "minimum":  0
+                                                                         },
+                                                    "loss_sample_count":  {
+                                                                              "maximum":  9007199254740991,
+                                                                              "type":  "integer",
+                                                                              "minimum":  0
+                                                                          },
+                                                    "transport_sample_count":  {
+                                                                                   "maximum":  9007199254740991,
+                                                                                   "type":  "integer",
+                                                                                   "minimum":  0
+                                                                               },
+                                                    "window_ms":  {
+                                                                      "maximum":  9007199254740991,
+                                                                      "type":  "integer",
+                                                                      "minimum":  0
+                                                                  },
+                                                    "sample_mono_ms":  {
+                                                                           "maximum":  9007199254740991,
+                                                                           "type":  "integer",
+                                                                           "minimum":  0
+                                                                       }
+                                                }
+                             }
+              }
+}

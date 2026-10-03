@@ -45,6 +45,8 @@ var help_text: Label
 var diagnostics_text: Label
 var diagnostics_panel := PopupPanel.new()
 var diagnostics_detail: Label
+var report_submit_button: Button
+var report_result: Label
 var legacy_import_button: Button
 var legacy_confirm := ConfirmationDialog.new()
 var _frame_samples: Array[Dictionary] = []
@@ -358,6 +360,8 @@ func _process(delta: float) -> void:
 		_update_inventory()
 	if diagnostics_panel.visible:
 		diagnostics_detail.text = diagnostics_details(app.diagnostic_metrics()) + "\n\n" + app.local_data_message()
+		report_submit_button.disabled = app.report_busy or app.local_data == null
+		report_result.text = app.report_message
 	queue_redraw()
 
 func _observe_frame(now_usec: int = -1) -> void:
@@ -393,12 +397,12 @@ static func _diagnostic_ms(value: float) -> String:
 	return "—" if value < 0 or not is_finite(value) else "%d ms" % roundi(value)
 
 func _build_diagnostics() -> void:
-	_button(self, "网络详情 / 报告", Vector2(1010, 708), Vector2(202, 30), func(): diagnostics_panel.popup_centered(Vector2i(810, 430)))
-	diagnostics_panel.size = Vector2i(810, 430)
+	_button(self, "网络详情 / 报告", Vector2(1010, 708), Vector2(202, 30), func(): diagnostics_panel.popup_centered(Vector2i(810, 526)))
+	diagnostics_panel.size = Vector2i(810, 526)
 	diagnostics_panel.add_theme_stylebox_override("panel", _box(Color("142536"), Color("365468")))
 	add_child(diagnostics_panel)
 	var contents := Control.new()
-	contents.custom_minimum_size = Vector2(810, 430)
+	contents.custom_minimum_size = Vector2(810, 526)
 	diagnostics_panel.add_child(contents)
 	_label(contents, "客户端网络诊断", Vector2(24, 18), Vector2(590, 38), 24)
 	_button(contents, "关闭", Vector2(684, 18), Vector2(94, 36), func(): diagnostics_panel.hide())
@@ -406,7 +410,14 @@ func _build_diagnostics() -> void:
 	diagnostics_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_button(contents, "标记刚才卡顿", Vector2(24, 348), Vector2(198, 42), func(): app.mark_stall())
 	_button(contents, "打开报告目录", Vector2(242, 348), Vector2(198, 42), func(): app.open_report_directory())
-	_label(contents, "只发送 reports 中的脱敏 JSONL，不发送整个 client-data", Vector2(24, 395), Vector2(758, 26), 13, Color("ffcf91"))
+	report_submit_button = _button(contents, "准备反馈邮件", Vector2(462, 348), Vector2(198, 42), func(): app.submit_diagnostic_report())
+	report_submit_button.disabled = true
+	report_submit_button.tooltip_text = "打开本机邮件草稿，需你确认发送；仅含最近两分钟的脱敏诊断"
+	_button(contents, "复制诊断摘要", Vector2(24, 400), Vector2(198, 38), func(): app.copy_diagnostic_report())
+	_button(contents, "复制收件地址", Vector2(242, 400), Vector2(198, 38), func(): app.copy_report_recipient())
+	_label(contents, "本机邮件草稿由你确认发送；离线可用；详细 JSONL 可手动附加", Vector2(24, 444), Vector2(758, 26), 13, Color("ffcf91"))
+	report_result = _label(contents, "", Vector2(24, 477), Vector2(758, 42), 13, Color("bad1df"))
+	report_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	legacy_import_button = _button(inventory_panel, "核对旧操作来源", Vector2(30, 538), Vector2(220, 42), _confirm_legacy_import)
 	legacy_import_button.hide()
 	legacy_confirm.title = "确认旧操作属于当前服务器"

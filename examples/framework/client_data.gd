@@ -8,20 +8,14 @@ const QUEUE_LIMIT := 128
 const QUEUE_BYTES := 128 * 1024
 const WRITE_INTERVAL_MS := 1000
 const StrictJSON = preload("res://sdk/roomkit/shared/strict_json.gd")
-const NUMERIC_FIELDS := [
-	"fps", "frame_max_ms", "rtt_ms", "rtt_variance_ms", "reliable_loss_percent",
-	"rx_bytes_per_sec", "tx_bytes_per_sec", "snapshot_interval_ms", "snapshot_age_ms",
-	"snapshot_interval_p50_ms", "snapshot_interval_p95_ms", "snapshot_samples",
-	"rtt_p50_ms", "rtt_p95_ms", "sample_count", "rtt_sample_count",
-	"loss_sample_count", "transport_sample_count", "window_ms", "sample_mono_ms",
-]
-const PHASES := ["IDLE", "CLOSED", "CONNECTING_LOBBY", "LOBBY", "CONNECTING", "AUTHENTICATING", "AUTHENTICATING_ACCOUNT", "LOADING", "SYNCHRONIZING", "IN_ROOM", "OTHER"]
-const ERRORS := ["NONE", "OTHER", "AUTH_FAILED", "AUTH_REQUIRED", "BUILD_MISMATCH", "CONTROL_UNAVAILABLE", "DISCONNECTED", "INVALID_SNAPSHOT", "LOAD_FAILED", "LOAD_TIMEOUT", "INVALID_RESPONSE", "UNEXPECTED_REPLY", "INVALID_OPTIONS", "RATE_LIMITED", "ALREADY_IN_ROOM", "ALREADY_CONNECTED", "ROOM_NOT_FOUND", "ROOM_FULL", "ROOM_NOT_READY", "ROOM_STOPPED", "TICKET_EXPIRED", "VERSION_MISMATCH"]
+const PlayerReport = preload("res://sdk/roomkit/shared/player_report.gd")
 
 var _root := ""
 var _reports := ""
 var _legacy := ""
-var _session := ""
+var _session := Crypto.new().generate_random_bytes(16).hex_encode()
+var _recent: Array[Dictionary] = []
+var _memory_marks := 0
 var _build := "unknown"
 var _active := ""
 var _mutex := Mutex.new()
@@ -73,6 +67,7 @@ func configure(data_root: String, build: String, legacy_source: String = "") -> 
 	if _configured:
 		return false
 	_configured = true
+	_build = build if _token(build, 96) else "unknown"
 	_root = _source_path(data_root) if OS.has_feature("editor") else data_root.simplify_path()
 	if _root.is_empty() or (not OS.has_feature("editor") and _root != default_root()) or not _plain_path(_root):
 		_fail("UNSAFE_PATH")
@@ -185,7 +180,7 @@ func report_directory() -> String:
 
 func status() -> Dictionary:
 	_mutex.lock()
-	var result := {"enabled": _enabled, "error": _error, "queued": _queue.size(), "dropped": _dropped, "session_id": _session, "settings_error": _settings_error}
+	var result := {"enabled": _enabled, "error": _error, "queued": _queue.size(), "dropped": _dropped, "session_id": _session, "settings_error": _settings_error, "memory_marks": _memory_marks}
 	_mutex.unlock()
 	return result
 
@@ -207,17 +202,33 @@ func mark() -> bool:
 
 func _record(metrics: Dictionary, kind: String) -> Dictionary:
 	var record := {"utc": Time.get_datetime_string_from_system(true, false) + "Z", "monotonic_ms": Time.get_ticks_msec(), "session_id": _session, "build": _build, "kind": kind}
-	for key in NUMERIC_FIELDS:
-		var value: Variant = metrics.get(key)
-		if (value is int or value is float) and is_finite(float(value)) and float(value) >= 0.0:
-			record[key] = value
-	var phase: Variant = metrics.get("phase", "IDLE")
-	var error: Variant = metrics.get("error", "NONE")
-	record.phase = phase if phase is String and phase in PHASES else "IDLE"
-	record.error = error if error is String and error in ERRORS else "OTHER"
+	var input := metrics.duplicate()
+	input.phase = metrics.get("phase", "IDLE")
+	input.error = metrics.get("error", "NONE")
+	record.merge(PlayerReport.clean_record(input))
 	return record
 
+## Submission never opens a report file: this bounded sanitized ring survives
+## journal write failure. Its lifetime is this client process only.
+func diagnostic_report(report_id: String = "", now_ms: int = -1) -> Dictionary:
+	if now_ms < 0:
+		now_ms = Time.get_ticks_msec()
+	_trim_recent(now_ms)
+	var report := {"format": 1, "report_id": Crypto.new().generate_random_bytes(16).hex_encode() if report_id == "" else report_id, "platform": PlayerReport.platform(), "records": _recent.duplicate(true)}
+	while not report.records.is_empty() and JSON.stringify(report).to_utf8_buffer().size() > PlayerReport.MAX_BYTES:
+		report.records.pop_front()
+	return report if PlayerReport.validate(report) else {}
+
+func _trim_recent(now_ms: int) -> void:
+	while not _recent.is_empty() and (int(_recent[0].monotonic_ms) < now_ms - PlayerReport.WINDOW_MS or _recent.size() > PlayerReport.MAX_RECORDS):
+		_recent.pop_front()
+
 func _enqueue(record: Dictionary) -> bool:
+	if not _closing:
+		_recent.append(record.duplicate(true))
+		_trim_recent(Time.get_ticks_msec())
+		if record.kind == "mark":
+			_memory_marks += 1
 	var line := JSON.stringify(record) + "\n"
 	var bytes := line.to_utf8_buffer().size()
 	_mutex.lock()
