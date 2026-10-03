@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车车图后改选街机控制：60Hz双方向/共享氮气、物理136/0和窗口68/0通过，但用户试玩基本感觉不到漂移，手感未通过；三版本对照完成，先改善甩尾再接练习圈计时和独立导出。",
+  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车60Hz双方向/共享氮气已交F2实时调参：更快转向与松键侧滑保持，物理158/0、窗口89/0；原交付手感未通过，新起点待用户试玩，之后接练习圈计时和独立导出。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -335,11 +335,11 @@ window.ROADMAP_DATA = {
       evidence: "本机独立结构检查退出0、9文件哈希与两端ZIP一致；两图已看。仅能力样本范围，存在已记录拓扑缺项，非游戏接入通过" },
     { id: "game-racing", area: "game", phase: 8, status: "pending",
       title: "赛车最小接入",
-      summary: "街车V2与港区操作/碰撞通过，用户漂移手感未通过；先改善甩尾，练习圈计时、导出与接网后置。",
-      details: "当前采用60Hz平面CharacterBody3D，自动加速、两方向转向/同时制动再直线倒车、真实侧滑充能、三槽共享氮气点按追加时间而不叠推力。已激活氮气不能取消，制动仍有效，喷射结束才倒车；实际倒退拒绝新氮气。车轮与倾斜为视觉，无悬挂射线；相机不跟车头转。V2车与港区平面变体已验12组有限护栏/细柱/脱困/本地推挤与窗口。旧600Hz力式结果保留为历史。OpenRacing只离线驾驶；用户反馈基本感觉不到漂移，先改善转向与松键甩尾，再接1ecae47顺序检查点、practice、计时/防刷与独立导出；Linux/真实手机/联机及GameAdapter未验。",
-      files: ["OpenRacing.cmd", "examples/racing/integration/README.md", "examples/racing/integration/arcade_vehicle.gd", "examples/racing/integration/arcade_control.gd", "prototypes/racing_level/harbor.gd", "prototypes/racing_visual/v2/models/street_car_v2.glb"],
-      docs: ["docs/17_framework_shooter_plan.md#racing-arcade-20261003","docs/17_framework_shooter_plan.md#racing-drift-reference-20261003","docs/17_framework_shooter_plan.md#racing-three-controller-comparison-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
-      evidence: "Windows新工程冷导入/十一解析退出0、物理136/0、窗口68/0，stderr0；两图已看。RTX3080三秒约120.0FPS、最慢8.68ms，只算单车短样本。r1解析/r3记录/r4窗口超时等失败保留轻量证据；街机Verify只留r5/r6，用户删除旧stage1-r1已核对。新SkidStorm重构参考已按哈希归档/只读对照，漂移迟滞和抓地渐变尚未实施，氮气省略，原游戏运行未验；新TopDown也已对照：侧向阻尼相近、转向请求更快。用户漂移手感未通过，现版代码本轮不变。整圈/导出/Linux/真实手机/框架接入未验" },
+      summary: "F2实时调参版已交，更快转向与松键侧滑保持；新起点手感待试玩，练习圈/导出/接网后置。",
+      details: "60Hz平面CharacterBody3D、自动加速、双方向制动后直线倒车、真实侧滑充能与三槽共享氮气规则保留。F2开放转向速度、转向/松键侧滑保留率、加速度和极速；显示实际前/侧向速度、侧滑角和碰撞转向限制，预设可切回原交付。新起点175°/s、0.95/0.95、加速度30、极速20；0.2更抓地，保留率越大越滑，以50Hz调参基准换算实际60Hz，参考Unity时间步未核实。参数仅当前窗口保留，可复制反馈。原交付用户基本感觉不到漂移，新起点仍待试玩；车轮/倾斜仅视觉，无悬挂射线，碰撞保护保留。离线驾驶不计圈，手感确定后接1ecae47顺序检查点、practice、计时/防刷和独立导出；Linux/真实手机/联机及GameAdapter未验。",
+      files: ["OpenRacing.cmd", "examples/racing/integration/README.md", "examples/racing/integration/arcade_vehicle.gd", "examples/racing/integration/arcade_control.gd", "examples/racing/integration/arcade_tuning.gd", "examples/racing/integration/arcade_tuning_panel.gd", "prototypes/racing_level/harbor.gd", "prototypes/racing_visual/v2/models/street_car_v2.glb"],
+      docs: ["docs/17_framework_shooter_plan.md#racing-live-tuning-20261003","docs/17_framework_shooter_plan.md#racing-arcade-20261003","docs/17_framework_shooter_plan.md#racing-drift-reference-20261003","docs/17_framework_shooter_plan.md#racing-three-controller-comparison-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
+      evidence: "Windows tuning-r3冷导入/十三解析退出0、物理158/0、窗口89/0，stderr0；调参画面已看。新参考实际侧滑/充能、氮气制动/限速倒车及贴墙拒绝穿透/脱困通过；再恢复原参数跑原12组碰撞回归。鼠标/触点注入和滑条信号非真人手机。tuning-r1解析1与包装异常资源占用/退出-1保留，tuning-r2通过为中间记录；Verify生成目录保留tuning-r1/r3，旧r5/r6/r2轻量证据保全。原手感未通过，新手感待验；剪贴板/整圈/导出/Linux/真实手机/框架接入未验；不声称复现SkidStorm或实施迟滞" },
     { id: "sdk-reuse-from-racing", area: "sdk", phase: 9, status: "planned",
       title: "从真实游戏提炼接入积木",
       summary: "赛车接通以后，减少下一款游戏的重复工作。",
