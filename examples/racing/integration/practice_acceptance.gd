@@ -268,4 +268,4 @@ func finish() -> void:
 		file.close()
 		if write_error != OK: check("result written", false, write_error)
 	print("PRACTICE_ACCEPTANCE_RESULT passed=", passed, " failed=", failed)
-	get_tree().quit(0 if failed == 0 else 1)
+	lab.quit_safely(0 if failed == 0 else 1)

@@ -18,7 +18,7 @@
 | 真实 Windows EXE → Linux 成品 | **跨机总门槛 69/0，退出 0** | **业务用源码 SDK 夹具**；**双 EXE** 验同房、约四秒持续快照、本地报告和正常入退房。未 FullRound，未八人成品 |
 | 开发试玩实例更新 | **PREPARED→VERIFIED→SEALED**，Start / 入口 Start 退出 0 | 保留旧账号/资产/配置/证书和旧包；不算正式游戏服务器部署 |
 | 用户简单试玩 | **人工反馈无问题** | 不补造逐项手感、朋友高延迟或 QQ 收信验收 |
-| 赛车 Windows 单人练习圈 | **规则360/0、检测607/0；驾驶181/0、窗口103/0；自动实车整圈及实际练习窗口通过** | 60Hz，最新八值及相机/HUD已验。圈中仅两方向/制动输入，无车辆位置/速度改写；首末过线计时33.933s。整圈真人手感、独立导出、Linux、真实手机/切窗/鼠标命中和联机另验；最终断言数量见本轮专题 |
+| 赛车 Windows 单人练习圈 | **规则360/0、检测607/0；驾驶181/0、窗口103/0；自动实车整圈及实际练习窗口通过** | 60Hz，最新八值、相机/HUD及四射线悬挂/胎痕/音效资源接线已验，反馈469/0与窗口471/0。圈中仅两方向/制动输入，无车辆位置/速度改写；首末过线计时33.933s。整圈真人手感、独立导出、Linux、真实手机/切窗/鼠标命中和联机另验；最终断言数量见本轮专题 |
 | 本轮回读复核 | **final 配套 47 文件；Linux 入口 Check 退出 0** | 仅包与指针/SEALED/连接材料检查，没有开服或再跑联机 |
 
 旧 MTU **89/1、149/1**、N2 **65/0**、移动交付 **54/0** 及其它中间失败均保留为历史。真实结果、命令和限制见 [v3 交付](docs/17_framework_shooter_plan.md#snapshot-v3-delivery-20261003) 与 [本轮交叉复核](docs/17_framework_shooter_plan.md#progress-review-20261003)。
@@ -27,7 +27,7 @@
 
 | 入口或产物 | 当前用途 |
 |---|---|
-| [OpenRacing.cmd](OpenRacing.cmd) | 港区单人一圈练习；3秒倒计时、顺序过点和圈速；F2八项驾驶与两项相机、A/D、双方向制动/倒车、空格氮气、R整场重开、TAB；引擎4.7.2；见[使用与边界](examples/racing/integration/README.md) |
+| [OpenRacing.cmd](OpenRacing.cmd) | 港区单人一圈练习；3秒倒计时、顺序过点和圈速；F2八项驾驶/两项相机/四项悬挂，M静音，A/D、双方向制动/倒车、空格氮气、R整场重开、TAB；引擎4.7.2；见[使用与边界](examples/racing/integration/README.md) |
 | [PlayLinuxPackage.cmd](PlayLinuxPackage.cmd) / StopLinuxPackage.cmd | 当前 Linux 试玩包远程入口，后台 SSH 回环 28691；原账号保留，正式部署目标另排 |
 | `artifacts/friend-clients/snapshot-v3-20261003/RoomKit-player-snapshot-v3.zip` | 当前朋友干净包，14 文件、38,168,885 bytes；不含 client-data。报告由玩家本机准备邮件/自行确认发送，不经游戏服务器 |
 | RoomKit.cmd / RoomKit.sh | 同一套 start/status/stop/check 动作，按本机系统与源码/导出包分派；不带动作只显示帮助 |

@@ -4,10 +4,13 @@ var view_controller
 var view_sliders: Dictionary = {}
 var view_values: Dictionary = {}
 var sliders: Dictionary = {}
+var suspension_sliders: Dictionary = {}
+var suspension_values: Dictionary = {}
 var values_text: Dictionary = {}
 var syncing := false
 var status: Label
 var telemetry: Label
+var sound: CheckButton
 
 func _ready() -> void:
 	var margin := MarginContainer.new()
@@ -42,6 +45,31 @@ func _ready() -> void:
 			slider.value_changed.connect(_view_changed.bind(item[0]))
 			view_sliders[item[0]] = slider
 			box.add_child(slider)
+	for item in [["suspension_travel", "悬挂行程 m", 0.01], ["suspension_hz", "回弹响应 Hz", 0.1], ["suspension_damping", "悬挂阻尼比", 0.05], ["suspension_tilt_degrees", "车身倾斜上限 °", 0.5]]:
+		var row := HBoxContainer.new()
+		var label := Label.new()
+		label.text = item[1]
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var number := Label.new()
+		row.add_child(number)
+		suspension_values[item[0]] = number
+		box.add_child(row)
+		var slider := HSlider.new()
+		var bounds: Vector2 = vehicle.suspension.LIMITS[item[0]]
+		slider.min_value = bounds.x
+		slider.max_value = bounds.y
+		slider.step = item[2]
+		slider.focus_mode = Control.FOCUS_NONE
+		slider.value_changed.connect(_suspension_changed.bind(item[0]))
+		suspension_sliders[item[0]] = slider
+		box.add_child(slider)
+	sound = CheckButton.new()
+	sound.name = "SoundEnabled"
+	sound.text = "开启音效（M 静音/恢复）"
+	sound.button_pressed = true
+	sound.toggled.connect(func(on: bool): view_controller.audio_feedback.set_muted(not on))
+	box.add_child(sound)
 	var preset_row := HBoxContainer.new()
 	box.add_child(preset_row)
 	for item in [["玩家调校", "player"], ["参考街机", "reference"], ["原参数", "original"]]:
@@ -105,6 +133,12 @@ func _view_changed(value: float, key: String) -> void:
 		view_values[key].text = "%.1f" % value
 		status.text = "相机已调整 · 不影响驾驶参数，本窗口内保留"
 
+func _suspension_changed(value: float, key: String) -> void:
+	if syncing: return
+	if vehicle.suspension.set_value(key, value):
+		suspension_values[key].text = "%.2f" % value
+		status.text = "悬挂表现已调整 · 不影响驾驶参数"
+
 func _sync() -> void:
 	syncing = true
 	for key in sliders:
@@ -115,6 +149,10 @@ func _sync() -> void:
 		var value: float = view_controller.get(key)
 		view_sliders[key].value = value
 		view_values[key].text = "%.1f" % value
+	for key in suspension_sliders:
+		var value: float = vehicle.suspension.values[key]
+		suspension_sliders[key].value = value
+		suspension_values[key].text = "%.2f" % value
 	syncing = false
 	status.text = "当前：" + str({"original": "原参数", "reference": "参考街机", "player": "玩家调校"}.get(vehicle.tuning.profile, "自定义")) + " · 可实时调整"
 
@@ -131,6 +169,7 @@ func layout(view_size: Vector2) -> void:
 	position = Vector2(view_size.x - size.x - 16, 18)
 
 func _process(_dt: float) -> void:
+	sound.set_pressed_no_signal(not view_controller.audio_feedback.muted)
 	var data: Dictionary = vehicle.telemetry
 	telemetry.text = "实际速度 %.1f m/s · 氮气极速 %.1f\n前向 %.1f · 侧向 %.1f m/s\n侧滑角 %.1f° · 转向受阻 %s" % [
 		float(data.get("speed", 0)), vehicle.tuning.nitro_speed(), float(data.get("forward_speed", 0)), float(data.get("lateral_speed", 0)),

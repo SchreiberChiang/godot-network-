@@ -56,6 +56,11 @@ $sources=@{
     'arcade_control.gd'='examples/racing/integration/arcade_control.gd';'arcade_control_test.gd'='examples/racing/integration/arcade_control_test.gd'
     'arcade_acceptance.gd'='examples/racing/integration/arcade_acceptance.gd'
     'arcade_tuning.gd'='examples/racing/integration/arcade_tuning.gd';'arcade_tuning_panel.gd'='examples/racing/integration/arcade_tuning_panel.gd'
+    'arcade_suspension.gd'='examples/racing/integration/arcade_suspension.gd';'arcade_skid_marks.gd'='examples/racing/integration/arcade_skid_marks.gd'
+    'arcade_audio.gd'='examples/racing/integration/arcade_audio.gd';'feedback_acceptance.gd'='examples/racing/integration/feedback_acceptance.gd'
+    'audio/engine_idle_loop.wav'='examples/racing/audio/engine_idle_loop.wav';'audio/engine_drive_loop.wav'='examples/racing/audio/engine_drive_loop.wav'
+    'audio/tire_skid_loop.wav'='examples/racing/audio/tire_skid_loop.wav';'audio/nitro_loop.wav'='examples/racing/audio/nitro_loop.wav'
+    'audio/impact_soft.wav'='examples/racing/audio/impact_soft.wav';'audio/countdown_beep.wav'='examples/racing/audio/countdown_beep.wav'
     'player-feedback.json'='docs/assets/racing/handling-approved-20261003-v2.json'
     'practice_hud.gd'='examples/racing/ui/practice_hud.gd'
     'tests/run_racing_hud.gd'='tests/run_racing_hud.gd'
@@ -116,6 +121,8 @@ try {
         InvokeEngine 'hud' ('--headless --path "'+$project+'" --script res://tests/run_racing_hud.gd') 30000
         InvokeEngine 'rules' ('--headless --path "'+$project+'" --script res://tests/run_racing_rules.gd') 30000
         InvokeEngine 'checkpoints' ('--headless --fixed-fps 120 --path "'+$project+'" --script res://tests/run_racing_checkpoints.gd') 30000
+        InvokeEngine 'feedback' ('--headless --fixed-fps 60 --path "'+$project+'" -- --test=feedback --evidence-dir="'+$run+'"') 120000
+        InvokeEngine 'feedback-render' ('--fixed-fps 60 --path "'+$project+'" -- --test=feedback-render --evidence-dir="'+$run+'"') 120000
         InvokeEngine 'physics' ('--headless --fixed-fps 60 --path "'+$project+'" -- --test=physics --evidence-dir="'+$run+'"') 120000
         InvokeEngine 'render' ('--path "'+$project+'" -- --test=render --evidence-dir="'+$run+'"') 120000
         InvokeEngine 'practice' ('--headless --fixed-fps 60 --path "'+$project+'" -- --test=practice --evidence-dir="'+$run+'"') 120000

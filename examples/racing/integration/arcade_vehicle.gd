@@ -3,6 +3,7 @@ signal movement_completed(previous: Vector3, current: Vector3, dt: float)
 ## Planar arcade motion; model suspension/lean are visual only. Forward is -Z.
 const ArcadeControl = preload("res://arcade_control.gd")
 const Tuning = preload("res://arcade_tuning.gd")
+const Suspension = preload("res://arcade_suspension.gd")
 const PLANE_Y := 0.145
 const RADIUS := 0.86
 const HALF_STRAIGHT := 1.10
@@ -39,6 +40,8 @@ var physics_steps := 0
 var yaw_shape := ConvexPolygonShape3D.new()
 var yaw_ring: Array[Vector2] = []
 var wall_release_contacts: Array[Dictionary] = []
+var suspension = Suspension.new()
+var last_visual_steer := 0.0
 
 func _ready() -> void:
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
@@ -65,6 +68,11 @@ func _ready() -> void:
 		wheels.append(visual_root.find_child("Wheel_" + suffix, true, false) as Node3D)
 		assert(wheels[-1] != null and steer_pivots[-1] != null)
 	control.reset()
+	# Release exports omit assert evaluation, so initialization runs separately.
+	var configured: bool = suspension.configure(self)
+	if not configured:
+		push_error("Racing suspension could not initialize imported wheels")
+		set_physics_process(false)
 
 func set_buttons(left: bool, right: bool) -> void:
 	held_left = left
@@ -87,6 +95,8 @@ func request_reset(pose: Transform3D) -> void:
 	wheel_spin = 0.0
 	visual_lean = 0.0
 	visual_pitch = 0.0
+	last_visual_steer = 0.0
+	suspension.reset()
 	control.reset()
 	telemetry = {}
 	contacted_rail_shapes.clear()
@@ -95,9 +105,11 @@ func request_reset(pose: Transform3D) -> void:
 
 func _physics_process(dt: float) -> void:
 	if paused:
+		_sync_visual(last_visual_steer, dt, true)
 		return
 	var previous_position := global_position
 	if practice_hold:
+		_sync_visual(last_visual_steer, dt, true)
 		velocity = Vector3.ZERO
 		last_actual_velocity = Vector2.ZERO
 		telemetry["speed"] = 0.0
@@ -176,6 +188,7 @@ func _physics_process(dt: float) -> void:
 	var incoming := velocity
 	move_and_slide() # Exactly one engine sweep per real physics tick.
 	var has_wall_contact := false
+	var impact_speed := 0.0
 	for i in range(get_slide_collision_count()):
 		var hit := get_slide_collision(i)
 		if hit.get_collider() != null and hit.get_collider().name == "ContinuousGuardrails":
@@ -186,6 +199,7 @@ func _physics_process(dt: float) -> void:
 			continue
 		normal = normal.normalized()
 		if incoming.dot(normal) < -0.05:
+			impact_speed = maxf(impact_speed, -incoming.dot(normal))
 			# Keep the engine's velocity after all slide planes have been resolved.
 			# Apply wall friction once per tick below, never once per collision.
 			has_wall_contact = true
@@ -211,7 +225,8 @@ func _physics_process(dt: float) -> void:
 	wheel_spin -= last_actual_velocity.dot(forward) * dt / WHEEL_RADIUS
 	visual_lean = lerpf(visual_lean, -float(state.steer) * clampf(motion.length() / TOP_SPEED, 0.0, 1.0) * 0.08, 1.0 - exp(-9.0 * dt))
 	visual_pitch = lerpf(visual_pitch, 0.035 if state.mode == "brake" else (-0.025 if state.boost_active else 0.0), 1.0 - exp(-8.0 * dt))
-	_sync_visual(float(state.steer))
+	last_visual_steer = float(state.steer)
+	_sync_visual(last_visual_steer, dt)
 	physics_usec_total += Time.get_ticks_usec() - started
 	physics_steps += 1
 	telemetry = {"mode": state.mode, "speed": last_actual_velocity.length(), "forward_speed": last_actual_velocity.dot(forward),
@@ -223,8 +238,9 @@ func _physics_process(dt: float) -> void:
 		"fuel": state.fuel, "boost_active": state.boost_active, "boost_remaining": state.boost_remaining,
 		"drifting": state.drifting, "slip_degrees": rad_to_deg(atan2(last_actual_velocity.dot(right), maxf(absf(last_actual_velocity.dot(forward)), 0.01))),
 		"yaw_queries": yaw_queries, "rejected_yaws": rejected_yaws, "wall_contacts": wall_contacts,
+		"wall_impact_speed": impact_speed,
 		"physics_steps": physics_steps, "mean_script_usec": float(physics_usec_total) / physics_steps,
-		"suspension_ray_queries": 0}
+		"suspension_ray_queries": suspension.snapshot().get("ray_queries_this_tick", 0)}
 	movement_completed.emit(previous_position, global_position, dt)
 
 func _try_yaw(amount: float) -> void:
@@ -275,8 +291,8 @@ func receive_push(push: Vector3) -> void:
 	if push.is_finite():
 		velocity = (velocity + Vector3(push.x, 0.0, push.z)).limit_length(float(tuning.values.top_speed))
 
-func _sync_visual(steer: float) -> void:
-	visual_root.rotation = Vector3(visual_pitch, 0.0, visual_lean)
+func _sync_visual(steer: float, dt := 1.0 / 60.0, frozen := false) -> void:
+	suspension.step(dt, steer, visual_pitch, visual_lean, frozen)
 	for i in range(4):
 		steer_pivots[i].rotation.y = -steer * deg_to_rad(25.0) if i < 2 else 0.0
 		wheels[i].rotation.x = wheel_spin

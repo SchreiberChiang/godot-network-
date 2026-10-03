@@ -924,4 +924,4 @@ func finish() -> void:
 			if write_error != OK:
 				check("JSON evidence file written", false, write_error)
 	print("ARCADE_ACCEPTANCE_RESULT passed=", passed, " failed=", failed)
-	get_tree().quit(0 if failed == 0 else 1)
+	lab.quit_safely(0 if failed == 0 else 1)

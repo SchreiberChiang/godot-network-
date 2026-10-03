@@ -4,6 +4,8 @@ const Harbor = preload("res://track/harbor.gd")
 const TuningPanel = preload("res://arcade_tuning_panel.gd")
 const Practice = preload("res://practice_session.gd")
 const PracticeHUD = preload("res://practice_hud.gd")
+const SkidMarks = preload("res://arcade_skid_marks.gd")
+const FeedbackAudio = preload("res://arcade_audio.gd")
 const VIEW_LIMITS := {"view_pitch_degrees": Vector2(35, 85), "view_size_m": Vector2(12, 50)}
 var view_pitch_degrees := 56.0
 var view_size_m := 44.5
@@ -28,11 +30,28 @@ var tuning_panel
 var tuning_paused := false
 var practice
 var practice_hud
+var skid_marks
+var audio_feedback
+var quitting := false
 
 func practice_enabled() -> bool:
-	return test_mode.is_empty() or test_mode.begins_with("practice")
+	return test_mode.is_empty() or test_mode.begins_with("practice") or test_mode.begins_with("feedback")
+
+func quit_safely(code := 0) -> void:
+	if quitting: return
+	quitting = true
+	if is_instance_valid(car): car.paused = true
+	if is_instance_valid(audio_feedback): audio_feedback.shutdown()
+	# WAV playbacks are released by the audio mixer asynchronously. Keep the
+	# tree alive briefly after stopping them; fixed-fps simulated time is not
+	# suitable here. This bounded wall-time wait runs only on application exit.
+	var deadline := Time.get_ticks_msec() + 120
+	while Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+	get_tree().quit(code)
 
 func _ready() -> void:
+	get_tree().auto_accept_quit = false
 	process_physics_priority = -100
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--test="): test_mode = a.trim_prefix("--test=")
@@ -59,6 +78,11 @@ func _ready() -> void:
 	car.name = "StreetCar"
 	if not test_mode.is_empty() and not practice_enabled(): car.tuning.use_preset("original")
 	add_child(car)
+	skid_marks = SkidMarks.new()
+	add_child(skid_marks)
+	car.movement_completed.connect(_feedback_step)
+	audio_feedback = FeedbackAudio.new()
+	add_child(audio_feedback)
 	if practice_enabled():
 		practice = Practice.new()
 		car.movement_completed.connect(_practice_step)
@@ -90,15 +114,17 @@ func _ready() -> void:
 	if not test_mode.is_empty():
 		var script = load("res://practice_acceptance.gd" if practice_enabled() else "res://arcade_acceptance.gd")
 		if script == null or not script.can_instantiate():
-			get_tree().quit(64)
+			quit_safely(64)
 			return
+		if test_mode.begins_with("feedback"):
+			script = load("res://feedback_acceptance.gd")
 		var tests = script.new()
 		tests.lab = self
 		add_child(tests)
 
 func _planar_collision_layers(node: Node) -> void:
 	if node is StaticBody3D:
-		node.collision_layer = 0 if node.name == "DriveSurface" or node.get_parent().name == "QuayFoundation" else 2
+		node.collision_layer = 8 if node.name == "DriveSurface" or node.get_parent().name == "QuayFoundation" else 2
 		if node.name == "ContinuousGuardrails":
 			for child in node.get_children():
 				if child is CollisionShape3D:
@@ -184,6 +210,8 @@ func reset_car() -> void:
 	nitro_requests = 0
 	var p: Vector3 = track.layout.spawns[0].position
 	car.request_reset(Transform3D(Basis.IDENTITY, p))
+	if skid_marks != null: skid_marks.reset()
+	if audio_feedback != null: audio_feedback.reset()
 	tuning_paused = false
 	car.paused = false
 	if practice != null:
@@ -191,6 +219,9 @@ func reset_car() -> void:
 		car.practice_hold = practice.holds_vehicle()
 	sync_tuning_pause()
 	resets += 1
+
+func _feedback_step(_previous: Vector3, _current: Vector3, dt: float) -> void:
+	skid_marks.step(dt, car.telemetry, car.suspension.snapshot().get("wheels", []), car.paused or car.practice_hold)
 
 func _practice_step(previous: Vector3, current: Vector3, dt: float) -> void:
 	practice.step(previous, current, dt)
@@ -231,8 +262,9 @@ func _input(event: InputEvent) -> void:
 		if event.pressed:
 			if key == KEY_F2: toggle_tuning()
 			if key == KEY_R: reset_car()
+			if key == KEY_M: audio_feedback.set_muted(not audio_feedback.muted)
 			if key == KEY_TAB: overview = not overview
-			if key == KEY_ESCAPE: get_tree().quit()
+			if key == KEY_ESCAPE: quit_safely()
 	elif event is InputEventScreenTouch:
 		touch_stamp = Time.get_ticks_msec()
 		if event.pressed: _pointer_down(event.index, event.position)
@@ -259,6 +291,7 @@ func button_state() -> Vector2i:
 		int(bool(held.get(KEY_D, false)) or bool(held.get(KEY_RIGHT, false)) or "right" in pointers.values()))
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST: quit_safely()
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		held.clear()
 		pointers.clear()
@@ -287,6 +320,7 @@ func apply_controls() -> void:
 	nitro_requests = 0
 
 func _process(_dt: float) -> void:
+	audio_feedback.update_feedback(_dt, car.telemetry, practice.snapshot() if practice != null else {}, car.paused, car.practice_hold)
 	var target: Vector3 = car.get_global_transform_interpolated().origin
 	var focus := Vector3.ZERO if overview else target + Vector3(0, 0, -3)
 	var pitch := deg_to_rad(view_pitch_degrees)
