@@ -1,6 +1,6 @@
 # RoomKit：独立的本地房间框架
 
-从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能与 Linux 源码服务已有验收；Linux 独立服务器普通目录也已构建和隔离运行。跨机完整对局用源码 SDK 客户端验证，真实 Client.exe 的双人入退房另列结果；用户已反馈本机与朋友公网试玩可用，但移动和枪口卡顿待定位。其它发行版、云端与导出包长期耐久仍未验收。
+从零开发的多游戏房间框架：一个独立管理后台，加上邀请码账号和永久资产，每个房间是一个独立的 Godot 进程。当前示例有横版射击和取石子。当前主线 `main`；实际通过、失败和未验收的项目只看 [STATUS](STATUS.md)。Windows 本机功能与 Linux 源码服务已有验收；Linux 独立服务器普通目录也已构建和隔离运行。当前跨机业务用源码 SDK 夹具验证，真实 Client.exe 的双人短入退房另列结果，未运行本版 FullRound。旧版朋友公网连通已有反馈；显示改进与快照 v3 已交配套新版，用户简单试玩反馈无问题，高延迟玩家专项仍待参与。其它发行版、云端与导出包长期耐久仍未验收。
 
 **想先了解项目有什么、做到哪一步：双击根目录 `ROADMAP.html`**（项目地图，不需要启动后台或联网），可以按模块或开发顺序查看、搜索、筛选并展开详情。
 **开发统一在本目录 `main` 和「完成 RoomKit M0 与 M1」会话。** 其他 14 个会话已归档；候选提交继续保留，17 个工作树已压缩归档，需要继续某项时先恢复对应目录。恢复位置与剩余保护项见 [收拢记录](docs/17_framework_shooter_plan.md#consolidation-20261003)，归档不代表候选已合并或通过验收。
@@ -9,19 +9,19 @@
 
 **离线比较人物移动：双击 `PreviewMovement.cmd`**，旧版和新版同屏显示；TAB 切换稳定更新、抖动和断流，Space / B 切换强调行，ESC 退出。它使用固定旧提交与当前游戏的真实显示算法、同一合成轨迹，不启动服务器。新版减少快照抖动造成的短暂停顿，会增加少量显示落后；机制及测量见 [移动比较](docs/25_shooter_room_rules.md#movement-candidate-result)。
 
-资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；已执行的清理范围和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
+资源管理器里各文件夹的用途见 [根目录 20 个文件夹说明](docs/01_scope_architecture.md#root-folders)；最新人工回收与保留项见 [进度复核](docs/17_framework_shooter_plan.md#progress-review-20261003)，此前清理和恢复说明见 [清理记录](docs/17_framework_shooter_plan.md#cleanup-review-20261002)。
 
 **分支和本地目录看这里：[主线与工作目录](docs/17_framework_shooter_plan.md#worktree-mainline-20261002)。** 日常仍用此项目根目录；转枪、移动及快照 v3 已交配套联网新版，双击根目录 **PreviewAim.cmd** 可离线看旧/新转枪（TAB 切换、ESC 退出）。
 
 **当前 Linux 新版试玩：双击 `PlayLinuxPackage.cmd`**，用原管理员账号在后台点“启动服务器”，再打开新版客户端 StartGame.cmd。旧账号、资产和证书保留；两平台 DTLS、Linux 源码 4/8 人与真实 Windows EXE→Linux 双人短验通过，真人公网/画面手感另验。给朋友用 `artifacts/friend-clients/snapshot-v3-20261003/RoomKit-player-snapshot-v3.zip`，不要发自己的 client-data。玩家“标记卡顿”后点“提交报告”，在本机准备到 `3455859197@qq.com` 的邮件，由玩家确认发送，不占游戏服务器的报告中转带宽。实际收信待确认，见 [交付与限制](docs/17_framework_shooter_plan.md#snapshot-v3-delivery-20261003)。
 
-配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#small-group-windows-result) 的 Windows 登录、退出清理、断线重连和备份重叠已通过。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环。[朋友公网试玩](docs/17_framework_shooter_plan.md#friends-public-preparation) 已收到人工通过反馈。诊断和枪口呈现已进主线，当前是移动候选复验、同源交付与短试玩，之后再接赛车；职责与完成门槛见 [当前执行表](docs/17_framework_shooter_plan.md#active-execution-board)。
+配套交付与 Linux 离线更新首版已完成，实际范围见 [交付说明](docs/17_framework_shooter_plan.md#deployment-stage-result)。[2–8 人小规模联机稳定性](docs/17_framework_shooter_plan.md#snapshot-v3-delivery-20261003) 已分别记录 Windows 登录/重连/备份重叠和 Linux 源码严格 4/8 人通过；八份独立成品与 Linux 备份重叠另验。[阶段 6](docs/17_framework_shooter_plan.md#stage6-result) 已完成依赖准备、7 天授权回收与生成物保留规则，并在 Mint/WSL2 各验一次短闭环。[朋友公网试玩](docs/17_framework_shooter_plan.md#friends-public-preparation) 已收到人工通过反馈。诊断和枪口呈现已进主线，快照 v3 同源交付与简单试玩已完成，下一步先复用赛车候选做本地单车完整一圈；职责与完成门槛见 [当前检查点](docs/17_framework_shooter_plan.md#next-checkpoints-20261003) 和 [赛车阶段](docs/17_framework_shooter_plan.md#racing-offline-plan-20261003)。正式部署到独立游戏服务器，机器尚未选定；本地公网实例只用于开发/试玩。
 
 ## 准备服务器和玩家目录
 
 **统一管理入口已接入**：Windows 用 `RoomKit.cmd start|status|stop|check`，Linux 用 `bash RoomKit.sh start|status|stop|check`（每次选一个动作）。入口自动识别源码/对应系统的导出包；不带动作只显示帮助。原有双击快捷入口继续可用，当前 Linux 试玩仍用 `PlayLinuxPackage.cmd`。默认实例、状态判断和验证范围见 [统一入口](docs/22_framework_operations.md#unified-entry)。
 
-**新客户端网络诊断已交付**：底部显示可靠发送丢包估计，右下角“网络详情 / 报告”查看 RTT、波动、收发与快照时序，并标记卡顿。导出版设置/报告保存在旁边的 `client-data/`，更新时保留；只分享 `reports` 里的脱敏日志。Linux 试玩已换为配套版本 `56f4b235deea`，仍用 PlayLinuxPackage.cmd；给朋友也需发新目录，详见 [N2 交付](docs/17_framework_shooter_plan.md#n2-final-delivery) 与 [诊断说明](docs/25_shooter_room_rules.md#client-diagnostics)。
+**新客户端网络诊断已交付**：底部显示可靠发送丢包估计，右下角“网络详情 / 报告”查看 RTT、波动、收发与快照时序，并标记卡顿。导出版设置/报告保存在旁边的 `client-data/`，更新时保留；只分享 `reports` 里的脱敏日志。Linux 试玩已换为配套版本 `e1bbf7b65cc9` / 协议 3，仍用 PlayLinuxPackage.cmd；给朋友也需发完整新版目录，详见 [当前 v3 交付](docs/17_framework_shooter_plan.md#snapshot-v3-delivery-20261003) 与 [诊断说明](docs/25_shooter_room_rules.md#client-diagnostics)。
 
 在这台 Windows 构建机双击 **PrepareDeployment.cmd**，默认生成 Linux 服务器与匹配的 Windows 玩家客户端；Windows 服务器用 `PrepareDeployment.cmd -ServerPlatform Windows`。**OpenDeployment.cmd** 随时打开最近生成的干净目录，其中 `Server/` 给服务器机器，`PlayerClient/` 给玩家。各自的启动、配置和停止步骤都在目录说明里，不需要多层寻找包号。
 
@@ -84,9 +84,9 @@ bash tools/roomkit_linux.sh stop      # 只请求退出并等待，不发信号
 
 ## 独立 Linux 服务器目录（无需 Godot 编辑器）
 
-本机朋友试玩入口 **`PlayLinuxPackage.cmd` / `StopLinuxPackage.cmd`** 已更新为阶段 7 配套版本（枪口、身体移动与诊断），后台通过 SSH 打开 <http://127.0.0.1:28691/>。原管理员、玩家账号和资产经官方升级保留：登录后台、启动游戏服务器，再用自动打开的玩家目录里的 `Client.exe`。朋友也需换完整新版玩家目录。路由器继续转发 TCP **28300**、UDP **28400–28431** 到笔记本 `192.168.10.105`；不转发后台或控制端口。旧版公网连接已有用户反馈，新版已通过跨机自动短验，真人手感及朋友公网另验。当前版本、路径和证据见 [整合与交付结果](docs/17_framework_shooter_plan.md#movement-integration-result)。Git 克隆不包含本机清单、程序、连接配置或密码。
+本机朋友试玩入口 **`PlayLinuxPackage.cmd` / `StopLinuxPackage.cmd`** 已更新为阶段 7 配套版本（枪口、身体移动、诊断与快照 v3），后台通过 SSH 打开 <http://127.0.0.1:28691/>。原管理员、玩家账号和资产经官方升级保留：登录后台、启动游戏服务器，再用自动打开的玩家目录里的 `Client.exe`。朋友也需换完整新版玩家目录。路由器继续转发 TCP **28300**、UDP **28400–28431** 到笔记本 `192.168.10.105`；不转发后台或控制端口。旧版公网连接已有用户反馈，新版已通过跨机自动短验，真人手感及朋友公网另验。当前版本 `e1bbf7b65cc9` / 协议 3、路径和证据见 [v3 交付结果](docs/17_framework_shooter_plan.md#snapshot-v3-delivery-20261003)。用户简单试玩反馈无问题；高延迟专项与 QQ 实际收信仍待参与。Git 克隆不包含本机清单、程序、连接配置或密码。
 
-Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；引擎已包含，缺少 pwsh 时用随包 `PrepareEnvironment.sh prepare`，不再下载 Godot 编辑器。系统库仍单独检查。当前目录及实测范围见 [阶段 6](docs/17_framework_shooter_plan.md#stage6-result)。
+Windows 构建入口：`powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_linux_server.ps1`。输出普通目录在 `artifacts/RoomKit-0.5.0-linux-x86_64-<编号>/`，整个干净目录复制到 Linux 即可；引擎已包含，缺少 pwsh 时用随包 `PrepareEnvironment.sh prepare`，不再下载 Godot 编辑器。系统库仍单独检查。基础依赖的历史验收见 [阶段 6](docs/17_framework_shooter_plan.md#stage6-result)，当前配套目录和实测范围见 [v3 交付](docs/17_framework_shooter_plan.md#snapshot-v3-delivery-20261003)。
 
 在目录内依次运行 `bash PrepareEnvironment.sh check`（缺少时显式 `prepare`）→ `bash CheckPackage.sh` → `bash RoomKit.sh start --instance demo`；状态用 `bash RoomKit.sh status --instance demo`，停止用 `bash RoomKit.sh stop --instance demo`。默认只绑定回环，新实例的端口与对外地址可在首次启动时设置；重启沿用保存配置。后台通过本机浏览器或同号 SSH 转发访问。玩家仍使用版本匹配的 Windows 客户端。
 
