@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车60Hz双方向/共享氮气已交F2实时调参：更快转向与松键侧滑保持，物理158/0、窗口89/0；原交付手感未通过，新起点待用户试玩，之后接练习圈计时和独立导出。",
+  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。赛车60Hz默认采用用户认可的五项玩家调校；氮气/碰墙补修冷导入与十三解析0、物理177/0、窗口103/0。F2八项可调，新氮气与擦墙手感待试玩，之后接练习圈计时和独立导出。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -335,11 +335,11 @@ window.ROADMAP_DATA = {
       evidence: "本机独立结构检查退出0、9文件哈希与两端ZIP一致；两图已看。仅能力样本范围，存在已记录拓扑缺项，非游戏接入通过" },
     { id: "game-racing", area: "game", phase: 8, status: "pending",
       title: "赛车最小接入",
-      summary: "用户自调已有明显漂移感觉；保留候选，氮气/未定位怪感待改善，练习圈/导出/接网后置。",
-      details: "60Hz平面CharacterBody3D、自动加速、双方向制动后直线倒车、真实侧滑充能与三槽共享氮气规则保留。F2开放五项调参。用户自调127°/s、0.97/0.989、加速度24、极速30，反馈漂移已有感觉；参数仅当前窗口生效，JSON已保存候选，未改默认参考起点。仍有氮气弱和未知怪感：普通30/固定氮气34、退喷硬限速、6m/s抓地切换与前向速度转向缩放条件已确认，怪感归因未证实。下一补修氮气两项可调并守住双键减速，再逐项定位突变。原交付手感失败保留；无悬挂射线，碰撞保护保留。离线不计圈，手感确定后接检查点/practice/计时/导出；Linux/手机/联机/GameAdapter未验。",
+      summary: "五项玩家调校原样保留，氮气/擦墙补修通过源码门槛；新手感待试玩，练习圈与接网后置。",
+      details: "60Hz平面CharacterBody3D。默认127°/s、0.97/0.989、加速度24、普通30；F2八项含氮气极速倍率/额外加速/擦墙阻力。新氮气默认45、额外32，退喷渐降且双键制动占优。擦墙保留引擎解算速度、每步一次阻力；真实5°/15°接触不重置可转离，保守旋转包络和受真实sweep约束的静态墙离墙助力，原5cm深度门槛不变。新手感仍需用户试玩，6m/s切换与其它怪感未归因；旧失败保留。离线不计圈，随后practice/检查点/计时/导出；Linux/手机/联机/GameAdapter未验。",
       files: ["OpenRacing.cmd", "examples/racing/integration/README.md", "examples/racing/integration/arcade_vehicle.gd", "examples/racing/integration/arcade_control.gd", "examples/racing/integration/arcade_tuning.gd", "examples/racing/integration/arcade_tuning_panel.gd", "prototypes/racing_level/harbor.gd", "prototypes/racing_visual/v2/models/street_car_v2.glb"],
-      docs: ["docs/17_framework_shooter_plan.md#racing-live-tuning-20261003","docs/17_framework_shooter_plan.md#racing-arcade-20261003","docs/17_framework_shooter_plan.md#racing-drift-reference-20261003","docs/17_framework_shooter_plan.md#racing-three-controller-comparison-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
-      evidence: "既有Windows tuning-r3冷导入/十三解析0、物理158/0、窗口89/0，stderr0；包含参考专项及恢复原参数后的回归。本轮仅人工反馈/只读分析，没有引擎重跑，不扩展到用户自调参数集。用户局部漂移认可，氮气/怪感仍未全项验收。旧失败/轻量证据和按用途两份生成记录保留；整圈/导出/Linux/真实手机/框架接入未验，不声称复现SkidStorm或实施迟滞" },
+      docs: ["docs/17_framework_shooter_plan.md#racing-nitro-contact-20261003","docs/17_framework_shooter_plan.md#racing-live-tuning-20261003","docs/17_framework_shooter_plan.md#racing-arcade-20261003","docs/17_framework_shooter_plan.md#racing-drift-reference-20261003","docs/17_framework_shooter_plan.md#racing-three-controller-comparison-20261003","docs/17_framework_shooter_plan.md#racing-offline-plan-20261003","docs/24_managed_game_template.md"],
+      evidence: "Windows nitro-wall-r7冷导入/十三解析0、物理177/0、窗口103/0，stderr0、总退出0；17项来源回读一致或仅换行/已声明路径映射，六项真实数据与朋友ZIP不变。新参数默认五值与用户JSON相同；氮气/擦墙手感待人工，不算整圈或Linux通过。失败原始输出/轻量结果/bundle保全，新增树实回收12→11，验收重型记录仅两份。" },
     { id: "sdk-reuse-from-racing", area: "sdk", phase: 9, status: "planned",
       title: "从真实游戏提炼接入积木",
       summary: "赛车接通以后，减少下一款游戏的重复工作。",
