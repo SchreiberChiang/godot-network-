@@ -1,6 +1,6 @@
 extends Node
 ## Can be instantiated without adding to SceneTree: new().run() -> Dictionary.
-const Control := preload("arcade_control.gd")
+const ArcadeControl := preload("arcade_control.gd")
 const FORWARD := Vector2(0.0, -1.0)
 const DRIFT_VELOCITY := Vector2(4.0, -10.0)
 const EPSILON := 0.00001
@@ -31,14 +31,14 @@ func _check(name: String, ok: bool, detail: Variant = null) -> void:
 func _close(actual: float, expected: float) -> bool:
 	return is_finite(actual) and absf(actual - expected) < EPSILON
 
-func _peek(control: Control) -> Dictionary:
+func _peek(control: ArcadeControl) -> Dictionary:
 	return control.step(0.0, false, false, Vector2.ZERO, FORWARD)
 
-func _charge(control: Control, units: float) -> Dictionary:
-	return control.step(units / Control.DRIFT_CHARGE_RATE, false, false, DRIFT_VELOCITY, FORWARD)
+func _charge(control: ArcadeControl, units: float) -> Dictionary:
+	return control.step(units / ArcadeControl.DRIFT_CHARGE_RATE, false, false, DRIFT_VELOCITY, FORWARD)
 
 func _test_defaults_and_modes() -> void:
-	var control := Control.new()
+	var control := ArcadeControl.new()
 	var state := _peek(control)
 	_check("starts forward without fuel or boost", state.mode == "forward" and state.steer == 0 and state.fuel == 0.0 and state.boost_remaining == 0.0 and not state.boost_active)
 	_check("empty tank refuses nitro without mutation", not control.request_nitro(false, false) and _peek(control).fuel == 0.0)
@@ -57,7 +57,7 @@ func _test_defaults_and_modes() -> void:
 	_check("release of either key restores forward despite backward inertia", state.mode == "forward" and state.steer == 1)
 
 func _test_drift_resources() -> void:
-	var control := Control.new()
+	var control := ArcadeControl.new()
 	var state := control.step(4.0, false, false, DRIFT_VELOCITY, FORWARD)
 	_check("actual drift charges without steering input", state.drifting and _close(state.fuel, 1.0))
 	state = control.step(100.0, false, false, DRIFT_VELOCITY, FORWARD)
@@ -75,14 +75,14 @@ func _test_drift_resources() -> void:
 		control.reset()
 		var velocity := Vector2(10.0 * tan(deg_to_rad(angle)), -10.0)
 		state = control.step(1.0, false, false, velocity, FORWARD)
-		var expected := angle >= 8.0 and angle <= 75.0
+		var expected: bool = angle >= 8.0 and angle <= 75.0
 		_check("actual slip boundary %.1f degrees" % angle, state.drifting == expected and _close(state.fuel, 0.25 if expected else 0.0), state)
 	control.reset()
 	state = control.step(4.0, false, false, Vector2(-4.0, -6.0), FORWARD * 2.0)
 	_check("six m/s boundary and opposite slip normalize heading", state.drifting and _close(state.fuel, 1.0))
 
 func _test_requests_and_duration() -> void:
-	var control := Control.new()
+	var control := ArcadeControl.new()
 	_charge(control, 0.75)
 	_check("fractional fuel cannot buy partial nitro", not control.request_nitro(false, false) and _close(_peek(control).fuel, 0.75))
 	_charge(control, 0.25)
@@ -109,7 +109,7 @@ func _test_requests_and_duration() -> void:
 	_check("queued duration remainder is conserved", _close(state.boost_fraction, 0.6) and state.boost_remaining == 0.0)
 
 func _test_boost_brake_reverse() -> void:
-	var control := Control.new()
+	var control := ArcadeControl.new()
 	_charge(control, 3.0)
 	_check("both keys refuse nitro without spending", not control.request_nitro(true, true) and _close(_peek(control).fuel, 3.0))
 	control.step(0.1, true, true, Vector2.ZERO, FORWARD)
@@ -136,7 +136,7 @@ func _test_boost_brake_reverse() -> void:
 	_check("reset clears fuel, queued spray and drift", state.mode == "forward" and state.fuel == 0.0 and state.boost_remaining == 0.0 and not state.boost_active and not state.drifting)
 
 func _test_backward_inertia_nitro() -> void:
-	var control := Control.new()
+	var control := ArcadeControl.new()
 	_charge(control, 2.0)
 	control.step(0.1, true, true, Vector2.ZERO, FORWARD)
 	control.step(0.1, true, true, Vector2(0.0, 3.0), FORWARD)
@@ -164,7 +164,7 @@ func _test_backward_inertia_nitro() -> void:
 func _test_rates_and_invalid_inputs() -> void:
 	var results: Array[Dictionary] = []
 	for hz in [60, 120]:
-		var control := Control.new()
+		var control := ArcadeControl.new()
 		var dt := 1.0 / float(hz)
 		for _i in range(4 * hz):
 			control.step(dt, false, false, DRIFT_VELOCITY, FORWARD)
@@ -179,7 +179,7 @@ func _test_rates_and_invalid_inputs() -> void:
 		_check("%d Hz conserved charge and real spray duration" % hz, accepted and _close(spray_time, 1.5) and _close(state.fuel, 0.5) and state.boost_remaining == 0.0 and peak_fraction <= 1.0, {"spray_time": spray_time, "fuel": state.fuel})
 		results.append({"spray_time": spray_time, "fuel": state.fuel})
 	_check("60 and 120 Hz give the same resource/time result", _close(results[0].spray_time, results[1].spray_time) and _close(results[0].fuel, results[1].fuel))
-	var control := Control.new()
+	var control := ArcadeControl.new()
 	_charge(control, 1.0)
 	control.request_nitro(false, false)
 	var state := control.step(1.5, false, false, DRIFT_VELOCITY, FORWARD)

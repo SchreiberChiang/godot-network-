@@ -52,6 +52,9 @@ $sources=@{
     'vehicle_base.gd'='examples/racing/prototype/vehicle.gd';'acceptance.gd'='examples/racing/integration/acceptance.gd';
     'track/harbor.gd'='prototypes/racing_level/harbor.gd';'track/track_data.gd'='prototypes/racing_level/track_data.gd';
     'models/street_car_v2.glb'='prototypes/racing_visual/v2/models/street_car_v2.glb'
+    'arcade_main.gd'='examples/racing/integration/arcade_main.gd';'arcade_vehicle.gd'='examples/racing/integration/arcade_vehicle.gd'
+    'arcade_control.gd'='examples/racing/integration/arcade_control.gd';'arcade_control_test.gd'='examples/racing/integration/arcade_control_test.gd'
+    'arcade_acceptance.gd'='examples/racing/integration/arcade_acceptance.gd'
 }
 $hashes=@()
 foreach($relative in $sources.Keys){
@@ -93,7 +96,7 @@ try {
     InvokeEngine 'version' '--version' 30000
     # A failed first cold import stops this run; never warm-import it into a pass.
     InvokeEngine 'cold-import' ('--headless --editor --import --path "'+$project+'"') 120000
-    foreach($script in @('main.gd','vehicle.gd','vehicle_base.gd','acceptance.gd','track/harbor.gd','track/track_data.gd')){
+    foreach($script in @('arcade_main.gd','arcade_vehicle.gd','arcade_control.gd','arcade_control_test.gd','arcade_acceptance.gd','main.gd','vehicle.gd','vehicle_base.gd','acceptance.gd','track/harbor.gd','track/track_data.gd')){
         InvokeEngine ('parse-'+$script.Replace('/','-').Replace('.gd','')) ('--headless --path "'+$project+'" --check-only --script "res://'+$script+'"') 30000
     }
     if($Mode -eq 'Verify'){
@@ -104,11 +107,17 @@ try {
 } finally {
     # Immutable completed runs only; live runs and changed files cannot be pruned.
     # Keep receipts and full test result values in the light retention ledger.
-    $summary=@{mode=$Mode;run=$RunName;sources=$hashes;results=@()}
+    $summary=@{mode=$Mode;run=$RunName;sources=$hashes;results=@();failure_excerpts=@()}
     foreach($file in Get-ChildItem -LiteralPath $run -File -Filter '*.json'){
         if($file.Name -ne 'sources.json'){$summary.results+=@{file=$file.Name;value=(Get-Content -LiteralPath $file.FullName -Encoding UTF8 -Raw|ConvertFrom-Json)}}
     }
-    $category='racing-offline-'+$Mode.ToLowerInvariant()
+    if($outcome -ne 'success'){
+        foreach($file in Get-ChildItem -LiteralPath $run -File -Filter '*.txt'){
+            $lines=@(Get-Content -LiteralPath $file.FullName -Encoding UTF8 | Where-Object {$_ -match 'SCRIPT ERROR|ERROR:|WARNING:|ARCADE_FAILED|ARCADE_PHASE|ARCADE_ACCEPTANCE_RESULT|at: GDScript'})
+            if($lines.Count){$summary.failure_excerpts+=@{file=$file.Name;lines=@($lines|Select-Object -First 80)}}
+        }
+    }
+    $category='racing-arcade-'+$Mode.ToLowerInvariant()
     Register-RoomKitArtifact -ProjectRoot $storageRoot -Category $category -Paths @($run) -Outcome $outcome -Summary $summary|Out-Null
     Invoke-RoomKitArtifactRetention -ProjectRoot $storageRoot -Category $category -Keep 2
 }

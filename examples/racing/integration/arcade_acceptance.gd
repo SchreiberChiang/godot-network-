@@ -60,7 +60,11 @@ func ticks(count: int) -> void:
 		await tick()
 
 func seconds(duration: float) -> void:
-	await ticks(ceili(duration * Engine.physics_ticks_per_second))
+	# Render FPS can be below physics Hz: count actual engine steps, not the
+	# number of coroutine resumptions which may skip several substeps.
+	var end_step := Engine.get_physics_frames() + ceili(duration * Engine.physics_ticks_per_second)
+	while Engine.get_physics_frames() < end_step:
+		await tick()
 
 func _key(code: int, down: bool) -> void:
 	var event := InputEventKey.new()
@@ -109,6 +113,7 @@ func _telemetry() -> Dictionary:
 	return lab.car.telemetry.duplicate(true)
 
 func run() -> void:
+	print("ARCADE_PHASE start ", lab.test_mode)
 	measurements.physics_hz = Engine.physics_ticks_per_second
 	check("real physics configured at 60 Hz", Engine.physics_ticks_per_second == 60)
 	var unit_script: Script = load("res://arcade_control_test.gd")
@@ -120,7 +125,9 @@ func run() -> void:
 		for item in pure.get("checks", []):
 			check("logic: " + str(item.get("name", "unnamed")), bool(item.get("ok", false)), item.get("detail"))
 		suite.free()
+	print("ARCADE_PHASE pure_complete")
 	await tick()
+	print("ARCADE_PHASE first_tick")
 	if lab.test_mode == "render":
 		await render_run()
 	elif lab.test_mode == "physics":
@@ -540,6 +547,7 @@ func push_run() -> void:
 	await tick()
 
 func render_run() -> void:
+	print("ARCADE_PHASE render_start")
 	check("render uses an actual graphics display", DisplayServer.get_name() != "headless", DisplayServer.get_name())
 	if DisplayServer.get_name() == "headless":
 		return
@@ -547,8 +555,10 @@ func render_run() -> void:
 	# Charge only by actual driving, then stage at the real track spawn for pixels.
 	reset_at()
 	await seconds(3.0)
+	print("ARCADE_PHASE render_accelerated")
 	buttons(true, false)
 	await seconds(14.0)
+	print("ARCADE_PHASE render_charged")
 	check("render has real drifting motion and charge", lab.car.telemetry.get("drifting", false) and lab.car.control._fuel >= 2.9)
 	buttons(false, false)
 	var spawn: Vector3 = lab.track.layout.spawns[0].position
@@ -557,10 +567,6 @@ func render_run() -> void:
 	lab.car.reset_physics_interpolation()
 	await tick()
 	var camera_basis: Basis = lab.camera.global_basis
-	var start_steps: int = lab.car.physics_steps
-	var start_usec: int = lab.car.physics_usec_total
-	frame_times.clear()
-	measuring_frames = true
 	nitro_edge()
 	await seconds(0.6)
 	buttons(true, false)
@@ -568,9 +574,20 @@ func render_run() -> void:
 	check("render shows actual boost and visual lean", lab.car.telemetry.get("boost_active", false) and absf(float(lab.car.visual_lean)) > 0.01 and float(lab.car.telemetry.get("speed", 0)) > 20.0)
 	check("HUD contains current nitro speed and drift information", not lab.hud.text.is_empty() and lab.fuel_bars.size() == 3 and lab.flames[0].visible and lab.flames[1].visible)
 	await RenderingServer.frame_post_draw
+	print("ARCADE_PHASE driver_drawn")
 	check("actual driver frame saved", get_viewport().get_texture().get_image().save_png(lab.evidence_dir.path_join("driving.png")) == OK)
 	buttons(false, false)
-	await seconds(2.15)
+	# Readback/PNG compression stalls are diagnostic work, outside the driving
+	# sample. Discard the following frame deltas before timing normal rendering.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var start_steps: int = lab.car.physics_steps
+	var start_usec: int = lab.car.physics_usec_total
+	frame_times.clear()
+	measuring_frames = true
+	var end_usec := Time.get_ticks_usec() + 3000000
+	while Time.get_ticks_usec() < end_usec:
+		await get_tree().process_frame
 	measuring_frames = false
 	check("driver camera direction stays fixed while car turns", camera_basis.is_equal_approx(lab.camera.global_basis))
 	var total := 0.0
@@ -580,7 +597,7 @@ func render_run() -> void:
 		slowest = maxf(slowest, dt)
 	var step_count: int = lab.car.physics_steps - start_steps
 	var mean_script := float(lab.car.physics_usec_total - start_usec) / maxi(1, step_count)
-	measurements.render = {"frames": frame_times.size(), "seconds": total, "mean_fps": float(frame_times.size()) / total if total > 0 else 0.0, "min_fps": 1.0 / slowest if slowest > 0 else 0.0, "slowest_frame_ms": slowest * 1000.0, "car_mean_script_usec": mean_script, "physics_steps": step_count, "physics_hz": Engine.physics_ticks_per_second, "visual_review": "pending human or main-agent image inspection", "spawn_staging_preserved_real_drift_fuel": true}
+	measurements.render = {"frames": frame_times.size(), "seconds": total, "mean_fps": float(frame_times.size()) / total if total > 0 else 0.0, "min_fps": 1.0 / slowest if slowest > 0 else 0.0, "slowest_frame_ms": slowest * 1000.0, "car_mean_script_usec": mean_script, "physics_steps": step_count, "physics_hz": Engine.physics_ticks_per_second, "screenshot_readback_in_sample": false, "visual_review": "pending human or main-agent image inspection", "spawn_staging_preserved_real_drift_fuel": true}
 	check("three seconds of actual frames and physics recorded", total >= 2.8 and frame_times.size() >= 30 and step_count >= 175, measurements.render)
 	lab.overview = true
 	await get_tree().process_frame

@@ -1,6 +1,7 @@
 extends Node3D
 const Data = preload("res://track_data.gd")
 var layout: Dictionary
+var flat_track := false
 var markers: Node3D
 var grid_models: Node3D
 var _materials := {}
@@ -17,7 +18,7 @@ func _ready() -> void:
 func build() -> void:
 	if not layout.is_empty():
 		return
-	layout = Data.create()
+	layout = Data.create(flat_track)
 	_box(self, "Water", Vector3(0, -1.2, 0), Vector3(500, 0.3, 500), Color("47858b"))
 	_box(self, "QuayFoundation", Vector3(0, -0.75, 0), Vector3(150, 1.4, 124), Color("748e89"), true)
 	_box(self, "QuayCap", Vector3(0, -0.06, 0), Vector3(150, 0.12, 124), CONCRETE)

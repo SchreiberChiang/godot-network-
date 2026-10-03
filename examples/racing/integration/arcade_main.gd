@@ -1,0 +1,250 @@
+extends Node3D
+const Vehicle = preload("res://arcade_vehicle.gd")
+const Harbor = preload("res://track/harbor.gd")
+var car
+var track
+var camera: Camera3D
+var hud: Label
+var held: Dictionary = {}
+var pointers: Dictionary = {}
+var controls: Dictionary = {}
+var fuel_bars: Array[ColorRect] = []
+var nitro_edge := false
+var nitro_requests := 0
+var test_mode := ""
+var evidence_dir := ""
+var overview := false
+var resets := 0
+var touch_stamp := -1000
+var pause_panel: PanelContainer
+var flames: Array[MeshInstance3D] = []
+
+func _ready() -> void:
+	process_physics_priority = -100
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--test="): test_mode = a.trim_prefix("--test=")
+		if a.begins_with("--evidence-dir="): evidence_dir = a.trim_prefix("--evidence-dir=")
+	var world := WorldEnvironment.new()
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color("91b1ab")
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color("e9e5cc")
+	env.ambient_light_energy = 0.22
+	world.environment = env
+	add_child(world)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-65, -30, 0)
+	sun.light_energy = 0.65
+	add_child(sun)
+	track = Harbor.new()
+	track.flat_track = true
+	add_child(track)
+	track.grid_models.visible = false
+	_planar_collision_layers(track)
+	car = Vehicle.new()
+	car.name = "StreetCar"
+	add_child(car)
+	for x in [-0.55, 0.55]:
+		var flame := MeshInstance3D.new()
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.06
+		cone.bottom_radius = 0.18
+		cone.height = 0.8
+		cone.radial_segments = 8
+		flame.mesh = cone
+		flame.rotation.x = PI * 0.5
+		flame.position = Vector3(x, 0.35, 2.2)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color("6ce7ee")
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		flame.material_override = mat
+		car.add_child(flame)
+		flames.append(flame)
+	camera = Camera3D.new()
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.size = 25
+	camera.far = 800
+	camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	add_child(camera)
+	_build_ui()
+	get_viewport().size_changed.connect(_layout_controls)
+	reset_car()
+	if not test_mode.is_empty():
+		var script = load("res://arcade_acceptance.gd")
+		if script == null or not script.can_instantiate():
+			get_tree().quit(64)
+			return
+		var tests = script.new()
+		tests.lab = self
+		add_child(tests)
+
+func _planar_collision_layers(node: Node) -> void:
+	if node is StaticBody3D:
+		node.collision_layer = 0 if node.name == "DriveSurface" or node.get_parent().name == "QuayFoundation" else 2
+		if node.name == "ContinuousGuardrails":
+			for child in node.get_children():
+				if child is CollisionShape3D:
+					(child.shape as BoxShape3D).size.y = 2.4
+					child.position.y = 0.8
+	for child in node.get_children():
+		_planar_collision_layers(child)
+
+func _build_ui() -> void:
+	var layer := CanvasLayer.new()
+	add_child(layer)
+	var panel := PanelContainer.new()
+	panel.position = Vector2(16, 14)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(panel)
+	hud = Label.new()
+	hud.add_theme_font_size_override("font_size", 18)
+	hud.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	panel.add_child(hud)
+	for kind in ["left", "right", "nitro_left", "nitro_right"]:
+		var button := ColorRect.new()
+		button.color = Color(0.12, 0.22, 0.26, 0.87)
+		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(button)
+		var caption := Label.new()
+		caption.text = "◀" if kind == "left" else ("▶" if kind == "right" else "氮气")
+		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		caption.add_theme_font_size_override("font_size", 26)
+		caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		caption.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		button.add_child(caption)
+		controls[kind] = button
+	for i in range(3):
+		var bar := ColorRect.new()
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		layer.add_child(bar)
+		fuel_bars.append(bar)
+	pause_panel = PanelContainer.new()
+	layer.add_child(pause_panel)
+	var resume := Button.new()
+	resume.text = "已暂停 · 继续驾驶"
+	resume.custom_minimum_size = Vector2(260, 64)
+	resume.pressed.connect(func(): car.paused = false; held.clear(); pointers.clear(); nitro_edge = false; nitro_requests = 0)
+	pause_panel.add_child(resume)
+	pause_panel.visible = false
+	_layout_controls()
+
+func _layout_controls() -> void:
+	var size := get_viewport().get_visible_rect().size
+	var button_size := Vector2(88, 72)
+	controls.left.position = Vector2(18, size.y - 90)
+	controls.right.position = Vector2(size.x - 106, size.y - 90)
+	controls.nitro_left.position = Vector2(18, size.y - 174)
+	controls.nitro_right.position = Vector2(size.x - 106, size.y - 174)
+	for button in controls.values(): button.size = button_size
+	for i in range(3):
+		fuel_bars[i].position = Vector2(size.x * 0.5 - 94 + i * 65, size.y - 47)
+		fuel_bars[i].size = Vector2(58, 14)
+	hud.custom_minimum_size = Vector2(minf(560, size.x - 32), 0)
+	pause_panel.position = (size - Vector2(260, 64)) * 0.5
+	pointers.clear()
+	nitro_edge = false
+	nitro_requests = 0
+
+func reset_car() -> void:
+	held.clear()
+	pointers.clear()
+	nitro_edge = false
+	nitro_requests = 0
+	var p: Vector3 = track.layout.spawns[0].position
+	car.request_reset(Transform3D(Basis.IDENTITY, p))
+	resets += 1
+
+func _pointer_kind(position: Vector2) -> String:
+	for kind in controls:
+		if controls[kind].get_global_rect().has_point(position): return kind
+	return ""
+
+func _pointer_down(id, position: Vector2) -> void:
+	var kind := _pointer_kind(position)
+	pointers[id] = kind
+
+func _nitro_is_held() -> bool:
+	if bool(held.get(KEY_SPACE, false)): return true
+	for kind in pointers.values():
+		if str(kind).begins_with("nitro"): return true
+	return false
+
+func _input(event: InputEvent) -> void:
+	var nitro_before := _nitro_is_held()
+	if event is InputEventKey and not event.echo:
+		var key: int = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+		held[key] = event.pressed
+		if event.pressed:
+			if key == KEY_R: reset_car()
+			if key == KEY_TAB: overview = not overview
+			if key == KEY_ESCAPE: get_tree().quit()
+	elif event is InputEventScreenTouch:
+		touch_stamp = Time.get_ticks_msec()
+		if event.pressed: _pointer_down(event.index, event.position)
+		else: pointers.erase(event.index)
+	elif event is InputEventScreenDrag:
+		touch_stamp = Time.get_ticks_msec()
+		if pointers.has(event.index):
+			pointers[event.index] = _pointer_kind(event.position)
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if not event.pressed:
+			pointers.erase("mouse")
+		elif Time.get_ticks_msec() - touch_stamp > 150:
+			_pointer_down("mouse", event.position)
+	elif event is InputEventMouseMotion and pointers.has("mouse"):
+		pointers.mouse = _pointer_kind(event.position)
+	# One logical action for both screen buttons and the keyboard. A release
+	# followed by another press remains another edge, even within one tick.
+	if not nitro_before and _nitro_is_held():
+		nitro_requests += 1
+		nitro_edge = true
+
+func button_state() -> Vector2i:
+	return Vector2i(int(bool(held.get(KEY_A, false)) or bool(held.get(KEY_LEFT, false)) or "left" in pointers.values()),
+		int(bool(held.get(KEY_D, false)) or bool(held.get(KEY_RIGHT, false)) or "right" in pointers.values()))
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		held.clear()
+		pointers.clear()
+		nitro_edge = false
+		nitro_requests = 0
+		if test_mode.is_empty() and is_instance_valid(car): car.paused = true
+
+func _physics_process(_dt: float) -> void:
+	if test_mode.is_empty() and not car.paused:
+		apply_controls()
+
+func apply_controls() -> void:
+	if car.paused: return
+	var buttons := button_state()
+	car.set_buttons(buttons.x != 0, buttons.y != 0)
+	for _i in range(nitro_requests):
+		car.request_nitro()
+	nitro_edge = false
+	nitro_requests = 0
+
+func _process(_dt: float) -> void:
+	var target: Vector3 = car.get_global_transform_interpolated().origin
+	camera.size = 175 if overview else 25
+	camera.position = Vector3(0, 180, 12) if overview else target + Vector3(13, 19, 17)
+	camera.look_at(Vector3.ZERO if overview else target + Vector3(0, 0, -3), Vector3.UP)
+	var fuel := float(car.telemetry.get("fuel", 0))
+	var remaining := float(car.telemetry.get("boost_remaining", 0))
+	var mode: String = car.telemetry.get("mode", "forward")
+	hud.text = "港区 · 街机驾驶\n←/A  →/D 转向；双键制动/倒车；空格 氮气\n%.0f km/h  氮气 %.1f/3  喷射 %.1f 秒  %s\n漂移充能 · 本阶段不计圈  R复位  TAB全景  ESC退出" % [
+		float(car.telemetry.get("speed", 0)) * 3.6, fuel, remaining,
+		"倒车" if mode == "reverse" else ("制动" if mode == "brake" else ("漂移" if car.telemetry.get("drifting", false) else "前进"))]
+	for i in range(3):
+		var amount := clampf(fuel - i, 0.0, 1.0)
+		fuel_bars[i].color = Color("46ccd2").lerp(Color("213c49"), 1.0 - amount)
+	var buttons := button_state()
+	controls.left.color = Color("408d96") if buttons.x else Color(0.12, 0.22, 0.26, 0.87)
+	controls.right.color = Color("408d96") if buttons.y else Color(0.12, 0.22, 0.26, 0.87)
+	var nitro_color := Color("56dbe4") if remaining > 0 else (Color("328a92") if fuel >= 1 else Color("34434a"))
+	controls.nitro_left.color = nitro_color
+	controls.nitro_right.color = nitro_color
+	for flame in flames: flame.visible = bool(car.telemetry.get("boost_active", false))
+	pause_panel.visible = car.paused

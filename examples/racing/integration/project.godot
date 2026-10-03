@@ -1,7 +1,7 @@
 config_version=5
 
 [application]
-config/name="RoomKit Port Loop Driving"
+config/name="RoomKit Port Loop Arcade"
 run/main_scene="res://main.tscn"
 
 [display]
@@ -11,8 +11,8 @@ window/stretch/mode="canvas_items"
 
 [physics]
 3d/physics_engine="GodotPhysics3D"
-common/physics_ticks_per_second=600
-common/max_physics_steps_per_frame=32
+common/physics_ticks_per_second=60
+common/max_physics_steps_per_frame=8
 common/physics_interpolation=true
 
 [rendering]

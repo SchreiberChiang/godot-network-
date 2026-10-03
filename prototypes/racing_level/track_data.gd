@@ -5,7 +5,7 @@ const APRON_WIDTH := 16.0
 const BASE_Y := 0.12
 const STEP := 1.4
 
-static func create() -> Dictionary:
+static func create(flat := false) -> Dictionary:
 	var points: Array[Vector3] = []
 	# Consecutive analytic lines/arcs. Start = (-52, 2), travel towards -Z.
 	_line(points, Vector2(-52, 2), Vector2(-52, -28))
@@ -24,6 +24,9 @@ static func create() -> Dictionary:
 	_arc(points, Vector2(-32, 28), 20.0, PI * 0.5, PI)
 	_line(points, Vector2(-52, 28), Vector2(-52, 2))
 	points.append(points[0]) # Explicit duplicated closure vertex.
+	if flat:
+		for i in range(points.size()):
+			points[i].y = BASE_Y
 	var distance := 0.0
 	var samples: Array = []
 	var count := points.size() - 1
