@@ -11,7 +11,8 @@ if($null -eq $ctx -or $ctx.build -notmatch '^[0-9]{14}-[0-9a-f]{8}$' -or $ctx.re
    $ctx.server -ne '192.168.10.105'){throw 'Explicit isolated exported-package context required.'}
 $legacyPorts=($ctx.panel -eq 28691 -and $ctx.lobby -eq 28700 -and $ctx.control -eq 28701)
 $reviewPorts=($ctx.panel -eq 28991 -and $ctx.lobby -eq 28900 -and $ctx.control -eq 28901)
-if(-not($legacyPorts -or $reviewPorts)){throw 'Only reserved acceptance port sets are supported.'}
+$publicGamePorts=($ctx.panel -eq 28991 -and $ctx.lobby -eq 28300 -and $ctx.control -eq 28301)
+if(-not($legacyPorts -or $reviewPorts -or $publicGamePorts)){throw 'Only reserved acceptance port sets are supported.'}
 $pointerPath=Join-Path $project 'artifacts/linux-package-playtest.json'
 $livePointer=Rk-ReadJson $pointerPath
 if((Test-Path -LiteralPath $pointerPath) -and $null -eq $livePointer){throw 'Active playtest pointer cannot be read safely.'}
@@ -72,6 +73,13 @@ function SaveServerLogs([string]$Phase){
     Check ($errors.Count -eq 0) ($Phase+' native server logs have no runtime/exit errors')
 }
 try{
+    if($publicGamePorts){
+        # Reuse only the already-authorized game firewall ports while the old
+        # release is stopped. The launcher checks conflicts before binding.
+        Check ($null -ne $livePointer -and $livePointer.instance -cne $ctx.instance) 'old playtest has an independent identity'
+        $old=Remote ('bash roomkit/releases/linux-'+$livePointer.build+'/RoomKit.sh status --instance '+$livePointer.instance)
+        Check (($old -join "`n") -match 'ROOMKIT_NOT_RUNNING') 'old playtest is stopped before shared game-port acceptance'
+    }
     $status=Remote ('bash '+$remote+'/RoomKit.sh status --instance '+$ctx.instance)
     Check (($status -join "`n") -match ('ROOMKIT_RUNNING.*panel='+[regex]::Escape($panelUrl+'/'))) 'fresh exported Operator is running on its isolated panel'
     $reservation=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,[int]$ctx.panel)
@@ -194,7 +202,13 @@ try{
     $end=[DateTime]::UtcNow.AddSeconds(120);while(@($exports|Where-Object {-not $_.process.HasExited}).Count -and [DateTime]::UtcNow -lt $end){Start-Sleep -Milliseconds 200}
     foreach($item in $exports){$report=Rk-ReadJson $item.report;Check ($item.process.HasExited -and $item.process.ExitCode -eq 0 -and $report.ok -and $report.stage -eq 'left_room' -and $report.left_state -eq 'LOBBY') ('actual exported client '+$item.n+' registers, joins and leaves')}
     $one=Rk-ReadJson $exports[0].report;$two=Rk-ReadJson $exports[1].report
-    Check ($one.players -contains $two.user_id -and $two.players -contains $one.user_id) 'actual exported clients see each other over direct LAN UDP'
+    $expectedIds=@([string]$one.user_id,[string]$two.user_id | Sort-Object)
+    $oneIds=@($one.players | Sort-Object);$twoIds=@($two.players | Sort-Object)
+    Check ($expectedIds.Count -eq 2 -and $expectedIds[0] -cne $expectedIds[1] -and
+        $one.room_id -ceq $shooterRoom -and $two.room_id -ceq $shooterRoom -and
+        $one.build_id -ceq $index.shooter.manifest.build_id -and $two.build_id -ceq $index.shooter.manifest.build_id -and
+        $oneIds.Count -eq 2 -and $twoIds.Count -eq 2 -and
+        ($oneIds -join '|') -ceq ($expectedIds -join '|') -and ($twoIds -join '|') -ceq ($expectedIds -join '|')) 'actual exported clients have exact distinct identities in the same DTLS room and build'
     if($PreparedPlayer){
         $reports=@(Get-ChildItem -LiteralPath (Join-Path $player 'client-data/reports') -Filter '*.jsonl' -File)
         Check ($reports.Count -eq 2) 'two actual exported clients keep separate local network reports'
@@ -202,7 +216,9 @@ try{
         foreach($journal in $reports){
             $journalText=[IO.File]::ReadAllText($journal.FullName)
             $samples=@($journalText -split "`r?`n" | Where-Object {$_} | ForEach-Object { $_ | ConvertFrom-Json })
-            Check (@($samples | Where-Object { $_.phase -eq 'IN_ROOM' -and $_.kind -eq 'sample' }).Count -gt 0) 'exported local report contains real Linux room samples'
+            $roomSamples=@($samples | Where-Object { $_.phase -eq 'IN_ROOM' -and $_.kind -eq 'sample' })
+            Check ($roomSamples.Count -ge 2) 'exported local report contains multiple real Linux room samples'
+            Check (@($roomSamples | Where-Object { $_.snapshot_interval_ms -is [ValueType] -and $_.snapshot_interval_ms -ge 0 -and $_.snapshot_age_ms -is [ValueType] -and $_.snapshot_age_ms -ge 0 -and $_.rx_bytes_per_sec -is [ValueType] -and $_.rx_bytes_per_sec -gt 0 }).Count -ge 2) 'actual exported client observes continuing snapshot and receive metrics'
             $ids=@($samples.session_id | Select-Object -Unique)
             Check ($ids.Count -eq 1 -and $ids[0] -and @($samples | Where-Object {$_.build -cne $index.shooter.manifest.build_id}).Count -eq 0) 'report session and build identify the tested client'
             $sessionIds+=$ids

@@ -150,6 +150,16 @@ func _run() -> void:
 	bad.board.asset_catalog = "thresholds.json"
 	_reject(registry, bad, "ASSET_CATALOG_CONFLICT", "incompatible level thresholds")
 	check(Validator.validate_file(base, "res://schemas/managed_game_registry.schema.json") == "", "standalone registration schema accepts explicit new game")
+	var prepared := base.duplicate(true)
+	prepared.race.prepared_input_receipt = {"format": 1, "algorithm": "roomkit-prepared-input-v1", "sha256": "a".repeat(64), "files": [{"path": "game_manifest.json", "sha256": "b".repeat(64)}]}
+	check(Registry.new().configure(prepared) == "", "frozen build receipt coexists with the runtime registry")
+	var invalid_receipt := prepared.duplicate(true)
+	invalid_receipt.race.prepared_input_receipt.algorithm = "unknown"
+	_reject(registry, invalid_receipt, "INVALID_GAME_REGISTRY", "unknown frozen input algorithm")
+	for receipt_path in ["../private", "/private", "game/../private", "game\\private", "C:/private"]:
+		invalid_receipt = prepared.duplicate(true)
+		invalid_receipt.race.prepared_input_receipt.files[0].path = receipt_path
+		_reject(registry, invalid_receipt, "INVALID_GAME_REGISTRY", "unsafe frozen input metadata path")
 	print("MANAGED_REGISTRY_RESULT passed=", passed, " failed=", failed)
 	quit(0 if failed == 0 else 1)
 

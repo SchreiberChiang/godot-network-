@@ -291,6 +291,32 @@ try {
         }
         Check (WaitOnlineSet $expected) 'backend still contains exactly the full group after all same-room snapshots'
         Check (@($burst | Where-Object { -not $_.process.HasExited -and (Rk-Report $_).phase -eq 'IN_ROOM' }).Count -eq $Clients) 'the entire group remains alive in the same room after mutual visibility'
+        # One cached snapshot is not sustained delivery. Require every client to
+        # retain the complete identity set while its authoritative tick advances.
+        $progress=@{}
+        for($i=0;$i -lt $Clients;$i++) {
+            $initial=Rk-Report $burst[$i]
+            $progress[$i]=@{first=[long]$initial.world.tick;last=[long]$initial.world.tick;advances=0}
+        }
+        $window=[Diagnostics.Stopwatch]::StartNew()
+        while($window.Elapsed.TotalSeconds -lt 3) {
+            for($i=0;$i -lt $Clients;$i++) {
+                $sample=Rk-Report $burst[$i]
+                $ids=@($sample.world.players | ForEach-Object { [string]$_.user_id } | Sort-Object)
+                if(-not($null -ne $sample -and $sample.ok -and $sample.phase -eq 'IN_ROOM' -and
+                    -not $burst[$i].process.HasExited -and $sample.user_id -ceq $accounts[$i].user_id -and
+                    $ids.Count -eq $Clients -and ($ids -join '|') -ceq ($expected -join '|'))) { throw ('Sustained room identity set failed for client '+$i) }
+                $tick=[long]$sample.world.tick
+                if($tick -lt $progress[$i].last) { throw ('Sustained tick went backwards for client '+$i) }
+                if($tick -gt $progress[$i].last) { $progress[$i].advances++ }
+                $progress[$i].last=$tick
+            }
+            Start-Sleep -Milliseconds 200
+        }
+        for($i=0;$i -lt $Clients;$i++) {
+            Check ($progress[$i].advances -ge 3 -and $progress[$i].last -gt $progress[$i].first) ('client '+$i+' receives sustained authoritative snapshots for three seconds')
+        }
+        Rk-SaveJson (Join-Path $root 'logs/room-progress.json') @{elapsed_ms=$window.ElapsedMilliseconds;clients=$progress}
         foreach($client in $burst) {
             $left=Rk-Command $client 'leave' @{} 20
             Check ($null -ne $left -and $left.ok) ('client '+$client.name+' leaves the room back to the lobby')

@@ -13,6 +13,7 @@
     "properties": {
       "project": {"$ref": "#/$defs/path"},
       "manifest": {"$ref": "game_manifest.schema.json"},
+      "prepared_input_receipt": {"$ref": "#/$defs/prepared_input_receipt"},
       "name": {"type": "string", "minLength": 1, "maxLength": 64},
       "asset_catalog": {"$ref": "#/$defs/path"},
       "asset_policy": {"$ref": "#/$defs/path"},
@@ -24,5 +25,29 @@
       "client_pack": {"$ref": "#/$defs/path"}
     }
   },
-  "$defs": {"path": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[^\\x00-\\x1f\\x7f]+$"}}
+  "$defs": {
+    "path": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[^\\x00-\\x1f\\x7f]+$"},
+    "prepared_input_receipt": {
+      "description": "Optional local build evidence. Exporters verify the raw-byte digest; the runtime validates its structure and never executes or opens these receipt paths.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "algorithm", "sha256", "files"],
+      "properties": {
+        "format": {"const": 1},
+        "algorithm": {"const": "roomkit-prepared-input-v1"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "files": {
+          "type": "array", "minItems": 1, "maxItems": 4096,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\\\x00-\\x1f\\x7f:]+$"},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            }
+          }
+        }
+      }
+    }
+  }
 }
