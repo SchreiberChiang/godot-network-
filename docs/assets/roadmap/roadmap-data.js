@@ -3,7 +3,7 @@
 // 改动状态时同步更新 checkedAt 与对应来源。
 window.ROADMAP_DATA = {
   checkedAt: "2026-10-03",
-  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和真实Windows EXE→Linux双人成品69/0通过，正式迁移SEALED，原账号保留，PlayLinuxPackage已换新版。玩家本地邮件反馈已交付；现在短试玩/QQ实际收信，再赛车完整一圈。真人公网与成品长期负载未验。",
+  baseline: "新任务/代理仅用GPT-6.1 Sol，沿用当前主线会话。快照v3两平台DTLS、Linux源码严格4/8人和双人成品69/0通过，正式迁移SEALED。用户简单试玩没问题，高延迟玩家体验及QQ收信留待后续。正式部署目标独立游戏服务器，本地公网仅开发/试玩，正式机器未选定。接下来赛车一车一图完整一圈。",
   statuses: {
     verified:    { label: "已验证", hint: "通过条目注明的自动或真人验收；不等于所有平台、功能或性能通过" },
     implemented: { label: "已实现", hint: "代码已有，但关键场景尚未有测试或人工验收" },
@@ -38,7 +38,7 @@ window.ROADMAP_DATA = {
     { id: "framework-first-release", area: "deliver", phase: 7, status: "pending",
       title: "首版框架收束门槛",
       summary: "稳定试玩能排障、接游戏可复用、干净交付可获取。",
-      details: "已有账号资产、房间、后台、Windows/Linux、射击/取石子与模板。发布补修、快照v3两平台DTLS及Linux源码严格4/8人通过；双人成品69/0，正式离线迁移SEALED并切换入口。接着用户短试玩与本地邮件实际收信，再赛车完整一圈。新任务只用GPT-6.1 Sol；源码、成品与真人证据各守边界。被审批拒绝的生成目录仍保留。",
+      details: "已有账号资产、房间、后台、Windows/Linux、射击/取石子与模板。快照v3两平台DTLS、Linux源码严格4/8人及双人成品69/0通过，迁移SEALED；用户简单试玩没问题，高延迟玩家体验和QQ实际收信另验。正式部署到独立游戏服务器，本地公网只试玩，机器未选定。接着赛车完整一圈。被审批拒绝的生成目录仍保留，人工回收未确认。",
       files: ["STATUS.md", "AGENTS.md"], docs: ["docs/17_framework_shooter_plan.md#next-checkpoints-20261003", "docs/17_framework_shooter_plan.md#snapshot-v3-delivery-20261003", "docs/17_framework_shooter_plan.md#framework-closeout-20261002"],
       evidence: "v3真实双人成品69/0；迁移prepare/verify/seal/start及入口Start退出0；Linux源码4/8人94/0、158/0，两平台DTLS各158/0退出0 stderr0。D1核心+Edge10/10；历史失败保留，QQ实际收信/真人公网待验" },
     { id: "release-guard-fixes", area: "deliver", phase: 7, status: "verified",
