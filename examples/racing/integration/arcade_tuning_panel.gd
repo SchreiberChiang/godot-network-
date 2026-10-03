@@ -84,7 +84,7 @@ func _sync() -> void:
 		sliders[key].value = value
 		values_text[key].text = _format_value(key, value)
 	syncing = false
-	status.text = "当前：" + str({"original": "原参数", "reference": "参考街机", "player": "玩家调校"}.get(vehicle.tuning.profile, "自定义")) + " · 氮气/碰墙仍待试玩"
+	status.text = "当前：" + str({"original": "原参数", "reference": "参考街机", "player": "玩家调校"}.get(vehicle.tuning.profile, "自定义")) + " · 可实时调整"
 
 func _format_value(key: String, value: float) -> String:
 	if key.begins_with("lateral"): return "%.3f" % value

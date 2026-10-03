@@ -27,10 +27,10 @@ func use_preset(name: String) -> void:
 	values.nitro_extra_acceleration = 16.0
 	values.wall_slide_drag = 0.8
 	if profile == "player":
-		# The five driving values are the user's accepted candidate, unchanged.
-		values.merge({"turn_degrees": 127.0, "lateral_keep_turn": 0.97, "lateral_keep_release": 0.989,
-			"acceleration": 24.0, "top_speed": 30.0, "nitro_speed_multiplier": 1.5,
-			"nitro_extra_acceleration": 32.0}, true)
+		# Eight values approved in the user's final playable handling feedback.
+		values.merge({"turn_degrees": 120.0, "lateral_keep_turn": 0.97, "lateral_keep_release": 0.989,
+			"acceleration": 24.0, "top_speed": 30.0, "nitro_speed_multiplier": 1.71999995231628,
+			"nitro_extra_acceleration": 59.0, "wall_slide_drag": 6.2}, true)
 
 func set_value(key: String, value: float) -> bool:
 	if not LIMITS.has(key) or not is_finite(value):

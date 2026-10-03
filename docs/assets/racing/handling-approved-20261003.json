@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "legacy_steering": false,
+  "profile": "custom",
+  "reference_hz": 50,
+  "values": {
+    "acceleration": 24.0,
+    "lateral_keep_release": 0.989,
+    "lateral_keep_turn": 0.97,
+    "nitro_extra_acceleration": 59.0,
+    "nitro_speed_multiplier": 1.71999995231628,
+    "top_speed": 30.0,
+    "turn_degrees": 120.0,
+    "wall_slide_drag": 6.2
+  }
+}

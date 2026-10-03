@@ -211,9 +211,10 @@ function Invoke-RoomKitArtifactRetention {
         if(-not $candidates.Count){return [pscustomobject]@{removed=0;skipped=0;bytes=0;keep=$Keep}}
         try{$processes=@(Get-RoomKitRetentionProcesses);$protected=@($ProtectedPaths)+@(Get-RoomKitRetentionPointerPaths $ProjectRoot)}
         catch{Write-Warning 'ARTIFACT_RETENTION_SKIPPED activity_or_pointer_check_failed';return [pscustomobject]@{removed=0;skipped=$candidates.Count;bytes=0;keep=$Keep}}
-        # Current records may depend on a previous build. Keep those inputs too.
+        # Protect both current outputs and their inputs. A reused path may also
+        # appear in old metadata; pruning that record must not delete a kept run.
         foreach($group in @($records|Where-Object {$_.record.state -eq 'retained'}|Group-Object {$_.record.category})){
-            foreach($current in @($group.Group|Sort-Object {$_.record.id} -Descending|Select-Object -First $Keep)){$protected+=@($current.record.references)}
+            foreach($current in @($group.Group|Sort-Object {$_.record.id} -Descending|Select-Object -First $Keep)){$protected+=@($current.record.paths);$protected+=@($current.record.references)}
             # Two failed generations must not evict the last usable delivery.
             $usable=@($group.Group|Where-Object {$_.record.outcome -eq 'success'}|Sort-Object {$_.record.id} -Descending|Select-Object -First 1)
             foreach($current in $usable){$protected+=@($current.record.paths);$protected+=@($current.record.references)}

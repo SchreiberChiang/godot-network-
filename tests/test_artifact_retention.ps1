@@ -37,6 +37,25 @@ Check (Test-Path $unregistered) 'unregistered historical output is untouched'
 $summary=Get-Content -LiteralPath (Join-Path $fixture ('artifacts/retention-ledger/'+$record+'.json')) -Encoding UTF8 -Raw|ConvertFrom-Json
 Check ($summary.state -eq 'pruned' -and $summary.outcome -eq 'failure' -and $summary.snapshot[1].sha256.Length -eq 64) 'failure summary and original payload hash survive removal'
 
+# Old metadata for a reused physical path must not remove a latest-two output.
+# An independent obsolete directory must still be pruned by the same call.
+$obsolete=Output 'duplicate-independent-old';Register 'duplicate-generation' @($obsolete)|Out-Null
+$reused=Output 'duplicate-reused';$oldReusedRecord=Register 'duplicate-generation' @($reused)
+Register 'duplicate-generation' @($reused)|Out-Null
+$latest=Output 'duplicate-latest';Register 'duplicate-generation' @($latest)|Out-Null
+$reusedHash=(Get-FileHash -LiteralPath (Join-Path $reused 'payload.bin')).Hash
+$latestHash=(Get-FileHash -LiteralPath (Join-Path $latest 'payload.bin')).Hash
+$result=Prune 'duplicate-generation'
+$reusedExists=Test-Path -LiteralPath (Join-Path $reused 'payload.bin')
+$latestExists=Test-Path -LiteralPath (Join-Path $latest 'payload.bin')
+$hashesMatch=$reusedExists -and $latestExists
+if($hashesMatch){$hashesMatch=(Get-FileHash -LiteralPath (Join-Path $reused 'payload.bin')).Hash -eq $reusedHash -and (Get-FileHash -LiteralPath (Join-Path $latest 'payload.bin')).Hash -eq $latestHash}
+Check ($result.removed -eq 1 -and $result.skipped -eq 1 -and -not(Test-Path -LiteralPath $obsolete) -and $hashesMatch) 'duplicate old record cannot delete latest-two physical output; independent obsolete output still pruned'
+$oldReused=Get-Content -LiteralPath (Join-Path $fixture ('artifacts/retention-ledger/'+$oldReusedRecord+'.json')) -Encoding UTF8 -Raw|ConvertFrom-Json
+Check ($oldReused.state -eq 'retained' -and $oldReused.last_skip -eq 'referenced') 'duplicate old metadata records why current output is protected'
+$result=Prune 'duplicate-generation'
+Check ($result.removed -eq 0 -and $result.skipped -eq 1 -and (Test-Path -LiteralPath $reused) -and (Test-Path -LiteralPath $latest)) 'repeated pruning still preserves reused current output'
+
 $paths=Three 'changed';WriteText (Join-Path $paths[0] 'payload.bin') 'user edited bytes';$result=Prune 'changed'
 Check ($result.skipped -eq 1 -and (Test-Path $paths[0])) 'modified bytes protect old output'
 $paths=Three 'added';WriteText (Join-Path $paths[0] 'user-note.txt') 'keep me';$result=Prune 'added'

@@ -56,7 +56,7 @@ $sources=@{
     'arcade_control.gd'='examples/racing/integration/arcade_control.gd';'arcade_control_test.gd'='examples/racing/integration/arcade_control_test.gd'
     'arcade_acceptance.gd'='examples/racing/integration/arcade_acceptance.gd'
     'arcade_tuning.gd'='examples/racing/integration/arcade_tuning.gd';'arcade_tuning_panel.gd'='examples/racing/integration/arcade_tuning_panel.gd'
-    'player-feedback.json'='docs/assets/racing/handling-feedback-20261003.json'
+    'player-feedback.json'='docs/assets/racing/handling-approved-20261003.json'
 }
 $hashes=@()
 foreach($relative in $sources.Keys){
